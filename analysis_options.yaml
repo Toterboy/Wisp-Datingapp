@@ -1,0 +1,24 @@
+# Analyse-Optionen für sauberen, modernen und null-sicheren Code.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    # Lokale Plugin-Forks (Built-in-Kotlin-Fixes) werden nicht analysiert.
+    - "third_party/**"
+  errors:
+    invalid_annotation_target: ignore
+    unused_element: warning
+    dead_code: warning
+
+linter:
+  rules:
+    # Lesbarkeit & Stil
+    prefer_single_quotes: true
+    always_use_package_imports: true
+    # Null-Safety & Typsicherheit
+    avoid_null_checks_in_equality_operators: true
+    # Best Practices
+    camel_case_extensions: true
+    file_names: true
+    avoid_print: true

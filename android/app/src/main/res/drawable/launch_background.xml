@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- verwendet als windowBackground in AndroidManifest/Theme.
+     KEIN layer-list mehr - das ist die Wurzel des Alpha-Kompositionsbugs. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/splash"
+    android:gravity="center" />

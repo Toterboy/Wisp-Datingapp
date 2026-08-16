@@ -1,0 +1,363 @@
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:wisp/providers/auth_provider.dart';
+import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/supabase_service.dart';
+
+/// Screen zur Bestätigung der E-Mail-Adresse nach der Registrierung.
+///
+/// Pollt den Auth-Status alle 3 Sekunden via [emailConfirmedProvider].
+/// Bietet einen "Erneut senden"-Button, falls die Mail nicht ankommt.
+class EmailVerificationScreen extends ConsumerStatefulWidget {
+  const EmailVerificationScreen({super.key});
+
+  @override
+  ConsumerState<EmailVerificationScreen> createState() =>
+      _EmailVerificationScreenState();
+}
+
+class _EmailVerificationScreenState
+    extends ConsumerState<EmailVerificationScreen>
+    with WidgetsBindingObserver {
+  ProviderSubscription<bool?>? _emailConfirmedSub;
+  bool _resending = false;
+  bool _showSent = false;
+  int _cooldownSeconds = 0;
+  Timer? _sentTimer;
+  Timer? _cooldownTimer;
+  Timer? _autoLoginTimer;
+  bool _autoLoginInProgress = false;
+  int _autoLoginDelaySeconds = 5;
+  String? _capturedEmail;
+
+  /// Dauer der "E-Mail gesendet"-Bestätigung im Button.
+  static const _sentAnimationDuration = Duration(seconds: 2);
+
+  /// Cooldown bis zum nächsten erlaubten "Erneut senden".
+  static const _resendCooldownDuration = Duration(seconds: 60);
+
+  /// Start-Wartezeit bis zum ersten Auto-Login-Versuch.
+  static const _autoLoginInitialDelaySeconds = 5;
+
+  /// Maximale Wartezeit zwischen zwei Auto-Login-Versuchen (Backoff).
+  /// Begrenzter Backoff: Das Auth-Rate-Limit wurde auf 300/h angehoben,
+  /// daher darf der stille Login deutlich öfter probieren (schnellere
+  /// Erkennung der Bestätigung nach dem Mail-Klick).
+  static const _autoLoginMaxDelaySeconds = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // E-Mail aus der Registrierung (pendingVerificationEmailProvider) bzw.
+    // dem Auth-State erfassen. Nach signUp mit aktivierter Bestätigung gibt
+    // es KEINE Session (currentUser == null) â€“ deshalb primär der Provider.
+    _capturedEmail = ref.read(pendingVerificationEmailProvider) ??
+        SupabaseService.client.auth.currentUser?.email;
+    // Sobald die E-Mail bestätigt ist, automatisch zur Hauptapp weiterleiten.
+    _emailConfirmedSub = ref.listenManual<bool?>(
+      emailConfirmedProvider,
+      (previous, next) {
+        if (next == true && previous != true) {
+          context.go(AppRoutes.home);
+        }
+      },
+    );
+    // Stillen Auto-Login starten: Nach der Bestätigung meldet sich die App
+    // automatisch an und geht weiter (Session existiert erst nach Login).
+    _scheduleAutoLoginAttempt();
+    // Ohne Supabase (Demo-Modus) gibt es nichts zu bestätigen: direkt zur
+    // Hauptapp weiterleiten. Es gibt bewusst KEINEN "Weiter"-Button mehr,
+    // die Bestätigung läuft vollautomatisch über den Poller.
+    if (!SupabaseService.isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go(AppRoutes.home);
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Die Bestätigung passiert meist im Browser: Beim Zurückkehren in die
+    // App sofort prüfen. Im Hintergrund nicht pollen â€“ schont das
+    // Auth-Rate-Limit-Budget und den Akku.
+    if (state == AppLifecycleState.resumed) {
+      _autoLoginDelaySeconds = _autoLoginInitialDelaySeconds;
+      _attemptAutoLogin();
+    } else {
+      _autoLoginTimer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sentTimer?.cancel();
+    _cooldownTimer?.cancel();
+    _autoLoginTimer?.cancel();
+    _emailConfirmedSub?.close();
+    super.dispose();
+  }
+
+  /// Versucht im Hintergrund einen Login mit den Registrierungsdaten
+  /// (nur im Speicher). Vor der Bestätigung schlägt er fehl; sobald die
+  /// E-Mail bestätigt ist, baut er die Session auf - der
+  /// [emailConfirmedProvider] erkennt das und navigiert weiter.
+  void _scheduleAutoLoginAttempt() {
+    _autoLoginTimer?.cancel();
+    _autoLoginTimer =
+        Timer(Duration(seconds: _autoLoginDelaySeconds), _attemptAutoLogin);
+  }
+
+  Future<void> _attemptAutoLogin() async {
+    // Keine überlappenden Versuche (jeder Versuch kostet Rate-Limit-Budget).
+    if (_autoLoginInProgress) return;
+    if (!mounted || !SupabaseService.isInitialized) return;
+    final creds = ref.read(pendingVerificationCredentialsProvider);
+    if (creds == null) return;
+    // Session schon vorhanden? Dann ist der normale Poller zuständig.
+    if (SupabaseService.client.auth.currentSession != null) return;
+
+    _autoLoginInProgress = true;
+    try {
+      // silentLogin statt login(): Der Status bleibt bei einem Fehler
+      // unverändert, damit der Router den Nutzer nicht als "ausgeloggt"
+      // behandelt und zum Login-Screen wirft.
+      await ref.read(authProvider.notifier).silentLogin(
+            email: creds.email,
+            password: creds.password,
+          );
+      // Erfolg: silentLogin hat die Credentials geleert und die Session
+      // erzeugt. emailConfirmedProvider erkennt die Bestätigung und
+      // navigiert weiter.
+      return;
+    } catch (_) {
+      // Noch nicht bestätigt (oder temporärer Netzwerk-/Rate-Limit-Fehler):
+      // mit Backoff erneut versuchen, solange der Screen offen ist.
+      if (_autoLoginDelaySeconds < _autoLoginMaxDelaySeconds) {
+        _autoLoginDelaySeconds *= 2;
+        if (_autoLoginDelaySeconds > _autoLoginMaxDelaySeconds) {
+          _autoLoginDelaySeconds = _autoLoginMaxDelaySeconds;
+        }
+      }
+      _scheduleAutoLoginAttempt();
+    } finally {
+      _autoLoginInProgress = false;
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_resending || _showSent || _cooldownSeconds > 0) return;
+    setState(() => _resending = true);
+
+    try {
+      final email =
+          _capturedEmail ?? SupabaseService.client.auth.currentUser?.email;
+      if (email == null || email.isEmpty) {
+        throw Exception(
+            'Keine Emailadresse gefunden. Bitte registriere dich erneut.');
+      }
+      await SupabaseService.client.auth.resend(
+        type: OtpType.signup,
+        email: email,
+      );
+      if (!mounted) return;
+
+      // Kurze Erfolgs-Animation im Button ("E-Mail gesendet"), danach
+      // sichtbarer Countdown bis zum nächsten erlaubten Versand.
+      setState(() {
+        _resending = false;
+        _showSent = true;
+      });
+      _sentTimer = Timer(_sentAnimationDuration, () {
+        if (!mounted) return;
+        setState(() {
+          _showSent = false;
+          _cooldownSeconds = _resendCooldownDuration.inSeconds;
+        });
+        _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+          if (!mounted) {
+            t.cancel();
+            return;
+          }
+          setState(() => _cooldownSeconds--);
+          if (_cooldownSeconds <= 0) t.cancel();
+        });
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+        content: Text('Bestätigungsemail wurde erneut gesendet. '
+            'Bitte prüfe auch deinen Spamordner.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        // Bei Fehler Button sofort wieder freigeben (kein Cooldown).
+        setState(() => _resending = false);
+        final msg = e.toString();
+        final display = msg.contains('rate_limit')
+            ? 'Zu viele Anfragen. Bitte warte einen Moment.'
+            : 'Fehler beim Senden: $msg';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(display),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isConfirmed = ref.watch(emailConfirmedProvider);
+    final supabaseActive = SupabaseService.isInitialized;
+
+    final statusText = switch (isConfirmed) {
+      true => 'Email bestätigt!',
+      null => supabaseActive
+          ? 'Wir warten auf die Bestätigung...'
+          : 'In der Demo kannst du direkt fortfahren.',
+      false => 'Wir warten auf die Bestätigung...',
+    };
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Email bestätigen'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(
+              Icons.mark_email_read,
+              size: 80,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Bestätige deine Emailadresse',
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Wir haben dir eine Bestätigungsemail gesendet. '
+              'Bitte klicke auf den Link in der Email, um deinen Account zu aktivieren. '
+              'Danach geht es automatisch weiter.',
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              statusText,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            OutlinedButton.icon(
+              onPressed: (isConfirmed == true ||
+                      isConfirmed == null && !supabaseActive ||
+                      _resending ||
+                      _showSent ||
+                      _cooldownSeconds > 0)
+                  ? null
+                  : _resend,
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
+                child: _resending
+                    ? const SizedBox(
+                        key: ValueKey('resending'),
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : _showSent
+                        ? const Icon(Icons.check_circle,
+                            key: ValueKey('sent'), color: Colors.green)
+                        : const Icon(Icons.refresh, key: ValueKey('idle')),
+              ),
+              label: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: Text(
+                  _resending
+                      ? 'Wird gesendet...'
+                      : _showSent
+                          ? 'Email gesendet'
+                          : _cooldownSeconds > 0
+                              ? 'Erneut senden in ${_cooldownSeconds}s'
+                              : 'Bestätigungsmail erneut senden',
+                  key: ValueKey(
+                      'label-${_resending ? 'sending' : _showSent ? 'sent' : _cooldownSeconds > 0 ? 'cooldown' : 'idle'}'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Hinweis: DNS-Filter/VPNs können den Bestätigungslink blockieren.
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Kommt der Link in der Email nicht durch? Das kann an '
+                      'aktiven DNS Filtern oder VPNs (z. B. DNS Forge) liegen, '
+                      'die Tracking Links blockieren. Deaktiviere den Filter '
+                      'vorübergehend und klicke den Link erneut. Nach der '
+                      'Bestätigung kannst du ihn wieder aktivieren.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => context.push(AppRoutes.bugReport),
+              icon: const Icon(Icons.bug_report, size: 18),
+              label: const Text('Problem melden'),
+            ),
+            TextButton.icon(
+              // Ausweg, falls die Session serverseitig nicht (mehr) existiert
+              // und die Bestätigung daher nie gelingen kann: ausloggen und
+              // neu registrieren/anmelden.
+              onPressed: () async {
+                await ref.read(authProvider.notifier).logout();
+                if (mounted && context.mounted) {
+                  context.go(AppRoutes.login);
+                }
+              },
+              icon: const Icon(Icons.logout, size: 18),
+              label: const Text('Abmelden'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

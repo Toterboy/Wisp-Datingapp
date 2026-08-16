@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Zentriertes Bitmap-Logo, 10 % verkleinert -->
+<scale xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_raw"
+    android:scaleWidth="70%"
+    android:scaleHeight="70%"
+    android:scaleGravity="center" />
+

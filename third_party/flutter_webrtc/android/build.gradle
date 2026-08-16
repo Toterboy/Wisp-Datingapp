@@ -1,0 +1,61 @@
+group 'com.cloudwebrtc.webrtc'
+version '1.0-SNAPSHOT'
+
+// Lokaler Fork (third_party/flutter_webrtc):
+// Kein eigener buildscript/AGP-KGP-Klasspath mehr und KEINE KGP-Apply-Zeile.
+// Der Flutter-Plugin-Loader wendet KGP für dieses Plugin selbst an
+// (android.builtInKotlin=false); mit Built-in Kotlin kompiliert AGP selbst.
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.cloudwebrtc.webrtc'
+    }
+    compileSdkVersion 36
+
+    defaultConfig {
+        minSdkVersion 21
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    lintOptions {
+        disable 'InvalidPackage'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+// Kotlin-JVM-Ziel setzen, sobald die kotlin-Extension existiert
+// (vom Loader angewendetes KGP bzw. AGP Built-in Kotlin).
+def kotlinExt = project.extensions.findByName('kotlin')
+if (kotlinExt?.hasProperty('compilerOptions')) {
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
+        }
+    }
+} else {
+    android.kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8.toString()
+    }
+}
+
+dependencies {
+    implementation 'io.github.webrtc-sdk:android:144.7559.09'
+    implementation 'com.github.davidliu:audioswitch:039a35aefab7747c557242fa216c9ea11743b604'
+    implementation 'androidx.annotation:annotation:1.1.0'
+    testImplementation 'junit:junit:4.13.2'
+}

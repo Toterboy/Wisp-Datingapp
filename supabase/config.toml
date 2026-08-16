@@ -1,0 +1,51 @@
+# Supabase Projekt-Konfiguration
+# Wird vom Supabase CLI und der Plattform für Edge Functions verwendet.
+
+project_id = "jftuigjbmmuvrckbchqo"
+
+# --- Edge Functions mit JWT-Verifikation ---
+# Funktionen, die nur von authentifizierten Nutzern aufgerufen werden.
+
+[functions.process-location-check]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.verify-account]
+verify_jwt = true
+
+[functions.server-time]
+# Muss anonym aufrufbar sein, da die App beim Start (vor Login) die
+# Serverzeit synchronisieren möchte. Die Funktion gibt nur die aktuelle
+# ISO-Zeit zurück – keine personenbezogenen Daten.
+verify_jwt = false
+
+[functions.ice-config]
+verify_jwt = true
+
+[functions.prekeys]
+verify_jwt = true
+
+[functions.send-bug-report]
+verify_jwt = true
+enabled = true
+
+# --- Edge Functions OHNE JWT-Verifikation ---
+# check-location: wird INTERN von process-location-check via x-internal-secret aufgerufen
+# (eigene Auth im Code). verify_jwt auf Gateway-Ebene wuerde interne Calls blockieren.
+[functions.check-location]
+verify_jwt = false
+
+# send-confirmation-email: wird von Supabase Auth als Hook aufgerufen (eigenes Secret)
+[functions.send-confirmation-email]
+verify_jwt = false
+
+# confirm: oeffentliche Landing-Page fuer E-Mail-Bestaetigung
+[functions.confirm]
+verify_jwt = false
+
+# notify-user: eigene Auth im Code (internes Trigger-Secret ODER User-JWT
+# bei Client-Aufrufen). Gateway-JWT-Pruefung ist deshalb deaktiviert.
+[functions.notify-user]
+verify_jwt = false
