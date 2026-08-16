@@ -794,7 +794,7 @@ class _RulesCard extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-    const _RuleItem('1', 'Täglich 20:00 bis 21:00 Uhr (Beitritt bereits vorher möglich).'),
+    const _RuleItem('1', 'Samstags 20:00 bis 21:00 Uhr (Beitritt bereits vorher möglich).'),
     const _RuleItem('2', 'Direkt in 1:1 Chat verbunden, ohne vorherige Profilansicht.'),
     const _RuleItem('3', '5 Minuten Chat, dann Entscheidung: "Annehmen" oder "Ablehnen".'),
     const _RuleItem('4', 'Nur bei BEIDSEITIGEM "Annehmen" entsteht ein Match.'),

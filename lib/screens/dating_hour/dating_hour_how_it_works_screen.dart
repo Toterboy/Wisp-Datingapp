@@ -15,7 +15,7 @@ class DatingHourHowItWorksScreen extends ConsumerWidget {
   static const _steps = <_HowItWorksItem>[
     _HowItWorksItem(
       'Beitreten',
-      'Wähle deine Präferenzen und trete dem täglichen Event bei. '
+      'Wähle deine Präferenzen und trete dem samstäglichen Event bei. '
       'Du kannst jederzeit wieder austreten.',
     ),
     _HowItWorksItem(
@@ -52,7 +52,7 @@ class DatingHourHowItWorksScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Die Dating Hour läuft jeden Tag von 20:00 bis 21:00 Uhr. '
+              'Die Dating Hour läuft jeden Samstag von 20:00 bis 21:00 Uhr. '
               'Hier ist der Ablauf im Überblick:',
               style: Theme.of(context).textTheme.bodyLarge,
             ),

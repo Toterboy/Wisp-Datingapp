@@ -28,7 +28,7 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 - **Find your Match** – Blind-Matching „Persönlichkeit zuerst": Fotos sind erst nach einem Match sichtbar (Blind Mode ist standardmäßig aktiv). Beim ersten Öffnen verlangt die App eine eigene Vorstellung (Text UND Audio sind Pflicht). Der gewichtete Matching-Score berücksichtigt Entfernung, gemeinsame Interessen, Persönlichkeits-Kompatibilität (MBTI-Matrix) und Alter; strikte Geschlechts- und Altersfilter.
 - **Zufallschat** – automatische Zuordnung zu einem Peer-to-Peer-Textchat basierend auf Alter-/Distanz-Einstellungen
 - **QR-Code** – eigenes Profil als QR-Code teilen, fremde Codes scannen oder manuell eingeben
-- **Dating Hour (Event-Modus)** – täglich 20:00–21:00 Uhr:
+- **Dating Hour (Event-Modus)** – jeden Samstag 20:00–21:00 Uhr:
   - Beitritt ab 19:50 Uhr möglich (serverzeitsynchron, Manipulation der Geräteuhr wird erkannt)
   - Zwei zufällig zugeordnete Personen chatten direkt (ohne Profilansicht)
   - Nach 5 Minuten: beide können „Annehmen" oder „Ablehnen"
