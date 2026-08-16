@@ -1,30 +1,98 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:wisp/providers/auth_provider.dart';
+import 'package:wisp/providers/mood_provider.dart';
+import 'package:wisp/providers/profile_provider.dart';
+import 'package:wisp/providers/settings_provider.dart';
+import 'package:wisp/providers/user_preferences_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/utils/constants.dart';
 
 /// DSGVO-relevanter Datenschutz- und Account-Screen.
 ///
 /// - Zeigt die verarbeiteten Daten an (knappe Übersicht).
-/// - Ermöglicht den Export der eigenen Daten (Placeholder; vollständiger
-///   Export erfordert eine serverseitige Edge Function).
+/// - Ermöglicht den Export der eigenen Daten (E-01: lokale Daten als JSON
+///   inkl. Auftragsverarbeiter-Liste; Chat-Verläufe sind E2E-verschlüsselt
+///   und bleiben auf dem Gerät).
 /// - Ermöglicht das vollständige Löschen des Accounts inkl. aller Daten.
 class PrivacyScreen extends ConsumerWidget {
   const PrivacyScreen({super.key});
 
   Future<void> _requestDataExport(BuildContext context, WidgetRef ref) async {
-    // TODO: Export über serverseitige Edge Function umsetzen (z. B.
-    // `export-account-data`), die Profile, Matches, Messages, Likes, Photos
-    // etc. als JSON bereitstellt.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Datenexport ist noch in Vorbereitung. Bitte wende dich an support@wisp.app.',
+    // Lokale Daten bündeln (Profile, Einstellungen, Präferenzen, Mood).
+    // Chat-Verläufe sind E2E-verschlüsselt und werden bewusst NICHT
+    // exportiert — sie verbleiben auf dem Gerät.
+    final profile = ref.read(profileProvider);
+    final settings = ref.read(settingsProvider);
+    final prefs = ref.read(userPreferencesProvider);
+
+    final exportData = <String, dynamic>{
+      'exportedAt': DateTime.now().toIso8601String(),
+      'app': 'Wisp Dating App',
+      'userId': AppConstants.currentUserId,
+      'profile': profile.toJson(),
+      'settings': settings.toJson(),
+      'preferences': prefs.toJson(),
+      'mood': ref.read(moodProvider)?.value,
+      'note': 'Chat-Verläufe sind Ende-zu-Ende verschlüsselt und verbleiben '
+          'auf deinen Geräten — sie werden von keinem Server verarbeitet '
+          'und können daher nicht exportiert werden.',
+      'processors': [
+        {'name': 'Supabase Inc.', 'purpose': 'Hosting, Datenbank, Auth'},
+        {'name': 'Google LLC (Firebase)', 'purpose': 'Push-Benachrichtigungen'},
+        {'name': 'Hugging Face Inc.', 'purpose': 'NSFW-Foto-Moderation (nur Fotos)'},
+        {'name': 'Apple Inc.', 'purpose': 'App-Store-Verteilung'},
+      ],
+    };
+    final json = const JsonEncoder.withIndent('  ').convert(exportData);
+
+    if (kIsWeb) {
+      // Web kann keine Datei-Share-API nutzen: Inhalt im Dialog anzeigen.
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Deine Daten (JSON)'),
+          content: SingleChildScrollView(
+            child: SelectableText(json, style: const TextStyle(fontSize: 11)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Schließen'),
+            ),
+          ],
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/wisp_data_export.json');
+      await file.writeAsString(json);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/json')],
+          subject: 'Wisp Datenexport',
+          text: 'Dein Wisp-Datenexport (JSON).',
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export fehlgeschlagen: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
@@ -96,18 +164,47 @@ class PrivacyScreen extends ConsumerWidget {
             onTap: () => _requestDataExport(context, ref),
           ),
           const Divider(height: 32),
+          const _SectionTitle('Auftragsverarbeiter'),
+          const _InfoCard(
+            text:
+                'Folgende Dienstleister (Art. 28 DSGVO) verarbeiten Daten im '
+                'Auftrag. Chat-Inhalte sind Ende-zu-Ende verschlüsselt und '
+                'werden von keinem Dienstleister verarbeitet.',
+          ),
+          const SizedBox(height: 8),
+          const ListTile(
+            leading: Icon(Icons.cloud_outlined),
+            title: Text('Supabase Inc.'),
+            subtitle: Text('Hosting, Datenbank, Authentifizierung (EU)'),
+          ),
+          const ListTile(
+            leading: Icon(Icons.notifications_outlined),
+            title: Text('Google LLC (Firebase)'),
+            subtitle: Text('Push-Benachrichtigungen'),
+          ),
+          const ListTile(
+            leading: Icon(Icons.photo_filter_outlined),
+            title: Text('Hugging Face Inc.'),
+            subtitle: Text('NSFW-Foto-Moderation (nur Fotos, keine Chats)'),
+          ),
+          const ListTile(
+            leading: Icon(Icons.storefront_outlined),
+            title: Text('Apple Inc.'),
+            subtitle: Text('App-Store-Verteilung'),
+          ),
+          const Divider(height: 32),
           const _SectionTitle('Einwilligungen'),
-          ListTile(
-            leading: const Icon(Icons.location_on),
-            title: const Text('Standortfreigabe'),
-            subtitle: const Text(
+          const ListTile(
+            leading: Icon(Icons.location_on),
+            title: Text('Standortfreigabe'),
+            subtitle: Text(
                 'Du kannst die Standortfreigabe in den Systemeinstellungen '
                 'deines Geräts jederzeit widerrufen.'),
           ),
-          ListTile(
-            leading: const Icon(Icons.notifications),
-            title: const Text('Push Benachrichtigungen'),
-            subtitle: const Text(
+          const ListTile(
+            leading: Icon(Icons.notifications),
+            title: Text('Push Benachrichtigungen'),
+            subtitle: Text(
                 'Deaktiviere Benachrichtigungen in den App Einstellungen.'),
           ),
           const Divider(height: 32),

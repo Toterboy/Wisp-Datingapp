@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -9,6 +12,14 @@ import 'package:wisp/models/report_models.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
+
+/// Pseudonymisiert einen Identifier/Name mit SHA-256 (H-06).
+///
+/// Die Reporter-ID wird nur noch als Einweg-Hash gespeichert: Bei
+/// Storage-Inspektion (verlorenes Gerät, Debug-Bridge) ist die Zuordnung
+/// "Report → Nutzer" nicht mehr direkt lesbar. Die UUID hat hohe Entropie,
+/// ein Brute-Force über den Hash ist praktisch ausgeschlossen.
+String hashPii(String value) => sha256.convert(utf8.encode(value)).toString();
 
 /// Service für Nutzer-Reports (Melden-Funktion).
 ///
@@ -39,8 +50,11 @@ class ReportService {
     List<Message>? messages,
   }) async {
     final report = UserReport(
-      id: 'report_${reporterId}_${reportedUserId}_${DateTime.now().millisecondsSinceEpoch}',
-      reporterId: reporterId,
+      // Nicht-deterministischer Hive-Key OHNE PII (X-M-07): Die User-IDs
+      // dürfen nicht im Schlüssel auftauchen.
+      id: 'report_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(0xFFFFFF)}',
+      // Reporter-ID nur als SHA-256-Hash speichern (X-M-08/H-06).
+      reporterId: hashPii(reporterId),
       reportedUserId: reportedUserId,
       type: type,
       description: description,
@@ -88,8 +102,9 @@ class ReportService {
   }
 
   List<UserReport> getReportsByReporter(String reporterId) {
+    final hash = hashPii(reporterId);
     return _box.values
-        .where((r) => r.reporterId == reporterId)
+        .where((r) => r.reporterId == hash)
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }

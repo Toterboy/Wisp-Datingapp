@@ -3,10 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Gender', () {
-    test('Alle Werte vorhanden', () {
-      expect(Gender.values.length, 4);
+test('Alle Werte vorhanden', () {
+      expect(Gender.values.length, 6);
       expect(Gender.male.value, 'male');
       expect(Gender.female.value, 'female');
+      expect(Gender.maleTrans.value, 'male_trans');
+      expect(Gender.femaleTrans.value, 'female_trans');
       expect(Gender.diverse.value, 'diverse');
       expect(Gender.other.value, 'other');
     });
@@ -43,11 +45,14 @@ void main() {
   });
 
   group('GenderPreference', () {
-    test('Alle Werte vorhanden', () {
-      expect(GenderPreference.values.length, 4);
+test('Alle Werte vorhanden', () {
+      expect(GenderPreference.values.length, 7);
       expect(GenderPreference.male.value, 'male');
       expect(GenderPreference.female.value, 'female');
+      expect(GenderPreference.maleTrans.value, 'male_trans');
+      expect(GenderPreference.femaleTrans.value, 'female_trans');
       expect(GenderPreference.diverse.value, 'diverse');
+      expect(GenderPreference.other.value, 'other');
       expect(GenderPreference.all.value, 'all');
     });
 

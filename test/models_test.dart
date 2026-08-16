@@ -317,14 +317,14 @@ void main() {
   });
 
   group('AppSettings', () {
-    test('default blindMode ist aus', () {
+    test('defaults entsprechen "Persönlichkeit zuerst" (Blind Mode an)', () {
       final s = AppSettings.defaults();
-      expect(s.blindModeEnabled, isFalse);
+      expect(s.blindModeEnabled, isTrue);
       expect(s.profileVisibility, ProfileVisibility.everyone);
       expect(s.revealPhotosAfterMatch, isTrue);
-      expect(s.onboardingCompleted, isFalse);
+      expect(s.onboardingCompleted, isTrue);
       expect(s.maxDistanceKm, equals(50));
-      expect(s.ageRangeMin, 18);
+      expect(s.ageRangeMin, 16);
       expect(s.ageRangeMax, 99);
     });
 

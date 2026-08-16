@@ -16,23 +16,27 @@ import 'package:wisp/utils/constants.dart';
 /// Signaling läuft jetzt über Supabase Realtime (Broadcast-Kanal) —
 /// kein eigener Signaling-WebSocket-Server mehr nötig.
 ///
-/// ICE: Hartcodierte EU-STUN-Server (ohne Google). TURN wird nicht benötigt,
-/// weil STUN für IP-Ermittlung in den meisten Fällen reicht.
+/// ICE: Die ice-config Edge Function liefert STUN/TURN-Server dynamisch
+/// (H-03). Bei Nichterreichbarkeit greift eine statische EU-STUN-Fallback-
+/// Liste (kein Google). TURN wird nicht benötigt, weil STUN für
+/// IP-Ermittlung in den meisten Fällen reicht.
 class WebRTCService {
   static const String _dataChannelLabel = 'blind-date-chat';
 
   RTCPeerConnection? _peerConnection;
   RTCDataChannel? _dataChannel;
   final EncryptionService _encryptionService;
+  final http.Client _httpClient;
 
-  /// ICE-Server (NUR EU, KEIN Google).
-  /// Optionaler TURN-Server kann per --dart-define konfiguriert werden,
-  /// da sonst hinter restrictiven NATs keine Verbindung zustande kommt.
-  static final List<Map<String, dynamic>> _iceServers = [
-    {'urls': 'stun:stun.nextcloud.com:443'},         // Hetzner, DE
-    {'urls': 'stun:stun.miwifi.com:3478'},           // OVH, FR
-    {'urls': 'stun:stun.voipgate.com:3478'},         // DE
-    {'urls': 'stun:stun.voipstunt.com:3478'},        // NL
+  /// ICE-Fallback (NUR EU, KEIN Google), falls die ice-config Edge
+  /// Function nicht erreichbar ist. Optionaler TURN kann per
+  /// --dart-define konfiguriert werden, da sonst hinter restrictiven
+  /// NATs keine Verbindung zustande kommt.
+  static final List<Map<String, dynamic>> _fallbackIceServers = [
+    {'urls': 'stun:stun.nextcloud.com:443'},  // Hetzner, DE
+    {'urls': 'stun:stun.miwifi.com:3478'},    // OVH, FR
+    {'urls': 'stun:stun.voipgate.com:3478'},  // DE
+    {'urls': 'stun:stun.voipstunt.com:3478'}, // NL
     if (AppConstants.turnServerUrl.isNotEmpty)
       {
         'urls': AppConstants.turnServerUrl,
@@ -40,6 +44,10 @@ class WebRTCService {
         if (AppConstants.turnCredential.isNotEmpty) 'credential': AppConstants.turnCredential,
       },
   ];
+
+  /// Cache für die dynamisch geladene ICE-Konfiguration (H-03).
+  List<Map<String, dynamic>>? _cachedIceServers;
+  DateTime? _cacheExpiry;
 
   final StreamController<String> _incomingMessageController = StreamController<String>.broadcast();
   final StreamController<({Uint8List data, String contentType, Map<String, dynamic>? metadata})> _incomingBinaryController =
@@ -75,7 +83,79 @@ class WebRTCService {
   /// Signaling-Kaperung; keine Renegotiation in dieser Architektur).
   bool _remoteDescriptionSet = false;
 
-  WebRTCService(this._encryptionService);
+  WebRTCService(this._encryptionService, {http.Client? httpClient})
+      : _httpClient = httpClient ?? http.Client();
+
+  /// Lädt die ICE-Konfiguration von der ice-config Edge Function.
+  ///
+  /// Antwortformat: `{ "iceServers": [...], "ttlSeconds": 3600 }`.
+  /// Die Antwort wird bis zum Ablauf von `ttlSeconds` gecacht; bei jedem
+  /// Fehler (Netz, HTTP != 200, leere Liste) greift die statische
+  /// EU-Fallback-Liste. Damit bleibt P2P auch ohne Edge Function nutzbar.
+  Future<List<Map<String, dynamic>>> resolveIceServers() async {
+    final now = DateTime.now();
+    if (_cachedIceServers != null &&
+        _cacheExpiry != null &&
+        now.isBefore(_cacheExpiry!)) {
+      return _cachedIceServers!;
+    }
+
+    try {
+      final supabaseUrl = Supabase.instance.client.rest.url;
+      final token = Supabase.instance.client.auth.currentSession?.accessToken;
+      if (token == null) throw StateError('Keine aktive Session');
+      final res = await _httpClient.post(
+        Uri.parse('$supabaseUrl/functions/v1/ice-config'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      );
+      if (res.statusCode != 200) {
+        throw StateError('ice-config Status ${res.statusCode}');
+      }
+      final servers = parseIceConfig(res.body);
+      final ttl = _extractTtl(res.body);
+      _cachedIceServers = servers;
+      _cacheExpiry = now.add(Duration(seconds: ttl));
+      return servers;
+    } catch (e) {
+      debugPrint('[WebRTC] ice-config nicht verfügbar, Fallback aktiv: $e');
+      return _fallbackIceServers;
+    }
+  }
+
+  /// Parst die ice-config-Antwort (reine Funktion, testbar).
+  @visibleForTesting
+  static List<Map<String, dynamic>> parseIceConfig(String body) {
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final servers = (json['iceServers'] as List?)
+        ?.whereType<Map<String, dynamic>>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    if (servers == null || servers.isEmpty) {
+      throw StateError('ice-config ohne iceServers');
+    }
+    return servers;
+  }
+
+  /// Liest die TTL (Sekunden) aus der ice-config-Antwort (Default 3600).
+  static int _extractTtl(String body) {
+    try {
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      return (json['ttlSeconds'] as num?)?.toInt() ?? 3600;
+    } catch (_) {
+      return 3600;
+    }
+  }
+
+  /// Test-Hook: [resolveIceServers] ohne echte Edge Function prüfen.
+  @visibleForTesting
+  void setIceServerCache(List<Map<String, dynamic>> servers, Duration ttl) {
+    _cachedIceServers = servers;
+    _cacheExpiry = DateTime.now().add(ttl);
+  }
 
   /// Stream eingehender entschlüsselter Textnachrichten.
   Stream<String> get incomingMessages => _incomingMessageController.stream;
@@ -206,6 +286,15 @@ class WebRTCService {
     }
   }
 
+  /// Test-Hook: Peer-Pinning-Logik ([_routeSignaling]) ohne echte
+  /// Verbindung prüfen.
+  @visibleForTesting
+  void routeSignalingForTesting(Map<String, dynamic> msg) => _routeSignaling(msg);
+
+  /// Test-Hook: erwarteten Peer setzen, ohne einen Anruf aufzubauen.
+  @visibleForTesting
+  set currentPeerIdForTesting(String id) => _currentPeerId = id;
+
   /// Initialisiert eine neue Peer-Verbindung als Initiator.
   Future<void> createOffer(String peerId) async {
     _currentPeerId = peerId;
@@ -306,10 +395,11 @@ class WebRTCService {
     _dataChannel!.send(RTCDataChannelMessage(messageJson));
   }
 
-  /// Erstellt die PeerConnection mit statischer STUN-Konfiguration.
+  /// Erstellt die PeerConnection mit dynamischer ICE-Konfiguration
+  /// (ice-config Edge Function, Fallback: statische EU-STUN-Liste).
   Future<void> _createPeerConnection() async {
     final config = <String, dynamic>{
-      'iceServers': _iceServers,
+      'iceServers': await resolveIceServers(),
       'iceTransportPolicy': 'all',
       'bundlePolicy': 'max-bundle',
       'rtcpMuxPolicy': 'require',

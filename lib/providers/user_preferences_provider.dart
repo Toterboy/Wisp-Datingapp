@@ -117,8 +117,8 @@ class UserPreferences {
 
   /// Standardwerte: KEINE Geschlechts-Präferenz ausgewählt
   /// (leer = kein Filter; "Alle" ist eine explizite, abwählbare Auswahl).
-  factory UserPreferences.defaults() => UserPreferences(
-        genderPreferences: const [],
+  factory UserPreferences.defaults() => const UserPreferences(
+        genderPreferences: [],
         distanceFilterMode: DistanceFilterMode.distanceKm,
         maxDistanceKm: 100,
         preferredState: null,

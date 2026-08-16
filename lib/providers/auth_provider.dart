@@ -21,6 +21,7 @@ import 'package:wisp/services/supabase_auth_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
+import 'package:wisp/utils/demo_mode.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Verwaltet den Auth-Status. Unterstützt drei Modi:
@@ -290,25 +291,14 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
 
 /// Prüft, ob der Demo-Modus (lokaler Mock) aktiv ist.
 ///
-/// Im Release-Modus ist der Demo-Modus IMMER deaktiviert.
-/// Im Debug-Modus gilt:
-///   - Mit --dart-define=DEMO_MODE=true ist er aktiv.
-///   - Mit --dart-define=DEMO_MODE=false ist er inaktiv (fail-safe).
-///   - Ohne Angabe wird auf die URL-Heuristik zurückgegriffen.
-bool _isDemoMode() {
-  if (kReleaseMode) return false;
-  if (SupabaseService.isInitialized) return false;
-
-  // Explizites Build-Time-Flag hat Vorrang.
-  if (AppConstants.demoModeExplicitTrue) return true;
-  if (AppConstants.demoModeExplicitFalse) return false;
-
-  // Legacy-Fallback-Heuristik für Debug-Builds ohne explizites Flag.
-  const baseUrl = ApiConfig.baseUrl;
-  return baseUrl.contains('example.com') ||
-      baseUrl.contains('localhost') ||
-      baseUrl.isEmpty;
-}
+/// Entscheidung delegiert an die reine, testbare Funktion
+/// [resolveDemoMode] (lib/utils/demo_mode.dart).
+bool _isDemoMode() => resolveDemoMode(
+      isReleaseMode: kReleaseMode,
+      isSupabaseInitialized: SupabaseService.isInitialized,
+      demoModeFlag: AppConstants.demoMode,
+      baseUrl: ApiConfig.baseUrl,
+    );
 
 final authProvider =
     StateNotifierProvider<AuthNotifier, AsyncValue<bool>>((ref) {

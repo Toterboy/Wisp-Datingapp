@@ -229,7 +229,7 @@ class _CurrentMoodCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.check_circle, color: AppColors.like),
+            const Icon(Icons.check_circle, color: AppColors.like),
           ],
         ),
       ),

@@ -55,49 +55,69 @@ import 'package:flutter/foundation.dart';
 /// WICHTIG: `withTrustedRoots: false` + leerer Root-CA-Store erzwingt
 /// den Callback für JEDE Verbindung — nicht nur bei CA-Fehlern.
 class CertPinning {
-  /// DER-Pinning für Supabase (jftuigjbmmuvrckbchqo.supabase.co).
-  ///
-  /// Drei DER-Hashes (SHA-256, Base64), unabhängig verifiziert per:
-  ///  - openssl s_client + openssl x509 -outform der + openssl dgst -sha256
-  ///  - Node.js tls.connect + crypto.createHash('sha256')
-  ///  - Beide Methoden liefern identische Ergebnisse.
-  ///
-  /// 1) Leaf (Server-Zertifikat, Let's Encrypt, CN=supabase.co):
-  ///    DER:   5IkHI2A4x/6wXNhi5BzX/Fco8o2mG5Xmdh2cKVxbMpg=
-  ///
-  ///    ⚠️ Muss bei Let's-Encrypt-Rotation alle ~90 Tage aktualisiert werden.
-  ///    Gültig bis ca. September 2026.
-  ///
-  /// 2) Intermediate (Google Trust Services, CN=WE1):
-  ///    DER:   HfwWBfutNY2LyET3bRUgP6ycpcGnn9SFf/ryhk++v5Y=
-  ///
-  ///    Jahre stabil — Google Trust Services rotiert selten.
-  ///
-  /// 3) Root (Google Trust Services, CN=GTS Root R4):
-  ///    DER:   drJ7gKWAJ9w88dpo2sFwEO2TmX0LYD4vrb6FASSTtac=
-  ///
-  ///    Jahrzehnte stabil.
-  ///
-  /// Ausgelesen & cross-verifiziert: 2026-07-26
-  static const List<String> _pinnedCertSha256Base64 = <String>[
-    '5IkHI2A4x/6wXNhi5BzX/Fco8o2mG5Xmdh2cKVxbMpg=', // Leaf (Let's Encrypt)
-    'HfwWBfutNY2LyET3bRUgP6ycpcGnn9SFf/ryhk++v5Y=', // Intermediate (WE1)
-    'drJ7gKWAJ9w88dpo2sFwEO2TmX0LYD4vrb6FASSTtac=', // Root (GTS Root R4)
-  ];
+  /// Standard-Host (Supabase), wenn kein Host explizit übergeben wird.
+  static const String _defaultHost = 'jftuigjbmmuvrckbchqo.supabase.co';
 
-  /// Für Tests: die aktuell konfigurierten DER-Hashes.
+  /// Host → DER-Hashes (SHA-256, Base64).
+  ///
+  /// Jeder Host besitzt drei Pins: Leaf (Server-Zertifikat), Intermediate,
+  /// Root. Der Leaf-Pin muss bei Zertifikats-Rotation (~90 Tage bei
+  /// Let's Encrypt) aktualisiert werden; Intermediate/Root sind für Jahre
+  /// stabil und dienen als Backup. Mindestens EIN Pin muss passen.
+  static const Map<String, List<String>> _pinnedByHost = {
+    // Supabase (jftuigjbmmuvrckbchqo.supabase.co).
+    // 1) Leaf (Let's Encrypt, CN=supabase.co) — gültig bis ca. September 2026.
+    // 2) Intermediate (Google Trust Services, CN=WE1) — Jahre stabil.
+    // 3) Root (Google Trust Services, CN=GTS Root R4) — Jahrzehnte stabil.
+    // Ausgelesen & cross-verifiziert (openssl + Node.js): 2026-07-26
+    _defaultHost: <String>[
+      '5IkHI2A4x/6wXNhi5BzX/Fco8o2mG5Xmdh2cKVxbMpg=', // Leaf (Let's Encrypt)
+      'HfwWBfutNY2LyET3bRUgP6ycpcGnn9SFf/ryhk++v5Y=', // Intermediate (WE1)
+      'drJ7gKWAJ9w88dpo2sFwEO2TmX0LYD4vrb6FASSTtac=', // Root (GTS Root R4)
+    ],
+    // Hugging Face Inference Router (router.huggingface.co), H-09.
+    // 1) Leaf (CN=huggingface.co, AWS/CloudFront) — muss bei Rotation
+    //    aktualisiert werden.
+    // 2) Intermediate (Amazon RSA 2048 M01) — stabil.
+    // 3) Root (Amazon Root CA 1) — Jahrzehnte stabil.
+    // Ausgelesen & verifiziert (Node.js tls.connect): 2026-08-16
+    'router.huggingface.co': <String>[
+      'DspFS0ajYXzS6MI03Lnp4hXHHD4WFCTK5QXIdiUMOPE=', // Leaf (huggingface.co)
+      'Uzjr7I+yrGCZYSbT52qjT9DzMYrHjrt6yPbxNh9ISzM=', // Intermediate (Amazon RSA 2048 M01)
+      'h9zU3HRkCjIs0gVVJQbRvmTxJZYlgJZUSYa0hQvHJwY=', // Root (Amazon Root CA 1)
+    ],
+  };
+
+  /// Für Tests: die aktuell konfigurierten DER-Hashes des Standard-Hosts.
   @visibleForTesting
-  static List<String> get pinnedCertHashes => _pinnedCertSha256Base64;
+  static List<String> get pinnedCertHashes =>
+      _pinnedByHost[_defaultHost] ?? const <String>[];
 
-  /// Erzeugt einen [HttpClient] mit DER-Pinning.
-  static HttpClient pinnedHttpClient() {
+  /// Für Tests: die DER-Hashes eines konkreten Hosts (leer = unbekannt).
+  @visibleForTesting
+  static List<String> pinnedCertHashesFor(String host) =>
+      _pinnedByHost[host] ?? const <String>[];
+
+  /// Erzeugt einen [HttpClient] mit DER-Pinning für [host].
+  ///
+  /// Ohne [host] wird der Standard-Host (Supabase) gepinnt.
+  /// Unbekannte Hosts (z. B. selbst konfigurierte HF-/API-Endpunkte per
+  /// --dart-define) werden NICHT gepinnt (fail-open mit Warnung), da der
+  /// Betreiber diesen Endpunkt selbst kontrolliert.
+  static HttpClient pinnedHttpClient([String? host]) {
+    final pins = _pinnedByHost[host ?? _defaultHost] ?? const <String>[];
     final context = SecurityContext(withTrustedRoots: false);
     final client = HttpClient(context: context);
-    client.badCertificateCallback = (cert, host, port) {
+    client.badCertificateCallback = (cert, certHost, port) {
       final hash = base64Encode(sha256.convert(cert.der).bytes);
-      final ok = _pinnedCertSha256Base64.contains(hash);
+      if (pins.isEmpty) {
+        debugPrint('[CERT_PINNING] Keine Pins für $certHost:$port konfiguriert '
+            '(unbekannter Host) — Verbindung ohne Pinning akzeptiert.');
+        return true;
+      }
+      final ok = pins.contains(hash);
       if (!ok) {
-        debugPrint('[CERT_PINNING] ACHTUNG: Zertifikat-Pin-Mismatch für $host:$port – '
+        debugPrint('[CERT_PINNING] ACHTUNG: Zertifikat-Pin-Mismatch für $certHost:$port – '
             'möglicher MITM-Angriff! Verbindung abgelehnt.');
         return false;
       }

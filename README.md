@@ -1,6 +1,6 @@
 # Wisp
 
-Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf Persönlichkeit statt Aussehen. Wisp setzt auf Blind-Matching, Ende-zu-Ende-Verschlüsselung und ein starkes Sicherheitskonzept, um authentischere Verbindungen zu ermöglichen.
+Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt Aussehen**. Wisp setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen.
 
 Das Projekt befindet sich in aktiver Entwicklung und ist noch nicht vollständig funktional. Beiträge und Feedback sind willkommen.
 
@@ -8,94 +8,85 @@ Das Projekt befindet sich in aktiver Entwicklung und ist noch nicht vollständig
 
 ## Über die App
 
-Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod (State Management) und go_router (Navigation) im Material-3-Design. Statt sich nur auf Fotos zu verlassen, kombiniert die App intelligentes Matching, verschiedene Kennenlern-Modi und ein starkes Sicherheitskonzept.
+Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod (State Management) und go_router (Navigation) im Material-3-Design. Backend ist Supabase (Auth, Postgres, Storage, Edge Functions, Realtime); Chat-Nachrichten laufen Ende-zu-Ende-verschlüsselt über das Signal Protocol, die Verbindung direkt Peer-to-Peer per WebRTC.
 
 ---
 
 ## Kernfunktionen
 
-### Onboarding & Registrierung
+### Registrierung & Einrichtung
 
-- **Einführungs-/Erklärungsscreen** – nur beim allerersten App-Start
-- **Registrierung** mit Name, E-Mail (Domain-Validierung), Passwort, Geburtsdatum (Tag/Monat/Jahr), Geschlecht
 - **Einladungscode-Pflicht** bei der Registrierung (Bot-Schutz) – Codes werden vom Entwickler vergeben oder durch Einladungslinks von bestehenden Nutzern generiert
-- **Video-Verifizierung** mit Liveness-Check nach der Registrierung
+- **Registrierung** mit Name, E-Mail (Domain-Validierung), Passwort, Geburtsdatum (Tag/Monat/Jahr), Geschlecht
 - **Einmalige Standort-Abfrage** zur Fake-Account-Erkennung
-- **Persönlichkeitstest** (MBTI-Style, z. B. ENTP, INFJ) als Teil der Einrichtung nach der Registrierung
-- **Fortschrittsanzeige** während der Einrichtung (Schritt-Format statt unschöner Prozent-Nachkommastellen)
-- **Zurück-Button** zwischen den Einrichtungsschritten
+- **Persönlichkeitstest** (MBTI-Style, z. B. ENTP, INFJ)
+- **Einmalige Settings-/Privacy-Auswahl** nach der Registrierung
+- **Willkommens-Screen** nur beim allerersten App-Start
 
-### Matching-Algorithmus
+### Entdecken
 
-Zentraler, gewichteter Matching-Score basierend auf:
-
-- **Entfernung** (km, Bundesland oder ganz Deutschland wählbar)
-- **Gemeinsame Interessen**
-- **Persönlichkeits-Kompatibilität** (MBTI-Matrix)
-- **Alter** innerhalb der gewählten Präferenzen
-
-Strikte Geschlechts- und Altersfilter (keine falschen Vorschläge).
-
-### Swipe-Modi
-
-- **Klassischer Swipe-Modus** – mit Untermenü für Bilder, Video, Audio oder nur Text (Video/Audio vorerst deaktiviert)
-- **Zufallschat-Modus** – automatische Zuordnung zu einem Text-Chat basierend auf Alter/Distanz-Einstellungen
+- **Find your Match** – Blind-Matching „Persönlichkeit zuerst": Fotos sind erst nach einem Match sichtbar (Blind Mode ist standardmäßig aktiv). Beim ersten Öffnen verlangt die App eine eigene Vorstellung (Text UND Audio sind Pflicht). Der gewichtete Matching-Score berücksichtigt Entfernung, gemeinsame Interessen, Persönlichkeits-Kompatibilität (MBTI-Matrix) und Alter; strikte Geschlechts- und Altersfilter.
+- **Zufallschat** – automatische Zuordnung zu einem Peer-to-Peer-Textchat basierend auf Alter-/Distanz-Einstellungen
+- **QR-Code** – eigenes Profil als QR-Code teilen, fremde Codes scannen oder manuell eingeben
 - **Dating Hour (Event-Modus)** – täglich 20:00–21:00 Uhr:
-  - Beitritt ab 19:50 Uhr möglich
+  - Beitritt ab 19:50 Uhr möglich (serverzeitsynchron, Manipulation der Geräteuhr wird erkannt)
   - Zwei zufällig zugeordnete Personen chatten direkt (ohne Profilansicht)
   - Nach 5 Minuten: beide können „Annehmen" oder „Ablehnen"
-  - Match nur, wenn BEIDE annehmen
-  - Freundlich formulierte Ablehnungs-Nachricht bei Absage
+  - Match nur, wenn BEIDE annehmen; freundlich formulierte Ablehnungs-Nachricht bei Absage
   - Individuelle Präferenzen (Alter, Geschlecht, besondere Eigenschaft) vor Event-Start einstellbar
 
-### Sicherheit & Datenschutz
+### Chat & Kommunikation
 
-- **Ende-zu-Ende-Verschlüsselung** aller Chat-Nachrichten via Signal Protocol
-- **Peer-to-Peer-Kommunikation** (WebRTC) für Event- und Zufallschat-Modus
-- **Foto-Moderation**: automatischer Abgleich mit Verifizierungs-Video (Verwarnung bei Nicht-Übereinstimmung, Sperre bei zweitem Vorfall)
-- **Nacktbilder/-videos** führen zur sofortigen Account-Sperre
+- **Ende-zu-Ende-Verschlüsselung** aller Chat-Nachrichten via Signal Protocol (PreKeys, Sessions)
+- **Peer-to-Peer-Verbindung** (WebRTC) mit Peer-Pinning im Signaling-Routing; ICE-Server werden dynamisch über die Supabase-Edge-Function `ice-config` geladen (EU-Fallback ohne Google)
+- **Spice Questions (Eisbrecher-Fragen)** – im Chat: Fragen beantworten (max. 200 Zeichen); die Antwort des Gegenübers wird erst sichtbar, wenn beide geantwortet haben
+- Text-, Bild- und Sprachnachrichten
+- Audio-Anrufe innerhalb der App
+- Navigation zum Profil durch Klick auf Name/Profilbild
+- „Nutzer melden"-Funktion und „Match auflösen"-Button (mit Sicherheitsabfrage)
+
+### Aktuelles (Home)
+
+- Übersicht über neue Nachrichten, neue Likes und neue Matches
+- Likes-Screen mit getrennten Listen: vergebene Likes (zurückziehbar) vs. erhaltene Likes
+- Zugriff auf Einstellungen über Zahnrad-Icon; zentraler „Entdecken"-Button
+
+### Mood
+
+- Stimmung wählen und teilen – erscheint im eigenen Profil und in Profilansichten anderer Nutzer
+
+### Profil
+
+- Mehrere Profilbilder
+- Profil-Vorschau-Funktion (Ansicht wie andere Nutzer das Profil sehen)
+- Spenden-Button mit „Spender"-Badge (aktuell Mock-Zahlung)
+- „App empfehlen"-Button mit „Empfehler"-Badge nach erfolgreichem Teilen
+- Eigenes Geschlecht nur hier änderbar
+
+### Einstellungen & Datenschutz
+
+- Blind Mode (Fotos erst nach Match), Foto-Freigabe nach Match, Profil-Sichtbarkeit, Dark Mode, Altersbereich, Entfernung (km/Bundesland/ganz Deutschland), Benachrichtigungen
+- **Privacy-Screen**: echte JSON-Exportfunktion (Profil, Einstellungen, Präferenzen, Mood) zum Teilen/Speichern sowie Auflistung der Auftragsverarbeiter (Supabase, Google/Firebase, Hugging Face, Apple)
+- Admin-Bereich (nur mit `ADMIN_UUID`-dart-define aktiv): verwaltete Nutzer-Reports mit pseudonymisierten (gehashten) Reporter-IDs
+
+---
+
+## Sicherheitskonzept
+
+- **Ende-zu-Ende-Verschlüsselung** (Signal Protocol) + **Peer-to-Peer** (WebRTC) – Nachrichten liegen nicht im Klartext auf Servern
+- **Peer-Pinning** im Signaling-Routing: Nachrichten fremder Absender werden verworfen
+- **Cert Pinning** für Supabase- und Hugging-Face-Endpunkte (per-Host-Map, unbekannte Hosts fail-open mit Warnung)
+- **Pseudonymisierung**: Reporter-IDs werden gehasht (SHA-256), kein PII in lokalen Hive-Keys
+- **Serverzeit** als Single Source of Truth für die Dating Hour (Anti-Cheat gegen Manipulation der Geräteuhr); Warn-Banner im Event-Screen bei unverifizierter Serverzeit
 - **Altersschutz-System:**
   - Ab 20 Jahren keine Sichtbarkeit von 16-/17-Jährigen mehr
   - Minderjährige (16–17) können ihren Filter nur bis max. 20 Jahre einstellen
   - Profilfotos von 16–17-Jährigen nur für Gleichaltrige sichtbar
   - Profilfotos von 18–19-Jährigen nur nach Match sichtbar (nicht deaktivierbar)
   - Automatische Freischaltung aller Funktionen mit Erreichen des 20. Lebensjahres
-- **„Nutzer melden"-Funktion** in Chats und Profilen
-- **„Match auflösen"-Button** in jedem Chat (mit Sicherheitsabfrage)
-
-### Aktuelles-Screen
-
-- Übersicht über neue Nachrichten (bis 5 Personen mit Profilbild), neue Likes und neue Matches (einheitliche Feldbreiten, dynamische Höhe)
-- Eigener Likes-Screen mit getrennten Listen: vergebene Likes vs. erhaltene Likes (vergebene Likes zurückziehbar)
-- Zugriff auf Einstellungen über Zahnrad-Icon
-- Zentraler „Leute entdecken"-Button
-
-### Chat-Funktionen
-
-- Text-, Bild- und Sprachnachrichten
-- Audio-Anrufe innerhalb der App
-- Navigation zum Profil durch Klick auf Name/Profilbild
-- Blind-Chat-Option für nicht beantwortete Likes
-
-### Profil
-
-- Mehrere Profilbilder
-- Zahnrad-Icon für direkten Zugriff auf Einstellungen
-- Profil-Vorschau-Funktion (Ansicht wie andere Nutzer das Profil sehen)
-- Spenden-Button mit „Spender"-Badge nach abgeschlossener Spende
-- „App empfehlen"-Button mit „Empfehler"-Badge nach erfolgreichem Teilen
-- Eigenes Geschlecht nur hier änderbar (nicht in den Einstellungen)
-
-### Einstellungen
-
-- Klare visuelle Kennzeichnung ausgewählter Optionen (Privatsphäre, Darstellung)
-- Zentral synchronisierte Präferenzen (Geschlecht-Präferenz, Alter, Entfernung) zwischen Einrichtung und Einstellungen
-
-### Swipe-Screen
-
-- **Undo-Button** (links vom X-Button, ab erstem Swipe sichtbar, zunächst ausgegraut)
-- Anzeige des Persönlichkeitstyps auf der Karte, falls vorhanden
-- Spender-/Empfehler-Badges neben dem Alter
+- **Foto-Moderation**: automatischer NSFW-Abgleich über ein Hugging-Face-Inference-Modell (EU-Router, cert-gepinnt); Nacktbilder/-videos führen zur sofortigen Account-Sperre
+- **Session-Restore** synchron (kein Netzwerk beim App-Start), serverseitige Validierung im Hintergrund
+- **Demo-Mode** (dart-define `DEMO_MODE`): deterministische Heuristik, Release-Builds immer echtes Backend
 
 ---
 
@@ -107,14 +98,15 @@ Strikte Geschlechts- und Altersfilter (keine falschen Vorschläge).
 | State Management     | Riverpod                                           |
 | Navigation           | go_router                                          |
 | Design               | Material 3                                         |
+| Backend              | Supabase (Auth, Postgres, Storage, Edge Functions, Realtime) |
 | Verschlüsselung      | Signal Protocol (`libsignal_protocol_dart`)        |
 | Peer-to-Peer         | WebRTC (`flutter_webrtc`)                          |
-| Medien-Sharing       | `image_picker`, `video_player`                     |
-| App-Weiterempfehlung | `share_plus`                                       |
-| Backend              | Node.js + Supabase (Auth, Datenbank, Storage)      |
+| Moderation           | Hugging Face Inference (EU-Router), `mobile_scanner` |
+| Medien               | `image_picker`, `camera`, `video_player`           |
+| Teilen               | `share_plus`                                       |
 | Lokale Speicherung   | Hive (verschlüsselt), flutter_secure_storage       |
 | Standort             | `geolocator`, `geocoding`                          |
-| Benachrichtigungen   | `flutter_local_notifications`                      |
+| Benachrichtigungen   | `flutter_local_notifications`, Firebase Cloud Messaging |
 
 ---
 
@@ -122,97 +114,25 @@ Strikte Geschlechts- und Altersfilter (keine falschen Vorschläge).
 
 ```
 lib/
-├── models/
-│   ├── user_profile.dart
-│   ├── personality_type.dart
-│   ├── blind_chat.dart
-│   ├── dating_hour_models.dart
-│   ├── invitation_code_model.dart
-│   ├── match.dart
-│   ├── message.dart
-│   ├── app_settings.dart
-│   ├── gender.dart
-│   ├── profile_visibility.dart
-│   ├── swipe_mode.dart
-│   ├── live_event.dart
-│   ├── photo_moderation_models.dart
-│   ├── report_models.dart
-│   └── signal_key_models.dart
-├── services/
-│   ├── auth_service.dart
-│   ├── supabase_auth_service.dart
-│   ├── supabase_database_service.dart
-│   ├── supabase_storage_service.dart
-│   ├── matching_service.dart
-│   ├── encryption_service.dart
-│   ├── webrtc_service.dart
-│   ├── p2p_chat_service.dart
-│   ├── signaling_service.dart
-│   ├── verification_service.dart
-│   ├── dating_hour_service.dart
-│   ├── live_event_service.dart
-│   ├── blind_chat_service.dart
-│   ├── content_moderation_service.dart
-│   ├── photo_moderation_service.dart
-│   ├── report_service.dart
-│   ├── invitation_code_service.dart
-│   ├── location_verification_service.dart
-│   ├── location_check_service.dart
-│   ├── notification_service.dart
-│   ├── api_auth_service.dart
-│   ├── api_client.dart
-│   ├── secure_storage.dart
-│   ├── local_storage.dart
-│   ├── prekey_service.dart
-│   ├── server_time_service.dart
-│   ├── mock_data_service.dart
-│   ├── bug_report_service.dart
-│   └── brevo_bug_report_service.dart
-├── utils/
-│   ├── age_calculator.dart
-│   ├── age_safety_rules.dart
-│   ├── cert_pinning.dart
-│   ├── constants.dart
-│   ├── formatters.dart
-│   └── validators.dart
-├── providers/
-│   ├── auth_provider.dart
-│   ├── blind_chat_provider.dart
-│   ├── chat_provider.dart
-│   ├── profile_provider.dart
-│   ├── settings_provider.dart
-│   ├── suggestions_provider.dart
-│   └── user_preferences_provider.dart
+├── models/          # user_profile, match, message, app_settings, gender,
+│                    # personality_type, dating_hour_models, find_match_models,
+│                    # spice_question, user_mood, report_models, invitation_code, ...
+├── services/        # supabase_*, encryption, webrtc, p2p_chat, signaling,
+│                    # dating_hour, server_time, prekey, content/photo_moderation,
+│                    # report, invitation_code, bug_report, notification, ...
+├── providers/       # auth, chat, profile, settings, user_preferences, spice_question
 ├── screens/
-│   ├── onboarding/
-│   ├── auth/
-│   ├── swipe/
-│   ├── chat/
-│   ├── matches/
-│   ├── home/
-│   ├── aktuelles/
-│   ├── profile/
-│   ├── settings/
-│   ├── verification/
-│   ├── dating_hour/
-│   ├── live_event/
-│   ├── welcome/
-│   ├── error_screen.dart
-│   ├── main_navigation.dart
-│   ├── community_guidelines_screen.dart
-│   └── admin/
-├── routing/
-│   └── app_router.dart
-├── theme/
-│   └── app_theme.dart
-├── widgets/
-│   ├── app_logo.dart
-│   ├── buttons.dart
-│   ├── profile_widgets.dart
-│   ├── radio_group.dart
-│   ├── selectable_tile.dart
-│   ├── states.dart
-│   └── swipe_card.dart
+│   ├── core/        # main_navigation, error, loading
+│   ├── swipe/       # find_your_match, random_chat, mode selection
+│   ├── chat/  dating_hour/  quiz/  spice/  mood/  qr/  interests/
+│   ├── home/  profile/  settings/  privacy/  admin/  bug_report/
+│   ├── onboarding/  # personality_test, settings_privacy_once
+│   ├── auth/  welcome/  verification/  legal/
+├── routing/         # app_router.dart
+├── theme/           # app_theme.dart
+├── utils/           # cert_pinning, age_safety_rules, age_calculator,
+│                    # constants, demo_mode, formatters, validators, ...
+├── widgets/         # app_logo, buttons, profile_widgets, states, ...
 ├── app.dart
 └── main.dart
 ```
@@ -230,6 +150,13 @@ flutter build web --dart-define=ADMIN_UUID=<echte-supabase-user-id>
 
 Ohne `--dart-define=ADMIN_UUID` startet die App ohne Admin-Zugang — ein fail-safe, der verhindert, dass ein vergessener Platzhalter versehentlich Admin-Rechte freigibt.
 
+Weitere Optionen:
+
+- `--dart-define=DEMO_MODE=true` – erzwingt den Demo-Mode (Mock-Daten; Release-Builds ignorieren ihn und nutzen immer das echte Backend)
+- `--dart-define=TURN_SERVER=...` / `TURN_USERNAME=...` / `TURN_PASSWORD=...` – optionaler eigener TURN-Server für die WebRTC-Fallback-Kette (ohne Google)
+
+Konfiguration (Supabase-URL, Anon-Key, Admin-UUID) erfolgt über `.env` (Vorlage: `.env.example`, gitignored). Die Supabase-Migrationen liegen unter `supabase/migrations/`; Edge Functions unter `supabase/functions/`.
+
 ---
 
 ## Hinweis zum Entwicklungsstand
@@ -237,7 +164,7 @@ Ohne `--dart-define=ADMIN_UUID` startet die App ohne Admin-Zugang — ein fail-s
 Diese App befindet sich in aktiver Entwicklung. Folgende Bereiche sind aktuell als Platzhalter/Mock implementiert und müssten für eine echte Produktionsversion durch professionelle Dienste ersetzt werden:
 
 - **Automatischer Gesichtsabgleich** (Profilbild vs. Verifizierungs-Video) → z. B. selbstgehostete Open-Source-Modelle wie DeepStack oder Face Recognition (selbst gehostet, datenschutzfreundlich, EU-fähig)
-- **Content-Moderation** für unangemessene Inhalte → z. B. selbstgehostete Modelle von Hugging Face (EU-inference endpoints) oder Open-Source-NSFW-Detektionsmodelle
+- **Content-Moderation** für unangemessene Inhalte → z. B. selbstgehostete Modelle von Hugging Face (EU-Inference-Endpoints) oder Open-Source-NSFW-Detektionsmodelle
 - **Zahlungsabwicklung** für Spenden-Funktion (aktuell Mock-Zahlung)
 
 ---

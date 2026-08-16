@@ -42,8 +42,9 @@ void main() {
       final container = _createContainer();
       final notifier = container.read(settingsProvider.notifier);
 
+      // Standard: Blind Mode AN ("Persönlichkeit zuerst").
       final initial = container.read(settingsProvider).blindModeEnabled;
-      expect(initial, isFalse);
+      expect(initial, isTrue);
 
       await notifier.toggleBlindMode(true);
       expect(container.read(settingsProvider).blindModeEnabled, isTrue);
@@ -52,9 +53,9 @@ void main() {
       expect(container.read(settingsProvider).blindModeEnabled, isFalse);
     });
 
-    test('Standard-Einstellungen haben Blind Mode aus', () {
+    test('Standard-Einstellungen haben Blind Mode an', () {
       final container = _createContainer();
-      expect(container.read(settingsProvider).blindModeEnabled, isFalse);
+      expect(container.read(settingsProvider).blindModeEnabled, isTrue);
     });
 
     test('setMaxDistanceKm speichert die Distanz', () async {
@@ -109,9 +110,9 @@ void main() {
       expect(container.read(settingsProvider).personalityTestCompleted, isTrue);
     });
 
-    test('completeOnboarding markiert Onboarding als abgeschlossen', () async {
+    test('completeOnboarding: Onboarding ist standardmäßig bereits abgeschlossen', () async {
       final container = _createContainer();
-      expect(container.read(settingsProvider).onboardingCompleted, isFalse);
+      expect(container.read(settingsProvider).onboardingCompleted, isTrue);
       await container.read(settingsProvider.notifier).completeOnboarding();
       expect(container.read(settingsProvider).onboardingCompleted, isTrue);
     });
@@ -164,7 +165,7 @@ void main() {
       );
 
       // Sollte nicht crashen, sondern Defaults liefern
-      expect(container.read(settingsProvider).blindModeEnabled, isFalse);
+      expect(container.read(settingsProvider).blindModeEnabled, isTrue);
       expect(container.read(settingsProvider).maxDistanceKm, equals(50));
     });
 
@@ -177,7 +178,7 @@ void main() {
       );
 
       // Sollte nicht crashen, sondern Defaults liefern
-      expect(container.read(settingsProvider).blindModeEnabled, isFalse);
+      expect(container.read(settingsProvider).blindModeEnabled, isTrue);
       expect(container.read(settingsProvider).maxDistanceKm, equals(50));
     });
 
@@ -191,7 +192,7 @@ void main() {
       final settings = container.read(settingsProvider);
 
       // Sollte nicht crashen, sondern Defaults liefern
-      expect(settings.blindModeEnabled, isFalse);
+      expect(settings.blindModeEnabled, isTrue);
       expect(settings.maxDistanceKm, equals(50));
     });
   });

@@ -238,6 +238,10 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // B-05: Ohne verifizierte Server-Zeit sind Countdown/Status
+            // manipulationsanfällig (lokale Uhr) — Nutzer transparent warnen.
+            if (!ServerTimeService.instance.isVerified)
+              const _ServerTimeWarningBanner(),
             _EventStatusCard(
               event: event,
               isRunning: isRunning,
@@ -266,7 +270,7 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
     bool canJoin,
   ) {
     if (isEnded) {
-      return _PrimaryActionButton(
+      return const _PrimaryActionButton(
         icon: Icons.event_busy,
         label: 'Datinghour beendet',
         onPressed: null,
@@ -351,7 +355,7 @@ class _ActiveSessionButton extends ConsumerWidget {
         onPressed: null,
         color: Colors.grey,
       ),
-      error: (err, _) => _PrimaryActionButton(
+      error: (err, _) => const _PrimaryActionButton(
         icon: Icons.error_outline,
         label: 'Fehler beim Laden',
         onPressed: null,
@@ -373,6 +377,38 @@ class _ActiveSessionButton extends ConsumerWidget {
           color: Colors.pink,
         );
       },
+    );
+  }
+}
+
+/// Warn-Banner, wenn die Server-Zeit (noch) nicht verifiziert ist (B-05).
+class _ServerTimeWarningBanner extends StatelessWidget {
+  const _ServerTimeWarningBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber, size: 20, color: theme.colorScheme.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Die Server-Zeit konnte nicht verifiziert werden – '
+              'Countdown und Status basieren auf der lokalen Gerätezeit.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

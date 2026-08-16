@@ -53,3 +53,8 @@ app.*.map.json
 server/node_modules/
 supabase/.temp/
 supabase/.branches/
+
+# Interne Planungs-/Audit-Dokumente (Sicherheitsdetails nicht veröffentlichen)
+PLAN.md
+PLAN_ERWEITERUNGEN.md
+ANALYSE.md

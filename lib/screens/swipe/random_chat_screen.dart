@@ -369,7 +369,7 @@ class _RandomChatScreenState extends ConsumerState<RandomChatScreen> {
         _RandomChatState.searching => const _SearchingView(),
         _RandomChatState.matched => const _ConnectingView(),
         _RandomChatState.error => _ErrorView(message: _errorMessage),
-        _RandomChatState.ended => _ErrorView(
+        _RandomChatState.ended => const _ErrorView(
             message: 'Der Zufallschat wurde beendet.',
           ),
         _RandomChatState.chat => Column(

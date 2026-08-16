@@ -37,16 +37,12 @@ class AppConstants {
 
   /// Expliziter Demo-Modus-Schalter.
   ///
-  /// `--dart-define=DEMO_MODE=true` aktiviert den lokale Mock-Auth im Debug-Build.
-  /// `--dart-define=DEMO_MODE=false` deaktiviert ihn explizit.
-  /// Ohne Angabe wird im Debug-Modus auf die URL-Heuristik zurückgegriffen.
-  static const String _demoModeRaw = String.fromEnvironment(
-    'DEMO_MODE',
-    defaultValue: 'auto',
-  );
-
-  static bool get demoModeExplicitTrue => _demoModeRaw.toLowerCase() == 'true';
-  static bool get demoModeExplicitFalse => _demoModeRaw.toLowerCase() == 'false';
+  /// `--dart-define=DEMO_MODE=true` aktiviert die lokale Mock-Auth
+  /// (fail-safe: ohne Angabe bleibt der Demo-Modus ausgeschaltet).
+  /// Ob der Demo-Modus letztlich aktiv ist, entscheidet die reine
+  /// Funktion `resolveDemoMode()` (lib/utils/demo_mode.dart):
+  /// Release-Build und aktive Supabase-Session haben immer Vorrang.
+  static const bool demoMode = bool.fromEnvironment('DEMO_MODE');
 
   /// ID des Admin-Accounts (via --dart-define=ADMIN_UUID=... beim Build).
   ///
@@ -88,10 +84,12 @@ class AppConstants {
   );
 
   /// Optional: eigener Hugging Face Inference-Endpunkt (z. B. EU-Region
-  /// oder selbstgehostet). Standard bleibt der globale HF-Endpunkt.
+  /// oder selbstgehostet). Standard ist der HF-Inference-Router
+  /// (H-09: `api-inference.huggingface.co` existiert nicht mehr und
+  /// wird über `router.huggingface.co/hf-inference/models/...` bedient).
   static const String hfInferenceUrl = String.fromEnvironment(
     'HF_INFERENCE_URL',
-    defaultValue: 'https://api-inference.huggingface.co/models/Falconsai/nsfw_image_detection',
+    defaultValue: 'https://router.huggingface.co/hf-inference/models/Falconsai/nsfw_image_detection',
   );
 
   /// Optionale TURN-Server-Konfiguration für WebRTC.

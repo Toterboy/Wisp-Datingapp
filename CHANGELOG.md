@@ -2,6 +2,18 @@
 
 > Start: 2026-08-12
 
+## 2026-08-17 — Audit-Fixes (PLAN_ERWEITERUNGEN) + Spice Questions
+
+- **Spice Questions (Feature A):** Neues Feature „Eisbrecher-Fragen" im Chat — Migration `039_spice_questions.sql` (`match_questions` mit 12 deutschen Seed-Fragen, `match_question_response`, RLS, RPCs `get_spice_questions`/`answer_spice_question` mit Reveal-Logik: Partner-Antwort erst sichtbar, wenn beide geantwortet haben). Client: Modell `SpiceQuestion`/`SpiceAnswerResult`, `SpiceQuestionService`, `spiceQuestionsProvider`, Screen unter `/spice/:matchId` (Antwort max. 200 Zeichen, Refresh, Invalidate) und Chat-App-Bar-Button „Eisbrecher-Fragen".
+- **Migration `038_cleanup_and_tombstone.sql`:** pg_cron-Cleanup (alte `messages` > 90 Tage, beendete Dating-Hour-Sessions > 7 Tage, Teilnehmer abgeschlossener Events > 30 Tage) + `deleted_users`-Tombstone bei `auth.users`-DELETE (md5-Hash, Pseudonymisierung ohne PII).
+- **H-03 – ICE-Server über Edge Function:** `WebRTCService.resolveIceServers()` lädt die bestehende Edge Function `ice-config` mit TTL-Cache; EU-Fallback-Server (ohne Google) via `--dart-define=TURN_SERVER`/`TURN_USERNAME`/`TURN_PASSWORD`; testbar über `parseIceConfig`/`setIceServerCache`/Routing-Hooks.
+- **H-06 – Reporter-ID pseudonymisiert:** `report_service.dart` hasht die Reporter-ID (SHA-256), Hive-Key ohne PII; Admin-Screen zeigt nur den gekürzten Hash („ID gehasht").
+- **H-09 – Hugging-Face-Router:** `api-inference.huggingface.co` löst nicht mehr auf (DNS ENOTFOUND) → neuer Endpunkt `https://router.huggingface.co/hf-inference/models/...`; Cert Pinning auf per-Host-Map umgebaut (Supabase + HF-Router), unbekannte Hosts fail-open mit Warnung; Pins für Leaf/Intermediate/Root neu berechnet.
+- **G-01 – Demo-Mode:** `AppConstants.demoMode` als `bool.fromEnvironment('DEMO_MODE')`; neue reine Funktion `resolveDemoMode()` (Priorität: Release → Supabase initialisiert → Flag → URL-Heuristik) in `lib/utils/demo_mode.dart`.
+- **G-05 – Lints:** `prefer_const_constructors`, `prefer_final_locals`, `use_super_parameters`, `sort_child_properties_last` aktiviert; 14 const-Fixes; `flutter analyze` ohne Issues.
+- **Weitere Audit-Fixes:** B-05 Server-Zeit-Warnung im Dating-Hour-Event-Screen; C-04 explizite 404-Behandlung im Prekey-Service; E-01 Privacy-Screen neu (echter JSON-Export via SharePlus, Auftragsverarbeiter-Sektion, Web-Dialog); F-04 EXPERIMENTAL-Header im mobile_scanner-Stub.
+- **Tests:** 4 neue Testdateien (`server_time_lifecycle_test`, `dating_hour_service_test`, `webrtc_service_peer_pinning_test`, `auth_provider_demo_mode_test`); Test-Hooks in ServerTimeService/WebRTCService; vorbestehende Test-Drift bereinigt (age_safety_rules: dokumentierte Stufenregeln; gender: 6/7 Enum-Werte; Blind-Mode-Defaults: an = „Persönlichkeit zuerst", Onboarding standardmäßig abgeschlossen). **Gesamte Suite: 224 Tests grün.**
+
 ## 2026-08-16 — Rundes Logo + Open-Source-Audit
 
 - **Logo:** Neues rundes Startlogo `assets/images/wisp_icon_round.png` (Badge in einen Kreis maskiert, Ecken transparent, weiche Kante) — erzeugt durch neues Tool `tool/generate_round_logo.dart`. `AppLogo` nutzt es jetzt in Light- UND Dark Mode (kein weißes Viereck mehr, kein 1,5x-Skalierungs-Hack). Lade-Screen-Logo 120 → **112**, nativer Splash-Scale 77 % → **70 %**; `splash_raw.png` in allen 14 Dichteordnern auf das runde Logo umgestellt.

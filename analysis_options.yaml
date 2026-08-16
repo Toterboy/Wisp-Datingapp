@@ -22,3 +22,8 @@ linter:
     camel_case_extensions: true
     file_names: true
     avoid_print: true
+    # G-05: Konsistenz & Modernität
+    prefer_const_constructors: true
+    prefer_final_locals: true
+    use_super_parameters: true
+    sort_child_properties_last: true

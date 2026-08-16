@@ -28,6 +28,7 @@ import 'package:wisp/screens/admin/admin_screen.dart';
 import 'package:wisp/screens/swipe/swipe_mode_selection_screen.dart';
 import 'package:wisp/screens/swipe/find_your_match_screen.dart';
 import 'package:wisp/screens/quiz/quiz_screen.dart';
+import 'package:wisp/screens/spice/spice_questions_screen.dart';
 import 'package:wisp/screens/dating_hour/dating_hour_chat_screen.dart';
 import 'package:wisp/screens/dating_hour/dating_hour_event_screen.dart';
 import 'package:wisp/screens/dating_hour/dating_hour_how_it_works_screen.dart';
@@ -55,6 +56,8 @@ class AppRoutes {
   static const String findYourMatch = '/find-your-match';
   static const String interessen = '/interessen';
   static const String quiz = '/quiz/:matchId';
+  // Spice Questions (Eisbrecher-Fragen, Feature A)
+  static const String spiceQuestions = '/spice/:matchId';
   static const String chatDetail = '/chat/:matchId';
   static const String profile = '/profile';
   static const String profileEdit = '/profile/edit';
@@ -97,6 +100,9 @@ class AppRoutes {
 
   /// Baut die Quiz-URL für ein Match.
   static String quizPath(int matchId) => '/quiz/$matchId';
+
+  /// Baut die Spice-Questions-URL für ein Match.
+  static String spiceQuestionsPath(int matchId) => '/spice/$matchId';
 
   /// Baut die konkrete Profil-Detail-URL für ein fremdes Profil.
   static String profileDetailPath(String userId) => '/profile/$userId';
@@ -463,6 +469,12 @@ routes: [
           GoRoute(
             path: AppRoutes.quiz,
             builder: (context, state) => QuizScreen(
+              matchId: int.parse(state.pathParameters['matchId']!),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.spiceQuestions,
+            builder: (context, state) => SpiceQuestionsScreen(
               matchId: int.parse(state.pathParameters['matchId']!),
             ),
           ),

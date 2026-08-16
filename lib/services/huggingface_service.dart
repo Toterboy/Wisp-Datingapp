@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
+import 'package:wisp/utils/cert_pinning.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// Service für die Hugging Face Inference API.
@@ -10,8 +12,13 @@ import 'package:wisp/utils/constants.dart';
 /// Nutzt das Modell `Falconsai/nsfw_image_detection` zur Klassifikation von
 /// Bildern in Kategorien: drawings, hentai, neutral, porn, sexy.
 ///
-/// API: POST https://api-inference.huggingface.co/models/Falconsai/nsfw_image_detection
+/// API: POST https://router.huggingface.co/hf-inference/models/Falconsai/nsfw_image_detection
 /// Token: --dart-define=HF_API_TOKEN=hf_xxx...
+///
+/// H-09: Requests laufen über einen Zertifikat-gepinnten HTTP-Client
+/// (DER-Pins für `router.huggingface.co`). Eigene Endpunkte per
+/// --dart-define werden nicht gepinnt (fail-open mit Warnung, da der
+/// Betreiber den Endpunkt selbst kontrolliert).
 class HuggingFaceService {
   HuggingFaceService._();
 
@@ -32,6 +39,22 @@ class HuggingFaceService {
   /// Timeout für die HTTP-Verbindung.
   static const Duration timeout = Duration(seconds: 5);
 
+  /// Baut den HTTP-Client mit Cert-Pinning für den Inference-Host (H-09).
+  static http.Client _buildClient() {
+    if (kIsWeb) {
+      // Web kann kein Custom-Cert-Pinning via dart:io; hier auf
+      // Browser-Mechanismen (HPKP/CRT-Logs) sowie CSP vertrauen.
+      return http.Client();
+    }
+    try {
+      final host = Uri.parse(_baseUrl).host;
+      return IOClient(CertPinning.pinnedHttpClient(host));
+    } catch (e) {
+      debugPrint('[HF] Client-Aufbau fehlgeschlagen, Fallback ohne Pinning: $e');
+      return http.Client();
+    }
+  }
+
   /// Ergebnis der NSFW-Prüfung.
   /// [isSafe]: true = Bild kann durchgelassen werden.
   /// [isNsfw]: true = explizite NSFW-Kategorie mit hohem Score erkannt.
@@ -46,7 +69,7 @@ class HuggingFaceService {
     }
 
     try {
-      final response = await http
+      final response = await _buildClient()
           .post(
             Uri.parse(_baseUrl),
             headers: {

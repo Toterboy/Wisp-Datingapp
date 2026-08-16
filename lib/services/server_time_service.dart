@@ -48,7 +48,7 @@ class ServerTimeService with WidgetsBindingObserver {
   bool _initializing = false;
 
   /// Stream-Controller für Offset-Änderungen (für UI-Reaktionen).
-  final _offsetController = StreamController<int>.broadcast();
+  StreamController<int> _offsetController = StreamController<int>.broadcast();
 
   /// Stream von Offset-Änderungen.
   Stream<int> get offsetStream => _offsetController.stream;
@@ -159,6 +159,29 @@ class ServerTimeService with WidgetsBindingObserver {
     return correctedDate.year == serverNow.year &&
         correctedDate.month == serverNow.month &&
         correctedDate.day == serverNow.day;
+  }
+
+  /// Test-Hooks: Offset setzen bzw. Service-Zustand zurücksetzen, ohne
+  /// einen echten Sync durchzuführen (Singleton zwischen Tests isolieren).
+  @visibleForTesting
+  void setOffsetForTesting(int offsetMs) {
+    if (_offsetController.isClosed) {
+      _offsetController = StreamController<int>.broadcast();
+    }
+    _offsetMs = offsetMs;
+    _hasVerifiedOffset = true;
+    _offsetController.add(_offsetMs);
+  }
+
+  @visibleForTesting
+  void resetForTesting() {
+    _offsetMs = 0;
+    _hasVerifiedOffset = false;
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    if (_offsetController.isClosed) {
+      _offsetController = StreamController<int>.broadcast();
+    }
   }
 
   void dispose() {

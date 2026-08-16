@@ -190,7 +190,10 @@ class _ReportCard extends StatelessWidget {
 
     if (kind == _ReportKind.moderation) {
       final reportedName = data['reportedUserId'] as String? ?? '?';
-      final reporterName = data['reporterId'] as String? ?? '?';
+      final reporterHash = (data['reporterId'] as String? ?? '?');
+      final reporterShort = reporterHash.length > 12
+          ? '${reporterHash.substring(0, 12)}…'
+          : reporterHash;
       final reason = data['type'] as String? ?? 'unbekannt';
       final description = (data['description'] as String? ?? '').trim();
       final status = data['status'] as String? ?? 'neu';
@@ -217,7 +220,7 @@ class _ReportCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text('Gemeldet: $reportedName  (ID: ${data['reportedUserId'] ?? '?'})'),
-              Text('Von: $reporterName  (ID: ${data['reporterId'] ?? '?'})'),
+              Text('Von: Reporter $reporterShort  (ID gehasht)'),
               if (description.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text('Details: $description'),

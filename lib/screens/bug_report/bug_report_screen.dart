@@ -42,7 +42,7 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
   Future<void> _pickImage(ImageSource source) async {
     if (_images.length >= BugReportLimits.maxImages) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             'Maximal ${BugReportLimits.maxImages} Bilder erlaubt.',
           ),

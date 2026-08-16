@@ -70,6 +70,18 @@ class PreKeyService {
         return;
       }
 
+      // Explizite 404-Behandlung (C-04): Der Partner hat (noch) kein
+      // PreKey-Bundle hochgeladen — ein Retry mit Backoff ändert daran
+      // nichts und verzögert nur die Fehlermeldung. Sofort abbrechen.
+      if (response.status == 404) {
+        throw StateError(
+          'PreKey Bundle für $peerId existiert nicht (404) — der Partner hat '
+          'vermutlich noch keine PreKeys hochgeladen oder ist kein gültiger '
+          'Nutzer.',
+        );
+      }
+
+      // Transiente Fehler (503 "loading", Netzprobleme etc.): wiederholen.
       // Fehler-Details nicht ins UI/Log übernehmen, da sie PII enthalten
       // können (z. B. user_id). Stattdessen generische Meldung.
       lastError = response.status;

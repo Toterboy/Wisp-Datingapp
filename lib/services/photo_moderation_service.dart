@@ -40,11 +40,11 @@ class PhotoModerationService {
     }
 
     if (result.isSafe) {
-      return ModerationResult(approved: true);
+      return const ModerationResult(approved: true);
     }
 
     if (result.needsReview) {
-      return ModerationResult(
+      return const ModerationResult(
         approved: false,
         needsReview: true,
         reason: 'Moderation temporär nicht verfügbar — Foto wird geprüft.',

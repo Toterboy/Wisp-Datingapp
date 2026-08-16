@@ -589,7 +589,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         final path = '${dir.path}/wisp_voice_$timestamp.m4a';
 
         await _audioRecorder.start(
-          RecordConfig(
+          const RecordConfig(
             encoder: AudioEncoder.aacLc,
             bitRate: 64000,
             sampleRate: 48000,
@@ -823,6 +823,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.local_fire_department_outlined),
+            tooltip: 'Eisbrecher-Fragen (Spice Questions)',
+            onPressed: () => context.go(
+              AppRoutes.spiceQuestionsPath(int.parse(widget.matchId)),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.flag_outlined),
             tooltip: 'Nutzer melden',
@@ -1113,13 +1120,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: Colors.black54,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.all(Radius.circular(6)),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
-                                children: const [
+                                children: [
                                   Icon(Icons.lock, size: 12, color: Colors.white),
                                   SizedBox(width: 2),
                                   Text('Einmalig',

@@ -204,7 +204,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
                 labelText: 'Eigene Eigenschaft eingeben',
                 hintText: 'z. B. "Gute Laune", "Tiefgründige Gespräche"...',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                prefixIcon: Icon(Icons.edit),
+                prefixIcon: const Icon(Icons.edit),
               ),
               onChanged: (v) => setState(() => _selectedTrait = v.trim()),
               onSubmitted: (_) => _savePreferences(),
