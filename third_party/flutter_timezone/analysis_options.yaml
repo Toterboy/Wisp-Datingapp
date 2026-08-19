@@ -1,5 +1,0 @@
-include: "package:wolverinebeach_lints/flutter_3_44.yaml"
-
-linter:
-  rules:
-    avoid_classes_with_only_static_members: false # For backward compatibility
