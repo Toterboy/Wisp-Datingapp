@@ -1,6 +1,6 @@
 import 'dart:developer';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisp/services/auth_exception.dart';
@@ -35,9 +35,19 @@ class SupabaseStorageService {
       throw AppException('Nicht eingeloggt.');
     }
 
+    // Pfad-Traversal/Injektion verhindern (Audit N1): Nur harmlose
+    // Datei-Endungen erlauben, alles andere neutralisieren.
+    final safeExtension =
+        RegExp(r'^[A-Za-z0-9]{1,8}$').hasMatch(fileExtension)
+            ? fileExtension.toLowerCase()
+            : 'bin';
+
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final path = '$userId/chat/$timestamp.$fileExtension';
-    log('[SupabaseStorageService] Upload chat media: bucket=$_bucket path=$path size=${data.length}');
+    final path = '$userId/chat/$timestamp.$safeExtension';
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Upload chat media: '
+          'bucket=$_bucket size=${data.length}');
+    }
 
     await _client.storage.from(_bucket).uploadBinary(
           path,
@@ -66,7 +76,9 @@ class SupabaseStorageService {
     }
 
     final path = _avatarPathForUser(userId);
-    log('[SupabaseStorageService] Upload avatar: bucket=$_bucket path=$path size=${data.length}');
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Upload avatar: bucket=$_bucket size=${data.length}');
+    }
 
     await _client.storage.from(_bucket).uploadBinary(
           path,
@@ -80,7 +92,9 @@ class SupabaseStorageService {
   ///
   /// Gültigkeit: 3600 Sekunden. Die URL ist nur mit aktiver Session gültig.
   Future<String?> getSignedAvatarUrl(String path) async {
-    log('[SupabaseStorageService] Request signed URL: bucket=$_bucket path=$path');
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Request signed URL: bucket=$_bucket');
+    }
 
     final result = await _client.storage
         .from(_bucket)
@@ -97,7 +111,9 @@ class SupabaseStorageService {
     }
 
     final path = _avatarPathForUser(userId);
-    log('[SupabaseStorageService] Delete avatar: bucket=$_bucket path=$path');
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Delete avatar: bucket=$_bucket');
+    }
 
     await _client.storage.from(_bucket).remove([path]);
   }
@@ -113,7 +129,9 @@ class SupabaseStorageService {
     }
 
     final path = _introPathForUser(userId);
-    log('[SupabaseStorageService] Upload intro audio: bucket=$_bucket path=$path size=${data.length}');
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Upload intro audio: bucket=$_bucket size=${data.length}');
+    }
 
     await _client.storage.from(_bucket).uploadBinary(
           path,
@@ -131,7 +149,9 @@ class SupabaseStorageService {
     }
 
     final path = _introPathForUser(userId);
-    log('[SupabaseStorageService] Delete intro audio: bucket=$_bucket path=$path');
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Delete intro audio: bucket=$_bucket');
+    }
 
     await _client.storage.from(_bucket).remove([path]);
   }

@@ -1,5 +1,16 @@
 # Supabase Projekt-Konfiguration
 # Wird vom Supabase CLI und der Plattform für Edge Functions verwendet.
+#
+# Benötigte Secrets (supabase secrets set ...):
+#   WISP_INTERNAL_SECRET     – NEU rotieren (altes war im Repo)! Muss zum
+#                              Vault-Secret 'wisp_internal_secret' passen
+#                              (Migration 040, Audit K1).
+#   INTERNAL_SECRET          – für den internen Aufruf von check-location.
+#   FIREBASE_SERVICE_ACCOUNT_JSON – FCM-Push (Service-Account-JSON).
+#   BREVO_API_KEY            – Bug-Report-E-Mails (send-bug-report).
+#
+# TURN wird NICHT genutzt (Betreiber-Entscheidung, keine laufenden Kosten):
+# ice-config liefert ausschließlich STUN.
 
 project_id = "jftuigjbmmuvrckbchqo"
 
@@ -45,7 +56,31 @@ verify_jwt = false
 [functions.confirm]
 verify_jwt = false
 
+# captcha-page: laedt das CAPTCHA-Widget (Turnstile/hCaptcha) auf der
+# Projekt-Domain - Anbieter validieren den Hostnamen, about:blank wird
+# abgelehnt. Enthaelt KEINE Secrets (Sitekey ist oeffentlich).
+[functions.captcha-page]
+verify_jwt = false
+
 # notify-user: eigene Auth im Code (internes Trigger-Secret ODER User-JWT
 # bei Client-Aufrufen). Gateway-JWT-Pruefung ist deshalb deaktiviert.
 [functions.notify-user]
 verify_jwt = false
+
+# --- Passkeys (WebAuthn) ---
+# Aktiviert Passkey-Login/Registrierung in Supabase Auth. Die nativen Apps
+# (Android/iOS) sind über assetlinks.json / apple-app-site-association mit
+# der RP-Domain auth.wispdating.de verknüpft (siehe passkey-assets/).
+[auth.passkey]
+enabled = true
+
+[auth.webauthn]
+rp_display_name = "Wisp"
+rp_id = "auth.wispdating.de"
+# RP-Origins: HTTPS-Origin der RP-Domain + Android-App-Origin.
+# Den Android-Teil durch den BASE64(SHA256 deines Signing-Zertifikats)
+# ersetzen (siehe passkey-assets/README.md, Abschnitt 2/4).
+rp_origins = [
+  "https://auth.wispdating.de",
+  "android:apk-key-hash:N6pPbMHeuPWVdF6sCs4KGclUcoD8dI8CZr3S7HvpVXI",
+]

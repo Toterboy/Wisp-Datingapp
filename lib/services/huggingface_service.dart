@@ -1,126 +1,64 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
 
-import 'package:wisp/utils/cert_pinning.dart';
 import 'package:wisp/utils/constants.dart';
 
-/// Service für die Hugging Face Inference API.
+/// NSFW-Bild-Moderation – zurzeit per Feature-Flag DEAKTIVIERT
+/// (AppConstants.nsfwModerationEnabled, Betreiber-Entscheidung).
 ///
-/// Nutzt das Modell `Falconsai/nsfw_image_detection` zur Klassifikation von
-/// Bildern in Kategorien: drawings, hentai, neutral, porn, sexy.
+/// SICHERHEIT (Audit B1): Das frühere Design schickte Bilder mit einem via
+/// --dart-define eingebetteten Hugging-Face-Token direkt vom Client an die
+/// HF-API. Jedes in die App kompilierte Token ist aus APK/IPA extrahierbar
+/// – die Lücke wurde geschlossen, indem Token und URL vollständig aus dem
+/// Client entfernt wurden.
 ///
-/// API: POST https://router.huggingface.co/hf-inference/models/Falconsai/nsfw_image_detection
-/// Token: --dart-define=HF_API_TOKEN=hf_xxx...
+/// Die echte Implementierung wird später serverseitig als Edge Function
+/// erfolgen (Token liegt dann ausschließlich als Function-Secret
+/// HF_API_TOKEN bei Supabase). Das Aufruf-Format von [checkImage] bleibt
+/// identisch, damit der Service dann drop-in ersetzt werden kann.
 ///
-/// H-09: Requests laufen über einen Zertifikat-gepinnten HTTP-Client
-/// (DER-Pins für `router.huggingface.co`). Eigene Endpunkte per
-/// --dart-define werden nicht gepinnt (fail-open mit Warnung, da der
-/// Betreiber den Endpunkt selbst kontrolliert).
+/// Aktuelles Verhalten (Flag = false): Bilder werden ohne Prüfung
+/// durchgelassen (`isSafe: true`); die aufrufende
+/// PhotoModerationService-Schicht erzeugt dann auch KEINEN
+/// photo_moderation-DB-Eintrag (keine Admin-Warteschlange).
 class HuggingFaceService {
   HuggingFaceService._();
 
-  /// Basis-URL für das NSFW-Modell. Konfigurierbar via --dart-define,
-  /// um z. B. einen EU-basierten Inference-Endpunkt zu nutzen.
-  static final String _baseUrl = AppConstants.hfInferenceUrl;
-
-  /// Kategorien, die als NSFW gelten und zur Ablehnung führen.
-  static const _nsfwCategories = {'porn', 'hentai'};
-
-  /// Kategorien, die als "grau" gelten und manuelle Prüfung empfehlen.
-  static const _grayCategories = {'sexy', 'drawings'};
-
-  /// Schwellenwert: Score > threshold → Kategorie gilt als erkannt.
-  static const double _nsfwThreshold = 0.5;
-  static const double _grayThreshold = 0.3;
-
-  /// Timeout für die HTTP-Verbindung.
-  static const Duration timeout = Duration(seconds: 5);
-
-  /// Baut den HTTP-Client mit Cert-Pinning für den Inference-Host (H-09).
-  static http.Client _buildClient() {
-    if (kIsWeb) {
-      // Web kann kein Custom-Cert-Pinning via dart:io; hier auf
-      // Browser-Mechanismen (HPKP/CRT-Logs) sowie CSP vertrauen.
-      return http.Client();
-    }
-    try {
-      final host = Uri.parse(_baseUrl).host;
-      return IOClient(CertPinning.pinnedHttpClient(host));
-    } catch (e) {
-      debugPrint('[HF] Client-Aufbau fehlgeschlagen, Fallback ohne Pinning: $e');
-      return http.Client();
-    }
-  }
-
-  /// Ergebnis der NSFW-Prüfung.
-  /// [isSafe]: true = Bild kann durchgelassen werden.
-  /// [isNsfw]: true = explizite NSFW-Kategorie mit hohem Score erkannt.
-  /// [categories]: Rohdaten der API-Antwort.
-  /// [label]: Label mit dem höchsten Score.
-  /// [needsReview]: true = API nicht erreichbar → manuelle Prüfung nötig.
-  static Future<({bool isSafe, bool isNsfw, bool needsReview, Map<String, dynamic> categories, String label})> checkImage(Uint8List imageBytes) async {
-    final token = AppConstants.hfApiToken;
-    if (token.isEmpty) {
-      if (kDebugMode) debugPrint('[HF] Kein API-Token konfiguriert — Moderation deaktiviert.');
-      return (isSafe: true, isNsfw: false, needsReview: true, categories: <String, dynamic>{}, label: 'no_token');
-    }
-
-    try {
-      final response = await _buildClient()
-          .post(
-            Uri.parse(_baseUrl),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/octet-stream',
-            },
-            body: imageBytes,
-          )
-          .timeout(timeout);
-
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body) as List<dynamic>;
-        final categories = <String, double>{};
-        for (final entry in result) {
-          final label = entry['label'] as String;
-          final score = (entry['score'] as num).toDouble();
-          categories[label] = score;
-        }
-
-        final topLabel = categories.entries
-            .reduce((a, b) => a.value > b.value ? a : b)
-            .key;
-
-        final isNsfw = _nsfwCategories.any(
-          (cat) => (categories[cat] ?? 0) > _nsfwThreshold,
-        );
-        final isGray = _grayCategories.any(
-          (cat) => (categories[cat] ?? 0) > _grayThreshold,
-        );
-
-        return (
-          isSafe: !isNsfw,
-          isNsfw: isNsfw,
-          needsReview: isGray && !isNsfw,
-          categories: Map<String, dynamic>.from(categories),
-          label: topLabel,
-        );
+  static Future<
+      ({
+        bool isSafe,
+        bool isNsfw,
+        bool needsReview,
+        Map<String, dynamic> categories,
+        String label,
+      })> checkImage(Uint8List imageBytes) async {
+    if (!AppConstants.nsfwModerationEnabled) {
+      if (kDebugMode) {
+        debugPrint('[HF] NSFW-Moderation deaktiviert (Feature-Flag) — '
+            'Bild wird ohne Prüfung durchgelassen.');
       }
-
-      // Modell lädt (erster Request nach Inaktivität) → pending.
-      if (response.statusCode == 503) {
-        if (kDebugMode) debugPrint('[HF] Modell lädt (503) — pending review.');
-        return (isSafe: false, isNsfw: false, needsReview: true, categories: <String, dynamic>{}, label: 'model_loading');
-      }
-
-      // Anderer Fehler.
-      if (kDebugMode) debugPrint('[HF] API-Fehler ${response.statusCode}: ${response.body}');
-      return (isSafe: false, isNsfw: false, needsReview: true, categories: <String, dynamic>{}, label: 'api_error');
-    } catch (e) {
-      if (kDebugMode) debugPrint('[HF] Request fehlgeschlagen: $e');
-      return (isSafe: false, isNsfw: false, needsReview: true, categories: <String, dynamic>{}, label: 'timeout');
+      return (
+        isSafe: true,
+        isNsfw: false,
+        needsReview: false,
+        categories: <String, dynamic>{},
+        label: 'moderation_disabled',
+      );
     }
+
+    // Flag aktiv, aber noch keine serverseitige Implementierung deployed:
+    // fail-closed (nichts ungeprüft durchlassen).
+    if (kDebugMode) {
+      debugPrint(
+        '[HF] NSFW-Moderation aktiv, aber Edge-Function-Implementierung '
+        'fehlt — Bild → pending_review.',
+      );
+    }
+    return (
+      isSafe: false,
+      isNsfw: false,
+      needsReview: true,
+      categories: <String, dynamic>{},
+      label: 'moderation_unavailable',
+    );
   }
 }

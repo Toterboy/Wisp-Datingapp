@@ -51,11 +51,18 @@ serve(async (req) => {
   }
 
   // -------------------------------------------------------------------------
-  // INTERNER SCHUTZ: Nur Aufrufe mit gültigem internem Secret zulassen.
+  // INTERNER SCHUTZ: Nur Aufrufe mit gültigem internen Secret zulassen
+  // (constant-time Vergleich, Audit N5).
   // -------------------------------------------------------------------------
   const internalSecret = Deno.env.get("INTERNAL_SECRET");
-  const receivedSecret = req.headers.get("x-internal-secret");
-  if (!internalSecret || internalSecret !== receivedSecret) {
+  const receivedSecret = req.headers.get("x-internal-secret") ?? "";
+  const secretsMatch =
+    !!internalSecret &&
+    internalSecret.length === receivedSecret.length &&
+    [...internalSecret].every(
+      (c, i) => c.charCodeAt(0) === receivedSecret.charCodeAt(i),
+    );
+  if (!secretsMatch) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },

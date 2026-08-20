@@ -1,25 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// TURN-Server-Konfiguration (optional). Falls nicht konfiguriert, werden
-// nur die STUN-Server aus dem Client genutzt.
-const TURN_SERVER_URL = Deno.env.get("TURN_SERVER_URL") ?? "";
-const TURN_USERNAME = Deno.env.get("TURN_USERNAME") ?? "";
-const TURN_CREDENTIAL = Deno.env.get("TURN_CREDENTIAL") ?? "";
+// ICE-Konfiguration: liefert ausschließlich STUN-Server (EU).
+//
+// BETREIBER-ENTSCHEIDUNG: Kein TURN (keine laufenden Abos/Kosten).
+// Sämtliche TURN-Logik (statische Credentials wie auch der frühere
+// TURN-REST-API-Entwurf) wurde entfernt – die Funktion kann keine
+// TURN-Credentials mehr ausliefern und niemand kann versehentlich
+// langlebige Zugangsdaten konfigurieren.
+//
+// Konsequenz (bekannt und akzeptiert): Hinter symmetrischen NATs oder
+// strikten Firewalls (z. B. Unternehmensnetze) kann ohne TURN-Relay
+// ggf. keine direkte P2P-Verbindung aufgebaut werden. Falls später doch
+// TURN benötigt wird: Funktion um kurzlebige TURN-REST-Credentials
+// erweitern (HMAC, Secret als Function-Secret – nie statisch).
 
 serve((_req) => {
   const iceServers: Record<string, unknown>[] = [
-    { urls: "stun:stun.nextcloud.com:443" },
-    { urls: "stun:stun.miwifi.com:3478" },
-    { urls: "stun:stun.voipgate.com:3478" },
-    { urls: "stun:stun.voipstunt.com:3478" },
+    { urls: "stun:stun.nextcloud.com:443" },   // Hetzner, DE
+    { urls: "stun:stun.miwifi.com:3478" },     // OVH, FR
+    { urls: "stun:stun.voipgate.com:3478" },   // DE
+    { urls: "stun:stun.voipstunt.com:3478" },  // NL
   ];
-
-  if (TURN_SERVER_URL) {
-    const turn: Record<string, unknown> = { urls: TURN_SERVER_URL };
-    if (TURN_USERNAME) turn.username = TURN_USERNAME;
-    if (TURN_CREDENTIAL) turn.credential = TURN_CREDENTIAL;
-    iceServers.push(turn);
-  }
 
   return new Response(
     JSON.stringify({ iceServers, ttlSeconds: 86400 }),

@@ -72,6 +72,10 @@ serve(async (req) => {
     }
 
     // Bilder: maximal 5 Anhänge, jede Datei als {name, content(base64)}.
+    // Größenlimit (M8): max. 2 MB Base64 pro Bild, 8 MB insgesamt -
+    // verhindert E-Mail-Kontingent-/Größen-DoS.
+    const MAX_ATTACHMENT_BASE64 = 2 * 1024 * 1024;
+    const MAX_TOTAL_BASE64 = 8 * 1024 * 1024;
     const imagesRaw = Array.isArray(body.images) ? body.images : [];
     if (imagesRaw.length > 5) {
       return new Response(JSON.stringify({ error: "Maximal 5 Bilder erlaubt." }), {
@@ -89,6 +93,18 @@ serve(async (req) => {
         return { name, content };
       })
       .filter((a) => a.content.length > 0);
+
+    if (attachments.some((a) => a.content.length > MAX_ATTACHMENT_BASE64)) {
+      return new Response(JSON.stringify({ error: "Ein Bild überschreitet 2 MB." }), {
+        status: 413, headers: { "Content-Type": "application/json" },
+      });
+    }
+    const totalSize = attachments.reduce((sum, a) => sum + a.content.length, 0);
+    if (totalSize > MAX_TOTAL_BASE64) {
+      return new Response(JSON.stringify({ error: "Anhänge überschreiten insgesamt 8 MB." }), {
+        status: 413, headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // HTML-escaped Werte (gegen Stored XSS)
     const description = escapeHtml(descriptionRaw.trim());

@@ -18,10 +18,10 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 
 - **Einladungscode-Pflicht** bei der Registrierung (Bot-Schutz) – Codes werden vom Entwickler vergeben oder durch Einladungslinks von bestehenden Nutzern generiert
 - **Registrierung** mit Name, E-Mail (Domain-Validierung), Passwort, Geburtsdatum (Tag/Monat/Jahr), Geschlecht
-- **Einmalige Standort-Abfrage** zur Fake-Account-Erkennung
+- **Einmalige Standort-Abfrage** zum finden anderer Nutzer in der Umgebung und zur Fake-Account-Erkennung
 - **Persönlichkeitstest** (MBTI-Style, z. B. ENTP, INFJ)
-- **Einmalige Settings-/Privacy-Auswahl** nach der Registrierung
-- **Willkommens-Screen** nur beim allerersten App-Start
+- **Settings-/Privacy-Auswahl** nach der Registrierung
+- **Willkommens-Screen** beim allerersten App-Start
 
 ### Entdecken
 
@@ -29,9 +29,9 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 - **Zufallschat** – automatische Zuordnung zu einem Peer-to-Peer-Textchat basierend auf Alter-/Distanz-Einstellungen
 - **QR-Code** – eigenes Profil als QR-Code teilen, fremde Codes scannen oder manuell eingeben
 - **Dating Hour (Event-Modus)** – jeden Samstag 20:00–21:00 Uhr:
-  - Beitritt ab 19:50 Uhr möglich (serverzeitsynchron, Manipulation der Geräteuhr wird erkannt)
+  - Beitritt jederzeit möglich (serverzeitsynchron, Manipulation der Geräteuhr wird erkannt)
   - Zwei zufällig zugeordnete Personen chatten direkt (ohne Profilansicht)
-  - Nach 5 Minuten: beide können „Annehmen" oder „Ablehnen"
+  - Nach 5 Minuten: beide können ein Match „Annehmen" oder „Ablehnen"
   - Match nur, wenn BEIDE annehmen; freundlich formulierte Ablehnungs-Nachricht bei Absage
   - Individuelle Präferenzen (Alter, Geschlecht, besondere Eigenschaft) vor Event-Start einstellbar
 
@@ -59,15 +59,14 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 
 - Mehrere Profilbilder
 - Profil-Vorschau-Funktion (Ansicht wie andere Nutzer das Profil sehen)
-- Spenden-Button mit „Spender"-Badge (aktuell Mock-Zahlung)
-- „App empfehlen"-Button mit „Empfehler"-Badge nach erfolgreichem Teilen
+- Spenden-Button (aktuell Mock-Zahlung)
+- „App empfehlen"-Button
 - Eigenes Geschlecht nur hier änderbar
 
 ### Einstellungen & Datenschutz
 
 - Blind Mode (Fotos erst nach Match), Foto-Freigabe nach Match, Profil-Sichtbarkeit, Dark Mode, Altersbereich, Entfernung (km/Bundesland/ganz Deutschland), Benachrichtigungen
 - **Privacy-Screen**: echte JSON-Exportfunktion (Profil, Einstellungen, Präferenzen, Mood) zum Teilen/Speichern sowie Auflistung der Auftragsverarbeiter (Supabase, Google/Firebase, Hugging Face, Apple)
-- Admin-Bereich (nur mit `ADMIN_UUID`-dart-define aktiv): verwaltete Nutzer-Reports mit pseudonymisierten (gehashten) Reporter-IDs
 
 ---
 
@@ -86,7 +85,6 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
   - Automatische Freischaltung aller Funktionen mit Erreichen des 20. Lebensjahres
 - **Foto-Moderation**: automatischer NSFW-Abgleich über ein Hugging-Face-Inference-Modell (EU-Router, cert-gepinnt); Nacktbilder/-videos führen zur sofortigen Account-Sperre
 - **Session-Restore** synchron (kein Netzwerk beim App-Start), serverseitige Validierung im Hintergrund
-- **Demo-Mode** (dart-define `DEMO_MODE`): deterministische Heuristik, Release-Builds immer echtes Backend
 
 ---
 
@@ -110,58 +108,9 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 
 ---
 
-## Projektstruktur
-
-```
-lib/
-├── models/          # user_profile, match, message, app_settings, gender,
-│                    # personality_type, dating_hour_models, find_match_models,
-│                    # spice_question, user_mood, report_models, invitation_code, ...
-├── services/        # supabase_*, encryption, webrtc, p2p_chat, signaling,
-│                    # dating_hour, server_time, prekey, content/photo_moderation,
-│                    # report, invitation_code, bug_report, notification, ...
-├── providers/       # auth, chat, profile, settings, user_preferences, spice_question
-├── screens/
-│   ├── core/        # main_navigation, error, loading
-│   ├── swipe/       # find_your_match, random_chat, mode selection
-│   ├── chat/  dating_hour/  quiz/  spice/  mood/  qr/  interests/
-│   ├── home/  profile/  settings/  privacy/  admin/  bug_report/
-│   ├── onboarding/  # personality_test, settings_privacy_once
-│   ├── auth/  welcome/  verification/  legal/
-├── routing/         # app_router.dart
-├── theme/           # app_theme.dart
-├── utils/           # cert_pinning, age_safety_rules, age_calculator,
-│                    # constants, demo_mode, formatters, validators, ...
-├── widgets/         # app_logo, buttons, profile_widgets, states, ...
-├── app.dart
-└── main.dart
-```
-
----
-
-## Build & Deployment
-
-```bash
-# Admin-UUID setzen (sonst bleiben Admin-Funktionen deaktiviert):
-flutter build apk --dart-define=ADMIN_UUID=<echte-supabase-user-id>
-# Für Web:
-flutter build web --dart-define=ADMIN_UUID=<echte-supabase-user-id>
-```
-
-Ohne `--dart-define=ADMIN_UUID` startet die App ohne Admin-Zugang — ein fail-safe, der verhindert, dass ein vergessener Platzhalter versehentlich Admin-Rechte freigibt.
-
-Weitere Optionen:
-
-- `--dart-define=DEMO_MODE=true` – erzwingt den Demo-Mode (Mock-Daten; Release-Builds ignorieren ihn und nutzen immer das echte Backend)
-- `--dart-define=TURN_SERVER=...` / `TURN_USERNAME=...` / `TURN_PASSWORD=...` – optionaler eigener TURN-Server für die WebRTC-Fallback-Kette (ohne Google)
-
-Konfiguration (Supabase-URL, Anon-Key, Admin-UUID) erfolgt über `.env` (Vorlage: `.env.example`, gitignored). Die Supabase-Migrationen liegen unter `supabase/migrations/`; Edge Functions unter `supabase/functions/`.
-
----
-
 ## Hinweis zum Entwicklungsstand
 
-Diese App befindet sich in aktiver Entwicklung. Folgende Bereiche sind aktuell als Platzhalter/Mock implementiert und müssten für eine echte Produktionsversion durch professionelle Dienste ersetzt werden:
+Diese App befindet sich in aktiver Entwicklung. Folgende Bereiche sind aktuell als Platzhalter implementiert:
 
 - **Automatischer Gesichtsabgleich** (Profilbild vs. Verifizierungs-Video) → z. B. selbstgehostete Open-Source-Modelle wie DeepStack oder Face Recognition (selbst gehostet, datenschutzfreundlich, EU-fähig)
 - **Content-Moderation** für unangemessene Inhalte → z. B. selbstgehostete Modelle von Hugging Face (EU-Inference-Endpoints) oder Open-Source-NSFW-Detektionsmodelle

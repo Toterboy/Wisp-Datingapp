@@ -1,6 +1,14 @@
 -- ============================================================================
--- Invite-Codes für die App verwalten
+-- Invite-Codes fǬr die App verwalten
 -- ============================================================================
+-- SICHERHEIT: Alle unten stehenden Codes (BLIND-*) sind REINE BEISPIELE.
+-- Falls einer dieser Werte bereits in der Datenbank angelegt wurde (z. B.
+-- per Copy-Paste aus dieser Datei), gilt er als kompromittiert, weil die
+-- Datei im Git-Repo liegt: Sofort in der DB sperren oder löschen:
+--   UPDATE invite_codes SET used = true, max_uses = 0 WHERE code IN
+--     ('BLIND-SUPER-2026','BLIND-TEST-2026','BLIND-ONCE-2026','BLIND-ADMIN-2026');
+-- Neue, echte Codes IMMER direkt im SQL Editor anlegen, nie in diese Datei.
+--
 -- Tabelle: invite_codes
 --
 -- Erwartete Spalten:

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/models/photo_moderation_models.dart';
 import 'package:wisp/services/huggingface_service.dart';
+import 'package:wisp/utils/constants.dart';
 
 /// Service für Foto-Moderation (NSFW via Hugging Face, FaceMatch Mock).
 class PhotoModerationService {
@@ -17,11 +18,20 @@ class PhotoModerationService {
   static const int _maxViolationsIn24h = 3;
   static const Duration _violationWindow = Duration(hours: 24);
 
-  /// Prüft ein Bild auf Nacktinhalt via Hugging Face API.
+  /// Prüft ein Bild auf Nacktinhalt.
+  ///
+  /// Feature-Flag (Betreiber-Entscheidung): Ist die NSFW-Moderation
+  /// deaktiviert (AppConstants.nsfwModerationEnabled = false), wird das
+  /// Bild sofort freigegeben – OHNE Prüfung und OHNE photo_moderation-
+  /// DB-Eintrag (keine Admin-Warteschlange, keine Datenhoarder-Einträge).
   Future<ModerationResult> checkNudityContent({
     required String userId,
     required Uint8List imageBytes,
   }) async {
+    if (!AppConstants.nsfwModerationEnabled) {
+      return const ModerationResult(approved: true);
+    }
+
     final hash = sha256.convert(imageBytes).toString();
 
     final result = await HuggingFaceService.checkImage(imageBytes);
@@ -92,18 +102,22 @@ class PhotoModerationService {
   }
 
   // =========================================================================
-  // FaceMatch (Mock — TODO: separates Projekt)
+  // FaceMatch (noch nicht implementiert)
   // =========================================================================
 
-  /// PROTOTYP: Platzhalter. FaceMatch benötigt FaceNet/ArcFace +
-  /// Embedding-DB und ist ein eigenständiges Projekt. Kein Hugging-Face-
-  /// Modell bietet Face-Matching als Hosted-Service an.
+  /// NICHT IMPLEMENTIERT: FaceMatch benötigt FaceNet/ArcFace + Embedding-DB
+  /// und ist ein eigenständiges Projekt. Kein Hugging-Face-Modell bietet
+  /// Face-Matching als Hosted-Service an.
+  ///
+  /// Fail-closed (Audit M9): Gibt `false` zurück, bis eine echte
+  /// Implementierung existiert. Der frühere Mock (`return true`) hätte
+  /// eine nicht vorhandene Verifizierung vorgetäuscht.
   Future<bool> checkFaceMatch({
     required String userId,
     required String photoUrl,
     required String verificationVideoPath,
   }) async {
-    return true; // Mock: immer bestanden (kein Face-Matching verfügbar).
+    return false; // Kein automatisches Bestehen ohne echte Prüfung.
   }
 
   // =========================================================================

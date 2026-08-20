@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,9 +8,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisp/models/gender.dart';
 import 'package:wisp/providers/auth_provider.dart';
 import 'package:wisp/services/auth_exception.dart';
+import 'package:wisp/services/passkey_auth.dart';
+import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/validators.dart';
 import 'package:wisp/widgets/buttons.dart';
+import 'package:wisp/widgets/captcha_challenge.dart';
 
 /// Login & Registrierung (Mock).
 ///
@@ -44,6 +49,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isRegister = false;
   bool _obscurePassword = true;
   bool _submitAttempted = false;
+  bool _passkeyLoading = false;
 
   @override
   void dispose() {
@@ -100,6 +106,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           return;
         }
         debugPrint('[LoginScreen] Registriere Nutzer...');
+
+        // CAPTCHA (Bot-Schutz): Zeigt die Challenge VOR der Registrierung,
+        // wenn im Build konfiguriert (AppConstants.captchaEnabled) – Details
+        // siehe widgets/captcha_challenge.dart. Der Nutzer muss die Aufgabe
+        // lösen (Token) oder bricht ab.
+        String? captchaToken;
+        if (AppConstants.captchaEnabled) {
+          captchaToken = await showCaptchaChallenge(context);
+          if (captchaToken == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Bitte schließe den Sicherheitscheck ab, um dich zu '
+                    'registrieren.',
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return;
+          }
+        }
+
         await auth.register(
           name: _nameCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
@@ -109,18 +139,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           inviteCode: _inviteCodeCtrl.text.trim().isEmpty
               ? null
               : _inviteCodeCtrl.text.trim(),
+          captchaToken: captchaToken,
         );
         // Profil wurde bereits in AuthNotifier.register() via setProfile()
         // gesetzt – kein redundantes update() nötig.
       } else {
+        // CAPTCHA (Bot-Schutz) auch beim Login: gleicher Ablauf wie bei der
+        // Registrierung – Challenge lösen oder abbrechen.
+        String? captchaToken;
+        if (AppConstants.captchaEnabled) {
+          captchaToken = await showCaptchaChallenge(context);
+          if (captchaToken == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Bitte schließe den Sicherheitscheck ab, um dich '
+                    'anzumelden.',
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return;
+          }
+        }
         await auth.login(
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
+          captchaToken: captchaToken,
         );
       }
     } catch (e) {
-      debugPrint('[LoginScreen] FEHLER bei ${_isRegister ? "Registrierung" : "Login"}: $e');
-      debugPrint('[LoginScreen] Exception-Typ: ${e.runtimeType}');
+      if (kDebugMode) {
+        debugPrint('[LoginScreen] FEHLER bei ${_isRegister ? "Registrierung" : "Login"}: $e');
+        debugPrint('[LoginScreen] Exception-Typ: ${e.runtimeType}');
+      }
       if (mounted) {
         String message;
         if (e is AppException) {
@@ -177,6 +231,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         '${_isRegister ? AppRoutes.emailVerification : AppRoutes.home}');
     if (mounted) {
       context.go(_isRegister ? AppRoutes.emailVerification : AppRoutes.home);
+    }
+  }
+
+  /// Meldet den Nutzer per Passkey (WebAuthn) an, ohne E-Mail/Passwort.
+  ///
+  /// Läuft nur im Supabase-Modus. Erfolg/Fehler werden über SnackBar
+  /// angezeigt; bei Erfolg übernimmt der Router (Home/Setup-Redirect).
+  Future<void> _signInWithPasskey() async {
+    setState(() => _passkeyLoading = true);
+    try {
+      await PasskeyAuth.signIn();
+      // AuthNotifier setzt den Status via onAuthStateChange (signedIn).
+      if (mounted) context.go(AppRoutes.home);
+    } catch (e) {
+      if (mounted) {
+        final message = e is AppException
+            ? e.message
+            : (e.toString().toLowerCase().contains('cancel')
+                ? 'Passkey-Anmeldung abgebrochen.'
+                : 'Passkey-Anmeldung fehlgeschlagen. Bitte versuche es mit '
+                    'E-Mail und Passwort.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _passkeyLoading = false);
     }
   }
 
@@ -409,6 +490,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: loading ? null : _submit,
                     loading: loading,
                   ),
+                  if (!_isRegister && SupabaseService.isInitialized) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed:
+                          (loading || _passkeyLoading) ? null : _signInWithPasskey,
+                      icon: _passkeyLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.fingerprint),
+                      label: const Text('Mit Passkey anmelden'),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: loading

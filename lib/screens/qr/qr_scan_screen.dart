@@ -6,6 +6,7 @@ import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/utils/peer_id.dart';
 
 // mobile_scanner: Kamera auf Mobile, Stub auf Web/Desktop.
 import 'package:mobile_scanner/mobile_scanner.dart'
@@ -215,7 +216,9 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
               final uri = Uri.tryParse(raw);
               if (uri == null || uri.scheme != 'wisp' || uri.host != 'user') return;
               final peerId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
-              if (peerId.isEmpty) return;
+              // Fremd-kontrollierte QR-Payload: Peer-ID muss UUID sein
+              // (Audit M1 – verhindert Pfad-/Filter-Injection downstream).
+              if (!isValidPeerId(peerId)) return;
               _processing = true;
               controller.dispose();
               _onUserFound(peerId);

@@ -16,6 +16,7 @@ import 'package:wisp/services/app_auth_service.dart';
 import 'package:wisp/services/auth_service.dart';
 import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/local_storage.dart';
+import 'package:wisp/services/mfa_service.dart';
 import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/services/supabase_auth_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
@@ -51,8 +52,27 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     if (!SupabaseService.isInitialized) return;
     _authStateSub = SupabaseService.client.auth.onAuthStateChange.listen(
       (authState) {
-        if (authState.event == AuthChangeEvent.signedOut) {
+        final event = authState.event;
+        if (event == AuthChangeEvent.signedOut) {
           state = const AsyncValue.data(false);
+        } else if (event == AuthChangeEvent.passwordRecovery) {
+          // Passwort-Reset (Recovery-Deep-Link aus der E-Mail, von
+          // getSessionFromUrl via detectSessionInUriPredicate verarbeitet):
+          // Der Router erzwingt jetzt den Reset-Screen, bis das neue
+          // Passwort gesetzt ist (updateUser).
+          _ref.read(passwordRecoveryPendingProvider.notifier).state = true;
+          if (!state.hasValue || state.value != true) {
+            state = const AsyncValue.data(true);
+            unawaited(_syncFromServer());
+          }
+        } else if (event == AuthChangeEvent.signedIn ||
+            event == AuthChangeEvent.initialSession) {
+          // Passkey-Login (oder andere stille Anmeldung) meldet sich hier
+          // an, ohne dass login()/register() den State gesetzt hat.
+          if (!state.hasValue || state.value != true) {
+            state = const AsyncValue.data(true);
+            unawaited(_syncFromServer());
+          }
         }
       },
     );
@@ -137,6 +157,19 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
                   flags['personality_test_completed'] == true,
             );
       }
+
+      // MFA-Status laden (vor dem Router-Freigeben im finally): Der
+      // Redirect entscheidet damit synchron über Challenge-/Setup-Screen.
+      // Fehler dürfen den Sync nicht blockieren (Status bleibt initial,
+      // Router zeigt dann keine MFA-Screens).
+      try {
+        _ref.read(mfaStatusProvider.notifier).state =
+            await MfaService(SupabaseService.client).loadStatus();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[AuthNotifier] MFA-Status konnte nicht geladen werden: $e');
+        }
+      }
     } catch (e) {
       debugPrint('[AuthNotifier] Server-Sync fehlgeschlagen: $e');
     } finally {
@@ -170,8 +203,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     String? gender,
     required DateTime birthDate,
     String? inviteCode,
+    String? captchaToken,
   }) async {
-    debugPrint('[AuthNotifier] register() aufgerufen: name=$name, email=$email, gender=$gender, inviteCode=$inviteCode');
+    if (kDebugMode) {
+      // PII (E-Mail, Name) nur im Debug-Modus loggen (Audit H4).
+      debugPrint('[AuthNotifier] register() aufgerufen: name=$name, '
+          'email=$email, gender=$gender, inviteCode=$inviteCode');
+    }
     state = const AsyncValue.loading();
     try {
       // Standort für Fake-Account-Erkennung erfassen.
@@ -199,6 +237,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
         inviteCode: inviteCode,
         latitude: lat,
         longitude: lng,
+        captchaToken: captchaToken,
       );
       debugPrint('[AuthNotifier] register() erfolgreich: userId=${profile.id}');
       // E-Mail für den Bestätigungs-Screen sichern. Bei aktivierter
@@ -210,7 +249,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // der Bestätigung sichern (nie persistiert). Damit erkennt die App
       // die Bestätigung ohne Session und meldet den Nutzer automatisch an.
       _ref.read(pendingVerificationCredentialsProvider.notifier).state =
-          (email: email, password: password);
+          (email: email, password: password, createdAt: DateTime.now());
       _profileNotifier.setProfile(profile);
       state = const AsyncValue.data(true);
       // Server-Sync auch NACH der Registrierung anstoßen: Er setzt
@@ -229,11 +268,18 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
   Future<void> login({
     required String email,
     required String password,
+    String? captchaToken,
   }) async {
-    debugPrint('[AuthNotifier] login() aufgerufen: email=$email');
+    if (kDebugMode) {
+      debugPrint('[AuthNotifier] login() aufgerufen: email=$email');
+    }
     state = const AsyncValue.loading();
     try {
-      await _auth.login(email: email, password: password);
+      await _auth.login(
+        email: email,
+        password: password,
+        captchaToken: captchaToken,
+      );
       debugPrint('[AuthNotifier] login erfolgreich');
       // Nach erfolgreichem Login sind die zwischengespeicherten
       // Registrierungs-Daten nicht mehr nötig.
@@ -253,7 +299,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     await _auth.logout();
     _ref.read(pendingVerificationEmailProvider.notifier).state = null;
     _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
+    _ref.read(passwordRecoveryPendingProvider.notifier).state = false;
     _ref.read(serverSyncDoneProvider.notifier).state = false;
+    // MFA-Status zurücksetzen (keine Session -> keine Challenge/Setup).
+    _ref.read(mfaStatusProvider.notifier).state = const MfaStatus.initial();
     state = const AsyncValue.data(false);
   }
 
@@ -282,6 +331,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     // Account übergehen – auch DSGVO-relevant (Art. 17).
     _ref.read(pendingVerificationEmailProvider.notifier).state = null;
     _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
+    _ref.read(mfaStatusProvider.notifier).state = const MfaStatus.initial();
     await _ref.read(settingsProvider.notifier).resetToDefaults();
     await _ref.read(userPreferencesProvider.notifier).resetToDefaults();
     await _ref.read(profileProvider.notifier).resetToDefaults();
@@ -318,11 +368,19 @@ final authProvider =
     );
   } else if (_isDemoMode()) {
     final prefs = storage is SharedPreferencesStorage ? storage.raw : null;
+    // Legacy-Aufräum: alte (ungesalzene) Credential-Hashes aus
+    // SharedPreferences entfernen (Audit H6/M10).
+    unawaited(
+      prefs?.remove(AppConstants.prefsCredentialsKey) ?? Future.value(),
+    );
+    // Demo-Credentials (gesalzener Hash) liegen im Keystore/Keychain,
+    // NICHT in SharedPreferences (Audit M10/H6).
+    final secureStore = ref.watch(secureTokenStoreProvider);
     auth = AuthService(
       () async => prefs?.getString(AppConstants.prefsAuthKey),
       (String v) async => await prefs?.setString(AppConstants.prefsAuthKey, v),
-      () async => prefs?.getString(AppConstants.prefsCredentialsKey),
-      (String v) async => await prefs?.setString(AppConstants.prefsCredentialsKey, v),
+      secureStore.readDemoCredentials,
+      secureStore.writeDemoCredentials,
     );
   } else {
     final api = ref.watch(apiClientProvider);
@@ -346,9 +404,16 @@ final pendingVerificationEmailProvider = StateProvider<String?>((ref) => null);
 /// Login. Solange die E-Mail unbestätigt ist, schlägt er fehl; nach der
 /// Bestätigung baut er automatisch die Session auf und die App geht weiter.
 /// Wird bei erfolgreichem Login/Logout geleert; App-Neustart löscht den
-/// Wert ebenfalls (Speicher-only).
-final pendingVerificationCredentialsProvider =
-    StateProvider<({String email, String password})?>((ref) => null);
+/// Wert ebenfalls (Speicher-only). ABLAUF (Audit M1): [createdAt] begrenzt
+/// die Lebensdauer auf 15 Minuten – danach verweigert der Auto-Login das
+/// Passwort weiterzureichen (das Passwort bleibt nie unbegrenzt im Speicher).
+final pendingVerificationCredentialsProvider = StateProvider<
+        ({String email, String password, DateTime createdAt})?>((ref) => null);
+
+/// Zeigt an, ob ein Passwort-Reset (Recovery-Deep-Link) aussteht. Solange
+/// true ist, erzwingt der Router den Reset-Screen; nach erfolgreichem
+/// `updateUser` wird der Wert geleert.
+final passwordRecoveryPendingProvider = StateProvider<bool>((ref) => false);
 
 /// Zeigt an, ob der Server-Sync nach Login/Session-Restore abgeschlossen
 /// ist (Profil + Setup-Flags). Der Router wartet darauf, damit nach einer

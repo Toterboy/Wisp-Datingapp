@@ -17,6 +17,10 @@ abstract class AppAuthService {
 
   /// Registriert einen neuen Nutzer und gibt das [UserProfile] des
   /// neu angelegten Accounts zurück.
+  ///
+  /// [captchaToken]: Optionales CAPTCHA-Token (Bot-Schutz bei der
+  /// Registrierung). Wird aktuell nur von Supabase Auth ausgewertet,
+  /// wenn im Dashboard CAPTCHA aktiviert ist.
   Future<UserProfile> register({
     required String name,
     required String email,
@@ -26,12 +30,17 @@ abstract class AppAuthService {
     String? inviteCode,
     double? latitude,
     double? longitude,
+    String? captchaToken,
   });
 
   /// Loggt den Nutzer mit [email] und [password] ein.
+  ///
+  /// [captchaToken]: Optionales CAPTCHA-Token (Bot-Schutz beim Login).
+  /// Wird aktuell nur von Supabase Auth ausgewertet.
   Future<void> login({
     required String email,
     required String password,
+    String? captchaToken,
   });
 
   /// Loggt den Nutzer aus und löscht die lokale Session.

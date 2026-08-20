@@ -360,7 +360,7 @@
 ## 2026-08-13 — Webhook-Secret im whsec_-Format
 
 - `supabase/functions/send-confirmation-email/index.ts` — Secret-Verarbeitung an das Standard-Webhooks-Format angepasst: Dashboard-Format ist `v1,whsec_<base64>`; die Funktion erwartet `HOOK_SECRET` als `whsec_<base64>` und dekodiert nach dem Abstreifen des `whsec_`-Präfixes per Standard-Base64 (identisch zu GoTrue/standardwebhooks: TrimPrefix `v1,` → TrimPrefix `whsec_` → base64.StdEncoding → HMAC-SHA256).
-- Neues Secret gesetzt: `HOOK_SECRET` = `whsec_IAofKS0OKxQYHTcqLS0WDj05EwIgNiQ9ARIXFSMBLBw=` (nur alphanumerische Base64-Zeichen). Dashboard-Wert: `v1,whsec_IAofKS0OKxQYHTcqLS0WDj05EwIgNiQ9ARIXFSMBLBw=`.
+- Neues Secret gesetzt: `HOOK_SECRET` = `whsec_<rotiert-2026-08-18>` (nur alphanumerische Base64-Zeichen). Dashboard-Wert: `v1,whsec_<REDACTED — echtes Secret wurde entfernt; lag im Klartext in dieser Datei und ist in der Git-Historie. Bitte erneut rotieren (siehe SECURITY-Hinweis).>`.
 - Lokal gegen die exakte GoTrue-Signier-Kette getestet (korrekt/multi-secret akzeptiert, manipulierter Body abgelehnt). Deployed.
 
 ## 2026-08-13 — Webhook-Signatur-Fixes (Format + Verifikation)

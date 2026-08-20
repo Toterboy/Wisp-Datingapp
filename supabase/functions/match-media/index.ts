@@ -27,22 +27,21 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "
 const BUCKET = "avatars";
 const URL_EXPIRES_IN = 3600;
 
+// Strikte UUID-Validierung: targetUserId fließt in PostgREST-Filter und
+// Storage-Pfade - ohne Prüfung wäre Filter-/Pfad-Injection möglich (M6).
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
-}
-
+// CORS: Bewusst KEINE CORS-Header (Audit M7) – die Funktion wird nur von
+// der nativen App aufgerufen; Browser-Zugriffe werden dadurch geblockt.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -61,9 +60,6 @@ async function hasMatchBetween(user: string, target: string): Promise<boolean> {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders() });
-  }
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
   }
@@ -86,7 +82,13 @@ serve(async (req) => {
     const targetUserId = (body.targetUserId ?? "").toString();
     const kind = (body.kind ?? "").toString();
 
-    if (!targetUserId || (kind !== "avatar" && kind !== "intro")) {
+    if (
+      !UUID_REGEX.test(targetUserId) ||
+      (kind !== "avatar" && kind !== "intro")
+    ) {
+      return json({ error: "Ungültige Parameter" }, 400);
+    }
+    if (targetUserId === user.id) {
       return json({ error: "Ungültige Parameter" }, 400);
     }
 

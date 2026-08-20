@@ -6,11 +6,13 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 
 import 'package:wisp/utils/cert_pinning.dart';
+import 'package:wisp/utils/peer_id.dart';
 
 /// Zentrale Konfiguration der Backend-Endpunkte.
 ///
 /// In Produktion über `-dart-define=API_BASE_URL=https://...` oder eine
-/// Build-Konfiguration setzen. Niemals `http://` verwenden (TLS-Zwang!).
+/// Build-Konfiguration setzen. Niemals `http://` verwenden (TLS-Zwang!,
+/// unten erzwungen).
 class ApiConfig {
   ApiConfig._();
 
@@ -18,10 +20,14 @@ class ApiConfig {
   static const String baseUrl =
       String.fromEnvironment('API_BASE_URL', defaultValue: 'https://signaling.example.com');
 
-  /// WebSocket-URL für Signaling, abgeleitet von [baseUrl] (wss://).
+  /// WebSocket-URL für Signaling, abgeleitet von [baseUrl] (immer wss://).
   static String get signalingWsUrl {
     final uri = Uri.parse(baseUrl);
-    return uri.replace(scheme: uri.scheme == 'http' ? 'ws' : 'wss', path: '/ws').toString();
+    if (!uri.isScheme('https')) {
+      // TLS-Zwang (Audit M9): http:// wird nicht stillschweigend akzeptiert.
+      throw StateError('API_BASE_URL muss HTTPS sein: $baseUrl');
+    }
+    return uri.replace(scheme: 'wss', path: '/ws').toString();
   }
 }
 
@@ -150,8 +156,17 @@ class ApiClient {
 
   /// Holt das öffentliche PreKey-Bundle eines Kommunikationspartners - die
   /// Basis für den Aufbau einer Signal-Protocol-Session (s. prekey_service).
+  ///
+  /// [peerId] muss eine valide UUID sein (Audit M1) und wird zusätzlich
+  /// URL-encoded, bevor er in den Pfad eingebaut wird.
   Future<Map<String, dynamic>> fetchPeerPreKeys(String token, String peerId) async {
-    final r = await _getJson('/api/prekeys/$peerId', token: token);
+    if (!isValidPeerId(peerId)) {
+      throw ApiException(statusCode: 400, message: 'Ungültige Peer-ID');
+    }
+    final r = await _getJson(
+      '/api/prekeys/${Uri.encodeComponent(peerId)}',
+      token: token,
+    );
     return r;
   }
 

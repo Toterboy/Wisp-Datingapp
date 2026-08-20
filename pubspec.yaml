@@ -1,11 +1,11 @@
-﻿name: wisp
+name: wisp
 description: Eine moderne, datenschutzfreundliche Dating-App mit Blind Mode (Persönlichkeit zuerst).
 publish_to: 'none'
 version: 0.4.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
-  flutter: ">=3.19.0"
+  sdk: ^3.9.0
+  flutter: ^3.35.0
 
 dependencies:
   flutter:
@@ -104,11 +104,19 @@ dependencies:
   flutter_dotenv: ^6.0.1
   supabase_flutter: ^2.17.1
 
+  # Passkeys (WebAuthn): native Passkey-Dialoge (FaceID/TouchID/Biometrie).
+  # Der Plugin-Code läuft auf iOS 16+ / Android; es reicht die
+  # Plattform-Prompts an Supabase Auth weiter (siehe lib/services/passkey_auth.dart).
+  # ACHTUNG: Benötigt Flutter 3.35+ / Dart 3.9+ und supabase_flutter mit
+  # Passkey-Unterstützung (signInWithPasskey/registerPasskey).
+  passkeys: ^2.21.0
+
   # QR-Code (Profil teilen + Scannen)
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.4.0
   record: ^7.1.1
   just_audio: ^0.10.6
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   flutter_test:

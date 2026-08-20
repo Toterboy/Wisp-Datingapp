@@ -1,0 +1,13 @@
+/.well-known/*
+  Content-Type: application/json
+
+# Beim 200-Rewrite (netlify.toml) wird die Datei aus dem Root ausgeliefert –
+# dort greifen diese Regeln für den tatsächlich bedienten Pfad:
+/assetlinks.json
+  Content-Type: application/json
+
+/apple-app-site-association
+  Content-Type: application/json
+
+/captcha.html
+  Content-Type: text/html; charset=utf-8

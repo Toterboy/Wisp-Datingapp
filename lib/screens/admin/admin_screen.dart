@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -67,11 +68,21 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
     if (!mounted) return;
     try {
       final result = await SupabaseService.client.rpc('is_current_user_admin');
-      if (result != true && mounted) {
+      if (mounted && result != true) {
+        // Server sagt explizit: kein Admin.
         Navigator.of(context).pushReplacementNamed(AppRoutes.home);
       }
     } catch (e) {
-      debugPrint('[AdminScreen] Server-Admin-Check fehlgeschlagen: $e');
+      // Fail-closed (Audit H6): Schlägt die serverseitige Prüfung fehl
+      // (Netzwerk, blockierter RPC ...), wird der Admin-Bereich NICHT
+      // gerendert. Der Nutzer wird auf Home umgeleitet.
+      if (kDebugMode) {
+        debugPrint('[AdminScreen] Server-Admin-Check fehlgeschlagen '
+            '(fail-closed): $e');
+      }
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      }
     } finally {
       if (mounted) setState(() => _serverAdminChecked = true);
     }
@@ -163,7 +174,7 @@ class _ReportList extends ConsumerWidget {
     return ListView.separated(
       padding: const EdgeInsets.all(12),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final data = items[index] as Map<String, dynamic>;
         return _ReportCard(data: data, kind: kind, format: _formatTimestamp);
@@ -323,7 +334,7 @@ class _PhotoModerationListState extends ConsumerState<_PhotoModerationList> {
     }
     return ListView.separated(
       itemCount: _entries.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, i) {
         final entry = _entries[i];
         final userId = entry['user_id'] as String? ?? '?';

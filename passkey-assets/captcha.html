@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sicherheitscheck – Wisp</title>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #121212;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <!-- Öffentlicher Sitekey (kein Secret!). VOR dem Deploy den Platzhalter
+       <TURNSTILE_SITE_KEY> durch den echten Sitekey ersetzen. -->
+  <div id="captcha-box" class="cf-turnstile"
+       data-sitekey="<TURNSTILE_SITE_KEY>"></div>
+
+  <script>
+    function onSuccess(token) {
+      Captcha.postMessage(token);
+    }
+    function onError() {
+      Captcha.postMessage('ERROR:CAPTCHA_ERROR');
+    }
+    function onExpired() {
+      Captcha.postMessage('ERROR:CAPTCHA_EXPIRED');
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
+      var el = document.getElementById('captcha-box');
+      if (typeof turnstile === 'undefined' || !el) {
+        Captcha.postMessage('ERROR:SCRIPT_NOT_LOADED');
+        return;
+      }
+      turnstile.render(el, {
+        sitekey: el.getAttribute('data-sitekey'),
+        callback: onSuccess,
+        'error-callback': onError,
+        'expired-callback': onExpired
+      });
+    });
+  </script>
+</body>
+</html>

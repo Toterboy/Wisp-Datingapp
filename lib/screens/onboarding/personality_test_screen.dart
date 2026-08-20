@@ -202,7 +202,7 @@ class _PersonalityTestScreenState
                 child: ListView.separated(
                   padding: const EdgeInsets.all(24),
                   itemCount: _questions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 20),
+                  separatorBuilder: (_, _) => const SizedBox(height: 20),
                   itemBuilder: (context, i) {
                     final q = _questions[i];
                     return Column(

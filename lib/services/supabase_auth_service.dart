@@ -100,6 +100,10 @@ class SupabaseAuthService implements AppAuthService {
   ///
   /// Wenn [inviteCode] angegeben ist, wird vor der Registrierung geprüft,
   /// ob der Code gültig und noch nicht verwendet wurde.
+  ///
+  /// [captchaToken]: CAPTCHA-Token (hCaptcha/Turnstile) für den Bot-Schutz.
+  /// Supabase validiert es serverseitig, wenn im Dashboard CAPTCHA aktiviert
+  /// ist; ohne Dashboard-Aktivierung wird das Token ignoriert.
   @override
   Future<UserProfile> register({
     required String name,
@@ -110,6 +114,7 @@ class SupabaseAuthService implements AppAuthService {
     String? inviteCode,
     double? latitude,
     double? longitude,
+    String? captchaToken,
   }) async {
     await _encryption.initialized;
 
@@ -122,16 +127,16 @@ class SupabaseAuthService implements AppAuthService {
     }
 
     // 1) Invite-Code prüfen, falls angegeben.
+    //    Seit Migration 040 läuft die Validierung über die RPC
+    //    validate_invite_code (SECURITY DEFINER, boolean-Rückgabe) –
+    //    die Tabelle invite_codes ist per RLS nicht mehr lesbar (K4).
     String? usedInviteCode;
     if (inviteCode != null && inviteCode.isNotEmpty) {
-      final codeData = await _database.validateInviteCode(inviteCode);
-      if (codeData == null) {
-        throw AppException('Dieser Invite-Code ist ungültig oder existiert nicht.');
+      usedInviteCode = inviteCode.trim().toUpperCase();
+      final isValid = await _database.validateInviteCode(usedInviteCode);
+      if (isValid != true) {
+        throw AppException('Dieser Invite-Code ist ungültig oder wurde bereits verwendet.');
       }
-      if (codeData['used'] == true) {
-        throw AppException('Dieser Invite-Code wurde bereits verwendet.');
-      }
-      usedInviteCode = (codeData['code'] as String).trim().toUpperCase();
     }
 
     // 2) Auth-User anlegen.
@@ -139,13 +144,16 @@ class SupabaseAuthService implements AppAuthService {
     // Nutzerdaten – der serverseitige handle_new_user-Trigger
     // (Migration 009) liest diese Felder aus und legt das Profil mit
     // SECURITY DEFINER an. Dadurch ist kein clientseitiger INSERT nötig.
+    // Der Invite-Code wird ebenfalls in den Metadaten übergeben und vom
+    // Trigger serverseitig eingelöst (Migration 040 – atomar, ohne dass
+    // der Client ihn selbst markieren kann).
     //
     // WICHTIG: Das Passwort darf NIEMALS in raw_user_meta_data landen!
-    // Nur unkritische Profilfelder: name, gender, birth_date.
+    // Nur unkritische Profilfelder: name, gender, birth_date, invite_code.
     if (kDebugMode) {
       debugPrint('[SupabaseAuthService] signUp() wird aufgerufen: email=$email');
+      debugPrint('[SupabaseAuthService] Supabase-URL: ${_supabase.rest.url}');
     }
-    debugPrint('[SupabaseAuthService] Supabase-URL: ${_supabase.rest.url}');
 
     final User user;
     final AuthResponse authResponse;
@@ -153,39 +161,38 @@ class SupabaseAuthService implements AppAuthService {
       authResponse = await _supabase.auth.signUp(
         email: email,
         password: password,
+        captchaToken: captchaToken,
         data: {
           'name': name,
           'gender': gender ?? 'unknown',
           'birth_date': birth,
+          'invite_code': ?usedInviteCode,
         },
       );
-      debugPrint('[SupabaseAuthService] signUp() abgeschlossen: user=${authResponse.user?.id}');
+      if (kDebugMode) {
+        debugPrint('[SupabaseAuthService] signUp() abgeschlossen: user=${authResponse.user?.id}');
+      }
 
       user = authResponse.user ?? (throw AppException('Registrierung fehlgeschlagen. Bitte versuche es erneut.'));
     } on AuthException catch (e) {
-      debugPrint('[SupabaseAuthService] AuthException: ${e.message} (Code: ${e.statusCode})');
+      if (kDebugMode) {
+        debugPrint('[SupabaseAuthService] AuthException: ${e.message} (Code: ${e.statusCode})');
+      }
       rethrow;
     } catch (e, st) {
-      debugPrint('[SupabaseAuthService] UNERWARTETER Fehler bei signUp(): $e');
-      debugPrint('[SupabaseAuthService] StackTrace: $st');
+      if (kDebugMode) {
+        debugPrint('[SupabaseAuthService] UNERWARTETER Fehler bei signUp(): $e');
+        debugPrint('[SupabaseAuthService] StackTrace: $st');
+      }
       rethrow;
     }
 
-    // 3) Invite-Code als verwendet markieren.
-    // Nutzt die SECURITY DEFINER-RPC-Funktion (Migration 011),
-    // die auch ohne vollständig authentifizierte Session funktioniert.
-    if (usedInviteCode != null) {
-      try {
-        await _supabase.rpc('mark_invite_code_used', params: {
-          'p_code': usedInviteCode,
-          'p_user_id': user.id,
-        });
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[SupabaseAuthService] Invite-Code konnte nicht via RPC markiert werden: $e');
-        }
-      }
-    }
+    // 3) Invite-Code: Wurde bereits serverseitig durch handle_new_user
+    //    eingelöst (Migration 040 – der Trigger liest 'invite_code' aus
+    //    den Metadaten und markiert den Code atomar zum SignUp-Zeitpunkt).
+    //    Ein clientseitiges Nachziehen ist nicht mehr nötig; die RPC
+    //    mark_invite_code_used setzt zudem auth.uid() == p_user_id voraus
+    //    (Audit H1) und würde ohne Session fehlschlagen.
 
     // 4) Profil-Erstellung:
     //    Der serverseitige handle_new_user-Trigger (SECURITY DEFINER) hat
@@ -228,8 +235,16 @@ class SupabaseAuthService implements AppAuthService {
   }
 
   /// Loggt einen Nutzer per E-Mail + Passwort in Supabase Auth ein.
+  ///
+  /// [captchaToken]: CAPTCHA-Token (hCaptcha/Turnstile) für den Bot-Schutz –
+  /// Supabase validiert es serverseitig, wenn im Dashboard CAPTCHA
+  /// aktiviert ist.
   @override
-  Future<void> login({required String email, required String password}) async {
+  Future<void> login({
+    required String email,
+    required String password,
+    String? captchaToken,
+  }) async {
     if (kDebugMode) {
       debugPrint('[SupabaseAuthService] login aufgerufen');
     }
@@ -237,6 +252,7 @@ class SupabaseAuthService implements AppAuthService {
     final authResponse = await _supabase.auth.signInWithPassword(
       email: email,
       password: password,
+      captchaToken: captchaToken,
     );
 
     final session = authResponse.session;
@@ -264,12 +280,25 @@ class SupabaseAuthService implements AppAuthService {
   }
 
   /// Loggt den Nutzer aus Supabase Auth aus und löscht lokale Tokens.
+  ///
+  /// ASVS 7.4.1: `SignOutScope.global` ruft den GoTrue-Logout-Endpoint mit
+  /// dem Access-Token auf und widerruft die Session serverseitig (Refresh-
+  /// Token invalidiert). Erst danach lokaler SignOut + Token-Löschung.
+  /// Netzwerkfehler blockieren den Logout nicht (best-effort).
   @override
   Future<void> logout() async {
     try {
-      await _supabase.auth.signOut();
+      await _supabase.auth
+          .signOut(scope: SignOutScope.global)
+          .timeout(const Duration(seconds: 5));
     } catch (_) {
-      // Best-effort: lokales Löschen der Tokens erfolgt trotzdem.
+      // Offline-Fallback: nur lokal ausloggen; die serverseitige Session
+      // läuft bis zum Ablauf des Refresh-Tokens weiter.
+      try {
+        await _supabase.auth.signOut();
+      } catch (_) {
+        // Best-effort: lokales Löschen der Tokens erfolgt trotzdem.
+      }
     }
     await _tokens.clear();
   }

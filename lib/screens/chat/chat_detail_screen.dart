@@ -1,8 +1,8 @@
 ﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,10 +18,12 @@ import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/screens/chat/call_screen.dart';
 import 'package:wisp/services/report_service.dart';
+import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/p2p_chat_service.dart';
 import 'package:wisp/services/photo_moderation_service.dart';
 import 'package:wisp/services/quiz_service.dart';
 import 'package:wisp/services/secure_storage.dart';
+import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
@@ -260,6 +262,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   /// Ruft die notify-user-Edge-Function für den Chat-Partner auf
   /// (nur Metadaten – kein Nachrichteninhalt). Best effort.
+  ///
+  /// Seit Audit H2 generiert der SERVER Titel/Text (Client kann keine
+  /// Push-Inhalte mehr einschleusen – kein Push-Phishing möglich).
   Future<void> _notifyPeerAboutMessage(Match match) async {
     if (!SupabaseService.isInitialized) return;
     try {
@@ -268,12 +273,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         body: {
           'kind': 'messages',
           'target_user_id': match.partner.id,
-          'title': match.partner.name,
-          'body': 'Neue Nachricht von ${match.partner.name}',
         },
       );
     } catch (e) {
-      debugPrint('[ChatDetail] Push-Benachrichtigung fehlgeschlagen: $e');
+      if (kDebugMode) {
+        debugPrint('[ChatDetail] Push-Benachrichtigung fehlgeschlagen: $e');
+      }
     }
   }
 
@@ -666,6 +671,156 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  /// Zeigt den Safety-Number-Dialog (E2E-Identitätsverifikation, Audit B2).
+  ///
+  /// Beide Chat-Partner sehen für ihre Session dieselbe Nummer. Sie wird
+  /// out-of-band (persönlich/telefonisch) verglichen; stimmt sie überein,
+  /// kann die Identität hier bestätigt werden. Ein unterschobenes PreKey-
+  /// Bundle (kompromittierter Server) führt zu abweichenden Nummern.
+  Future<void> _showSafetyNumberDialog(String peerId, String peerName) async {
+    final encryption = ref.read(encryptionServiceProvider);
+    await encryption.initialized;
+
+    var verified = encryption.isPeerIdentityVerified(peerId);
+    final safetyNumber = encryption.safetyNumberFor(peerId);
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.verified_user_outlined),
+              SizedBox(width: 8),
+              Expanded(child: Text('Sicherheitsnummer')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                safetyNumber == null
+                    ? 'Noch keine verschlüsselte Verbindung zu $peerName '
+                        'aufgebaut. Die Nummer erscheint nach der ersten '
+                        'Nachricht.'
+                    : 'Vergleiche diese Nummer mit $peerName – am besten '
+                        'persönlich oder telefonisch:',
+              ),
+              if (safetyNumber != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    safetyNumber,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Identität bestätigt'),
+                  subtitle: const Text(
+                    'Nur aktivieren, wenn die Nummern übereinstimmen.',
+                  ),
+                  value: verified,
+                  onChanged: (value) async {
+                    await encryption.setPeerIdentityVerified(peerId, value);
+                    setDialogState(() => verified = value);
+                  },
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Schließen'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Zeigt den Bestätigungsdialog zum Blockieren eines Nutzers
+  /// (Bot-/Spam-Schutz, Migration 043).
+  ///
+  /// Serverseitig werden Likes in beide Richtungen und der Match gelöscht;
+  /// künftige Interaktionen werden dauerhaft verhindert (bis zum Unblock).
+  Future<void> _showBlockUserDialog(String peerId, String peerName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.block, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(child: Text('Nutzer blockieren?')),
+          ],
+        ),
+        content: Text(
+          '$peerName wird dauerhaft blockiert: Der Match wird gelöscht und '
+          'diese Person kann dich nicht mehr liken, matchen oder dir '
+          'Nachrichten senden. Die Blockierung kann später über den '
+          'Support-Dialog nicht aufgehoben werden – nur du selbst kannst '
+          'sie in den Einstellungen entfernen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Blockieren'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await SupabaseDatabaseService(SupabaseService.client).blockUser(peerId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$peerName wurde blockiert.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        // Match wurde serverseitig gelöscht -> zurück zur Match-Liste.
+        context.go(AppRoutes.interessen);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[ChatDetail] Blockieren fehlgeschlagen: $e');
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Blockieren fehlgeschlagen. Bitte versuche es erneut.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   /// Zeigt den Bestätigungsdialog zum Auflösen des Matches.
   Future<void> _showDissolveMatchDialog() async {
     final confirmed = await showDialog<bool>(
@@ -824,6 +979,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.verified_user_outlined),
+            tooltip: 'Sicherheitsnummer (E2E-Verifikation)',
+            onPressed: () => _showSafetyNumberDialog(partner.id, partner.name),
+          ),
+          IconButton(
             icon: const Icon(Icons.local_fire_department_outlined),
             tooltip: 'Eisbrecher-Fragen (Spice Questions)',
             onPressed: () => context.go(
@@ -855,10 +1015,38 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       tooltip: 'Audio Anruf',
             onPressed: _call,
           ),
-          IconButton(
-            icon: const Icon(Icons.block),
-            tooltip: 'Match auflösen',
-            onPressed: _showDissolveMatchDialog,
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Weitere Optionen',
+            onSelected: (value) {
+              switch (value) {
+                case 'block':
+                  _showBlockUserDialog(partner.id, partner.name);
+                case 'dissolve':
+                  _showDissolveMatchDialog();
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'block',
+                child: ListTile(
+                  leading: Icon(Icons.block),
+                  title: Text('Nutzer blockieren'),
+                  subtitle: Text(
+                    'Keine Nachrichten, Likes oder Matches mehr von dieser Person.',
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'dissolve',
+                child: ListTile(
+                  leading: Icon(Icons.link_off),
+                  title: Text('Match auflösen'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -21,7 +21,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://jftuigjbmmuvrckbchqo.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const CONFIRM_URL = `${SUPABASE_URL}/functions/v1/confirm`;
 
 serve(async (req) => {

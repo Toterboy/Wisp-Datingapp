@@ -1,6 +1,7 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
@@ -9,6 +10,7 @@ import 'package:libsignal_protocol_dart/libsignal_protocol_dart.dart';
 import 'package:wisp/models/signal_key_models.dart';
 import 'package:wisp/services/backup_crypto.dart';
 import 'package:wisp/services/hive_signal_store.dart';
+import 'package:wisp/services/secure_hive.dart';
 
 /// Zentrale Service-Klasse für Ende-zu-Ende-Verschlüsselung mit dem Signal Protocol.
 ///
@@ -26,11 +28,18 @@ import 'package:wisp/services/hive_signal_store.dart';
 class EncryptionService {
   static const String _boxNameIdentity = 'signal_identity';
   static const String _boxNameSessions = 'signal_sessions';
+  static const String _boxNamePeerTrust = 'signal_peer_trust';
   static const String _identityKey = 'identity';
   static const String _registrationIdKey = 'registration_id';
 
   late final Box<SignalIdentityKeyPairAdapter> _identityBox;
   late final Box<SignalSessionRecordAdapter> _sessionBox;
+
+  /// Peer-Trust-Store: peerId → JSON { identityKeyPublic, verified }.
+  /// Grundlage der Safety-Number-Verifikation (Audit B2) – verschlüsselt
+  /// über [SecureHive], da hier Identity-Keys und Vertrauensstatus liegen.
+  /// (Als JSON-String, weil Hive für Map keinen eingebauten Adapter hat.)
+  late final Box<String> _peerTrustBox;
 
   HiveSignalProtocolStore? _store;
   IdentityKeyPair? _identityKeyPair;
@@ -53,11 +62,18 @@ class EncryptionService {
   static const int _preKeyLowWatermark = 10;
 
   /// Initialisiert den Service und öffnet die Hive-Boxen.
+  ///
+  /// Die Boxen werden AES-256-verschlüsselt geöffnet (Schlüssel liegt im
+  /// Keystore/Keychain, siehe [SecureHive]) – der private Identity-Key und
+  /// die Session-Ratchet-States liegen damit nicht im Klartext auf der Platte.
   Future<void> initialize() async {
-    _identityBox =
-        await Hive.openBox<SignalIdentityKeyPairAdapter>(_boxNameIdentity);
-    _sessionBox =
-        await Hive.openBox<SignalSessionRecordAdapter>(_boxNameSessions);
+    _identityBox = await SecureHive.instance.openBox<SignalIdentityKeyPairAdapter>(
+      _boxNameIdentity,
+    );
+    _sessionBox = await SecureHive.instance.openBox<SignalSessionRecordAdapter>(
+      _boxNameSessions,
+    );
+    _peerTrustBox = await SecureHive.instance.openBox<String>(_boxNamePeerTrust);
 
     await _loadOrCreateIdentity();
     _store = await HiveSignalProtocolStore.open(
@@ -208,6 +224,10 @@ class EncryptionService {
   /// entsprechen (wird vom Server via [PreKeyService.fetchPeerPreKeys] geliefert).
   /// Ein hartcodierter Wert (z.B. 1) führt zu Key-Derivation-Fehlern und
   /// nicht-dechiffrierbaren Nachrichten.
+  ///
+  /// Seit Audit B2 wird die Peer-Identity zusätzlich im Trust-Store
+  /// persistiert – sie ist die Grundlage der Safety-Number
+  /// ([safetyNumberFor]) und damit des Out-of-Band-Fingerprint-Vergleichs.
   Future<void> buildSession(
     String recipientId,
     String recipientIdentityKeyB64,
@@ -241,6 +261,111 @@ class EncryptionService {
         recipientIdentityKey,
       ),
     );
+
+    // Peer-Identity für Safety-Number persistieren. Ändert sich der Key
+    // (Server schiebt anderes Bundle unter), wird die Verifikation
+    // zurückgesetzt (TOFU mit Reset bei Key-Wechsel).
+    final existingEntry = _decodeTrustEntry(recipientId);
+    final existingKey = existingEntry?['identityKeyPublic'] as String?;
+    if (existingKey != recipientIdentityKeyB64) {
+      await _peerTrustBox.put(recipientId, jsonEncode({
+        'identityKeyPublic': recipientIdentityKeyB64,
+        'verified': false,
+      }));
+    }
+  }
+
+  Map<String, dynamic>? _decodeTrustEntry(String peerId) {
+    final raw = _peerTrustBox.get(peerId);
+    if (raw == null) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ==========================================================================
+  // Safety-Numbers (Audit B2: Out-of-Band-Fingerprint-Vergleich)
+  // ==========================================================================
+
+  /// Berechnet die Safety-Number zwischen zwei öffentlichen Identity-Keys.
+  ///
+  /// Symmetrisch (Reihenfolge der Keys egal): BEIDE Seiten berechnen für
+  /// dieselbe Session dieselbe Nummer und können sie out-of-band (persönlich,
+  /// Telefon) vergleichen – ein unterschobenes PreKey-Bundle (kompromittierter
+  /// Server) führt zu ABWEICHENDEN Nummern und wird erkannt.
+  ///
+  /// Verfahren (vereinfachtes Signal-Safety-Number-Schema):
+  /// 5200-fach iteriertes SHA-512 über die byte-lexikografisch sortierte
+  /// Konkatenation beider öffentlicher Keys; die ersten 15 Bytes werden
+  /// auf je 2 Dezimalziffern (byte % 100) abgebildet → 30 Ziffern,
+  /// gruppiert in 6 Blöcke à 5 Ziffern.
+  @visibleForTesting
+  static String computeSafetyNumber(Uint8List ourIdentityPub, Uint8List theirIdentityPub) {
+    // Kanonische Reihenfolge: byte-lexikografisch kleinerer Key zuerst
+    // (unabhängig davon, wer die Nummer berechnet).
+    final first = Uint8List.fromList(ourIdentityPub);
+    final second = Uint8List.fromList(theirIdentityPub);
+    final Uint8List a;
+    final Uint8List b;
+    if (_compareBytes(first, second) <= 0) {
+      a = first;
+      b = second;
+    } else {
+      a = second;
+      b = first;
+    }
+
+    var digest = sha512.convert(a + b).bytes;
+    for (var i = 1; i < 5200; i++) {
+      digest = sha512.convert(digest).bytes;
+    }
+
+    final buffer = StringBuffer();
+    for (var i = 0; i < 15; i++) {
+      buffer.write((digest[i] % 100).toString().padLeft(2, '0'));
+    }
+    final digits = buffer.toString();
+    return RegExp(r'.{5}')
+        .allMatches(digits)
+        .map((m) => digits.substring(m.start, m.end))
+        .join(' ');
+  }
+
+  static int _compareBytes(Uint8List x, Uint8List y) {
+    final len = x.length < y.length ? x.length : y.length;
+    for (var i = 0; i < len; i++) {
+      if (x[i] != y[i]) return x[i] < y[i] ? -1 : 1;
+    }
+    return x.length.compareTo(y.length);
+  }
+
+  /// Safety-Number für [peerId] (oder `null`, wenn noch keine Session bzw.
+  /// keine gespeicherte Peer-Identity existiert).
+  String? safetyNumberFor(String peerId) {
+    final peerKeyB64 = _decodeTrustEntry(peerId)?['identityKeyPublic'] as String?;
+    if (peerKeyB64 == null || _identityKeyPair == null) return null;
+    return computeSafetyNumber(
+      _identityKeyPair!.getPublicKey().serialize(),
+      base64Decode(peerKeyB64),
+    );
+  }
+
+  /// True, wenn die Peer-Identity per Out-of-Band-Vergleich bestätigt wurde.
+  bool isPeerIdentityVerified(String peerId) =>
+      _decodeTrustEntry(peerId)?['verified'] == true;
+
+  /// Markiert die Peer-Identity als verifiziert (nach gemeinsamem Vergleich
+  /// der Safety-Number über einen zweiten Kanal) bzw. entfernt die
+  /// Verifikation.
+  Future<void> setPeerIdentityVerified(String peerId, bool verified) async {
+    final entry = _decodeTrustEntry(peerId);
+    if (entry == null) return;
+    await _peerTrustBox.put(peerId, jsonEncode({
+      'identityKeyPublic': entry['identityKeyPublic'],
+      'verified': verified,
+    }));
   }
 
   /// Verschlüsselt eine Nachricht für einen Empfänger.
@@ -300,6 +425,7 @@ class EncryptionService {
   Future<void> clearAllData() async {
     await _identityBox.clear();
     await _sessionBox.clear();
+    await _peerTrustBox.clear();
     _identityKeyPair = null;
     _store = null;
   }
@@ -353,6 +479,7 @@ class EncryptionService {
   Future<void> dispose() async {
     await _identityBox.close();
     await _sessionBox.close();
+    await _peerTrustBox.close();
   }
 }
 

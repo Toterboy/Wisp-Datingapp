@@ -554,7 +554,7 @@ class _PulsingBorderState extends State<_PulsingBorder> with SingleTickerProvide
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
-      builder: (_, __) => Container(
+      builder: (_, _) => Container(
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(

@@ -44,6 +44,10 @@ class _EmailVerificationScreenState
   /// Start-Wartezeit bis zum ersten Auto-Login-Versuch.
   static const _autoLoginInitialDelaySeconds = 5;
 
+  /// Maximales Alter der im Speicher gehaltenen Registrierungs-Credentials
+  /// (E-Mail + Passwort). Danach wird der stille Login eingestellt.
+  static const _autoLoginCredentialsMaxAge = Duration(minutes: 15);
+
   /// Maximale Wartezeit zwischen zwei Auto-Login-Versuchen (Backoff).
   /// Begrenzter Backoff: Das Auth-Rate-Limit wurde auf 300/h angehoben,
   /// daher darf der stille Login deutlich öfter probieren (schnellere
@@ -118,8 +122,16 @@ class _EmailVerificationScreenState
     // Keine überlappenden Versuche (jeder Versuch kostet Rate-Limit-Budget).
     if (_autoLoginInProgress) return;
     if (!mounted || !SupabaseService.isInitialized) return;
-    final creds = ref.read(pendingVerificationCredentialsProvider);
+final creds = ref.read(pendingVerificationCredentialsProvider);
     if (creds == null) return;
+    // Ablauf (Audit M1): Die Registrierungs-Credentials dürfen höchstens
+    // 15 Minuten im Speicher weitergegeben werden. Danach wird der
+    // Auto-Login eingestellt und der Nutzer muss sich regulär anmelden.
+    if (DateTime.now().difference(creds.createdAt) >
+        _autoLoginCredentialsMaxAge) {
+      ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
+      return;
+    }
     // Session schon vorhanden? Dann ist der normale Poller zuständig.
     if (SupabaseService.client.auth.currentSession != null) return;
 

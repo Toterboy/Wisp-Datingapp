@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,55 +14,29 @@ class InvitationCodeService {
 
   final SupabaseDatabaseService _database;
 
-  static const String _codePrefix = 'BLIND-';
+  // Codes beginnen serverseitig mit dem Präfix 'BLIND-' (siehe
+  // create_invite_code-RPC in Migration 043).
 
   /// Prüft, ob ein Code gültig und noch nicht verwendet wurde.
   ///
-  /// Fragt die `invite_codes`-Tabelle ab:
-  /// `SELECT ... WHERE code = ? AND used = false`.
+  /// Läuft über die serverseitige RPC `validate_invite_code` (Migration 040,
+  /// Audit K4): Die invite_codes-Tabelle ist per RLS nicht mehr für alle
+  /// lesbar – Validierung und Einlösung erfolgen ausschließlich über
+  /// RPCs (kein Enumeration-/Massen-Burn-Angriffsvektor mehr).
   Future<bool> validateCode(String code) async {
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) return false;
-
-    final row = await _database.validateInviteCode(normalized);
-    if (row == null) return false;
-
-    final expiresAt = row['expires_at'] as String?;
-    if (expiresAt != null) {
-      final expiry = DateTime.tryParse(expiresAt);
-      if (expiry != null && DateTime.now().isAfter(expiry)) {
-        return false;
-      }
-    }
-
-    final maxUses = (row['max_uses'] as int?) ?? 1;
-    final currentUses = (row['current_uses'] as int?) ?? 0;
-    return currentUses < maxUses;
+    return _database.validateInviteCode(normalized);
   }
 
-  /// Löst einen Code für einen Nutzer ein.
+  /// Löst einen Code für den aktuellen Nutzer ein.
   ///
-  /// Nutzt die SECURITY DEFINER-Funktion [mark_invite_code_used] (Migration 011),
-  /// die serverseitig prüft und atomar markiert – kein clientseitiges UPDATE.
+  /// Nutzt die SECURITY DEFINER-Funktion [mark_invite_code_used] (Migration
+  /// 011/040), die serverseitig prüft (inkl. auth.uid() == p_user_id) und
+  /// atomar markiert – kein clientseitiges UPDATE.
   Future<bool> redeemCode(String code, String userId) async {
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) return false;
-
-    // Zuerst clientseitig validieren (schnelles Feedback).
-    final row = await _database.validateInviteCode(normalized);
-    if (row == null) return false;
-
-    final maxUses = (row['max_uses'] as int?) ?? 1;
-    final currentUses = (row['current_uses'] as int?) ?? 0;
-    if (currentUses >= maxUses) return false;
-
-    final expiresAt = row['expires_at'] as String?;
-    if (expiresAt != null) {
-      final expiry = DateTime.tryParse(expiresAt);
-      if (expiry != null && DateTime.now().isAfter(expiry)) {
-        return false;
-      }
-    }
 
     // Serverseitige, atomare Einlösung via SECURITY DEFINER-Funktion.
     try {
@@ -83,59 +55,64 @@ class InvitationCodeService {
 
   /// Erstellt einen neuen Einladungscode.
   ///
-  /// Nur verifizierte Nutzer dürfen Codes erstellen (RLS-Policy in
-  /// Migration 011 enforced dies zusätzlich serverseitig).
-  /// Maximal 5 Codes pro Nutzer und Monat (clientseitige Vorprüfung).
+  /// Seit Migration 043 ausschließlich über die SECURITY DEFINER-RPC
+  /// `create_invite_code` (serverseitig erzwungen):
+  /// - max. 2 Codes pro Nutzer und Kalendermonat,
+  /// - Code-Erstellung erst ab 7 Tagen Account-Alter,
+  /// - Code-Wert wird serverseitig generiert (kein Client-Einfluss).
+  /// Der frühere direkte INSERT (mit clientseitigem 5/Monat-Precheck)
+  /// ist durch die entfernte INSERT-Policy blockiert.
   Future<InvitationCode?> createCode({
     required String creatorId,
     int maxUses = 1,
     Duration? validFor,
   }) async {
-    // Clientseitige Vorprüfung: Monats-Limit.
-    final existingCodes = await getAllCodes();
-    final myCodesThisMonth = existingCodes.where((c) {
-      if (c.createdBy != creatorId) return false;
-      final now = DateTime.now();
-      return c.createdAt.year == now.year && c.createdAt.month == now.month;
-    }).length;
+    try {
+      final result = await SupabaseService.client.rpc(
+        'create_invite_code',
+        params: {
+          'p_max_uses': maxUses,
+          'p_valid_hours': validFor?.inHours,
+        },
+      );
 
-    if (myCodesThisMonth >= 5) {
-      if (kDebugMode) {
-        debugPrint('[InvitationCodeService] Monats-Limit (5) für $creatorId erreicht.');
+      if (result is Map) {
+        final map = Map<String, dynamic>.from(result);
+        return InvitationCode(
+          code: map['code'] as String,
+          createdAt: DateTime.parse(map['created_at'] as String),
+          createdBy: map['created_by'] as String?,
+          expiresAt: map['expires_at'] == null
+              ? null
+              : DateTime.parse(map['expires_at'] as String),
+          maxUses: (map['max_uses'] as int?) ?? 1,
+          currentUses: (map['current_uses'] as int?) ?? 0,
+        );
       }
       return null;
-    }
-
-    final code = _generateCode();
-    final now = DateTime.now();
-    final invitation = InvitationCode(
-      code: code,
-      createdAt: now,
-      createdBy: creatorId,
-      maxUses: maxUses,
-      expiresAt: validFor != null ? now.add(validFor) : null,
-      currentUses: 0,
-    );
-
-    try {
-      await SupabaseService.client.from('invite_codes').insert({
-        'code': invitation.code,
-        'created_at': invitation.createdAt.toIso8601String(),
-        'created_by': invitation.createdBy,
-        'max_uses': invitation.maxUses,
-        'current_uses': invitation.currentUses,
-        'expires_at': invitation.expiresAt?.toIso8601String(),
-        'used': false,
-      });
-    } catch (e) {
+    } on Exception catch (e) {
+      // Serverseitige Limit-Fehler verständlich übersetzen.
+      final msg = e.toString();
+      if (msg.contains('invite_code_monthly_limit')) {
+        _lastCreateCodeError = 'Monatslimit erreicht (2 Codes).';
+      } else if (msg.contains('invite_code_account_too_new')) {
+        _lastCreateCodeError =
+            'Dein Account ist noch keine 7 Tage alt.';
+      } else if (msg.contains('no_profile')) {
+        _lastCreateCodeError = 'Profil nicht gefunden.';
+      } else {
+        _lastCreateCodeError = null;
+      }
       if (kDebugMode) {
         debugPrint('[InvitationCodeService] Code-Erstellung fehlgeschlagen: $e');
       }
       return null;
     }
-
-    return invitation;
   }
+
+  /// Letzte serverseitige Fehlermeldung der Code-Erstellung (für UI-Feedback).
+  String? get lastCreateCodeError => _lastCreateCodeError;
+  String? _lastCreateCodeError;
 
   /// Gibt alle Codes zurück (für Admin-UI).
   Future<List<InvitationCode>> getAllCodes() async {
@@ -192,16 +169,8 @@ class InvitationCodeService {
   /// ein RLS-Policy-basierter Check ergänzt werden.
   bool isAdminCode(String code) => false;
 
-  /// Generiert einen lesbaren, eindeutigen Code.
-  String _generateCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Ohne verwechselbare Zeichen
-    final random = Random.secure();
-    final buffer = StringBuffer(_codePrefix);
-    for (var i = 0; i < 12; i++) {
-      buffer.write(chars[random.nextInt(chars.length)]);
-    }
-    return buffer.toString();
-  }
+  // Code-Generierung erfolgt seit Migration 043 SERVERSEITIG in der
+  // create_invite_code-RPC (verhindert Client-gewählte Code-Werte).
 }
 
 /// Provider für den [InvitationCodeService].

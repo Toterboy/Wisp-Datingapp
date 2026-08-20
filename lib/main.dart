@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -37,11 +38,16 @@ import 'package:wisp/utils/constants.dart';
 Future<void> main() async {
   FlutterError.onError = (details) {
     FlutterError.dumpErrorToConsole(details);
-    debugPrint('[GLOBAL_ERROR] ${details.exception}\n${details.stack}');
+    if (kDebugMode) {
+      // StackTraces/Exceptions nicht in Release-Builds loggen (M11).
+      debugPrint('[GLOBAL_ERROR] ${details.exception}\n${details.stack}');
+    }
   };
 
   ErrorWidget.builder = (details) {
-    debugPrint('[ERROR_WIDGET] ${details.exception}\n${details.stack}');
+    if (kDebugMode) {
+      debugPrint('[ERROR_WIDGET] ${details.exception}\n${details.stack}');
+    }
     return Material(
       child: Scaffold(
         body: Center(
@@ -165,6 +171,28 @@ Future<void> _initializeSupabase() async {
     await Supabase.initialize(
       url: supabaseUrl,
       publishableKey: supabaseAnonKey,
+      // Deep-Link-Handling für Passwort-Reset / E-Mail-Bestätigung
+      // (wisp://reset-password): supabase_flutter hört über app_links auf
+      // eingehende URIs. Der eingebaute Filter erkennt aber nur
+      // access_token/code/error – PKCE-Links mit token_hash (Standard bei
+      // E-Mail-OTP und Recovery) würden ignoriert. Das Predicate erweitert
+      // die Erkennung um token_hash, damit getSessionFromUrl den Link
+      // verarbeitet und das passwordRecovery-Event feuert (das der
+      // AuthNotifier in den passwordRecoveryPendingProvider schreibt).
+      // QR-Deep-Links (wisp://user/...) tragen kein Auth-Token und fallen
+      // weiterhin NICHT darunter.
+      authOptions: FlutterAuthClientOptions(
+        detectSessionInUriPredicate: (uri) {
+          final query = uri.queryParameters;
+          final fragment = Uri.splitQueryString(uri.fragment);
+          bool has(String key) =>
+              query.containsKey(key) || fragment.containsKey(key);
+          return has('access_token') ||
+              has('token_hash') ||
+              has('code') ||
+              has('error');
+        },
+      ),
     ).timeout(const Duration(seconds: 4));
   } on TimeoutException {
     debugPrint('[MAIN] Supabase.initialize Timeout (> 4s) – Limit-Modus.');

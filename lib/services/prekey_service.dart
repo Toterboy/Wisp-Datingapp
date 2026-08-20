@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/services/encryption_service.dart';
+import 'package:wisp/utils/peer_id.dart';
 
 /// Vermittelt den Aufbau einer Ende-zu-Ende-Session zum Kommunikationspartner.
 ///
@@ -40,6 +41,12 @@ class PreKeyService {
   Future<void> _build(String peerId) async {
     await _encryption.initialized;
 
+    // Peer-ID validieren, bevor sie in den Function-Pfad eingebaut wird
+    // (Audit M1: Pfad-Manipulation über manipulierte QR-Payloads).
+    if (!isValidPeerId(peerId)) {
+      throw StateError('Ungültige Peer-ID (keine UUID): Verbindung abgelehnt.');
+    }
+
     // PreKey-Bundle des Partners via Supabase Edge Function abrufen.
     // Bei 404/503 kurz warten und wiederholen (z. B. Bundle noch nicht hochgeladen).
     const maxAttempts = 3;
@@ -51,7 +58,7 @@ class PreKeyService {
       }
 
       final response = await Supabase.instance.client.functions.invoke(
-        'prekeys/$peerId',
+        'prekeys/${Uri.encodeComponent(peerId)}',
         method: HttpMethod.get,
       );
 

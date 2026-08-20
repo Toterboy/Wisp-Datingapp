@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
-/// Zertifikat-Pinning (DER-Hash, SHA-256).
+/// Zertifikat-Pinning (DER-Hash, SHA-256) – fail-closed.
 ///
 /// Schützt vor Man-in-the-Middle, selbst wenn ein Angreifer ein gültiges,
 /// von einer vertrauenswürdigen CA ausgestelltes Zertifikat präsentieren
@@ -20,15 +20,15 @@ import 'package:flutter/foundation.dart';
 ///     sich ebenso wie DER → kein praktischer Vorteil für Leaf-Zertifikate
 ///   - Intermediate + Root DER-Hashes sind für Jahre stabil
 ///
-/// Pinning-Strategie: Drei DER-Hashes (Leaf, Intermediate, Root). Der Leaf-
-/// Pin muss bei Let's-Encrypt-Rotation (~90 Tage) aktualisiert werden.
-/// Intermediate und Root sind für Jahre stabil und dienen als Backup.
-/// Mindestens EIN Pin muss zum präsentierten Zertifikat passen.
-///
-/// Pin-Rotation: Vor Ablauf des aktuellen Leaf-Pins (~September 2026) einen
-/// ZWEITEN Leaf-Pin aus dem aktuellen Zertifikat extrahieren und hinzufügen.
-/// DEployen, 7 Tage warten (App-Updates verteilen sich), dann alten Pin
-/// entfernen. So gibt es nie eine Downtime.
+/// Pinning-Strategie (Stand 2026-08, Audit K5/H9): Der Leaf-Pin ist die
+/// stärkste Stufe. Da Dart im Callback nur das Leaf sieht und Let's-Encrypt/
+/// GTS-Zertifikate ~90 Tage rotieren, gibt es einen eng begrenzten
+/// Rotation-Fallback: Stimmt der Leaf-Pin nicht, wird der Issuer (erwartete
+/// CA), der Host und der Gültigkeitszeitraum geprüft. Das verhindert
+/// App-weiten DoS bei Zertifikats-Rotation und blockiert gleichzeitig
+/// Self-Signed-/Fremd-CA-MITM. Leaf-Pins sollten dennoch bei Rotation
+/// aktualisiert werden: `dart run tool/rotate_cert_pins.dart` prüft die
+/// Pins gegen die Live-Zertifikate und liefert die aktuellen Hashes.
 ///
 /// Extraktion der DER-Hashes (unabhängig verifiziert via openssl + Node.js):
 ///
@@ -88,6 +88,19 @@ class CertPinning {
     ],
   };
 
+  /// Host → erwarteter Issuer (Rotation-Fallback, Kleinbuchstaben-Vergleich).
+  ///
+  /// Dart's badCertificateCallback liefert nur das Leaf-Zertifikat –
+  /// Intermediate-/Root-Pins sind daher praktisch nie prüfbar. Der
+  /// Rotation-Fallback akzeptiert bei Leaf-Pin-Mismatch nur Zertifikate,
+  /// die vom gepinnten Issuer für den korrekten Host im Gültigkeitszeitraum
+  /// ausgestellt wurden. Das überlebt Leaf-Rotationen (~90 Tage) ohne
+  /// App-Update und blockiert trotzdem Self-Signed-/Fremd-CA-MITM.
+  static const Map<String, String> _pinnedIssuerByHost = {
+    _defaultHost: 'google trust services', // Leaf-Issuer: CN=WE1 (GTS)
+    'router.huggingface.co': 'amazon', // Leaf-Issuer: Amazon RSA 2048 M01
+  };
+
   /// Für Tests: die aktuell konfigurierten DER-Hashes des Standard-Hosts.
   @visibleForTesting
   static List<String> get pinnedCertHashes =>
@@ -100,29 +113,74 @@ class CertPinning {
 
   /// Erzeugt einen [HttpClient] mit DER-Pinning für [host].
   ///
-  /// Ohne [host] wird der Standard-Host (Supabase) gepinnt.
-  /// Unbekannte Hosts (z. B. selbst konfigurierte HF-/API-Endpunkte per
-  /// --dart-define) werden NICHT gepinnt (fail-open mit Warnung), da der
-  /// Betreiber diesen Endpunkt selbst kontrolliert.
+  /// - Gepinnte Hosts: exakter Leaf-Pin; bei Mismatch wird ein eng
+  ///   begrenzter Rotation-Fallback geprüft (Issuer + Host + Gültigkeit).
+  /// - Ungepinnte Hosts: normaler System-Trust-Store (fail-closed) –
+  ///   ungültige/self-signed Zertifikate werden ABGELEHNT. Früher wurden
+  ///   hier alle Zertifikate akzeptiert (fail-open, Audit K5).
   static HttpClient pinnedHttpClient([String? host]) {
-    final pins = _pinnedByHost[host ?? _defaultHost] ?? const <String>[];
+    final targetHost = host ?? _defaultHost;
+    final pins = _pinnedByHost[targetHost] ?? const <String>[];
+
+    if (pins.isEmpty) {
+      // Kein Pin konfiguriert: Standard-HttpClient MIT System-Roots.
+      // Der Callback wird nur bei bereits fehlgeschlagener Normal-
+      // Validierung aufgerufen → immer ablehnen (fail-closed).
+      final client = HttpClient();
+      client.badCertificateCallback = (cert, certHost, port) {
+        if (kDebugMode) {
+          debugPrint('[CERT_PINNING] Keine Pins für $certHost:$port konfiguriert '
+              '— System-Validierung fehlgeschlagen, Verbindung abgelehnt.');
+        }
+        return false;
+      };
+      return client;
+    }
+
     final context = SecurityContext(withTrustedRoots: false);
     final client = HttpClient(context: context);
     client.badCertificateCallback = (cert, certHost, port) {
       final hash = base64Encode(sha256.convert(cert.der).bytes);
-      if (pins.isEmpty) {
-        debugPrint('[CERT_PINNING] Keine Pins für $certHost:$port konfiguriert '
-            '(unbekannter Host) — Verbindung ohne Pinning akzeptiert.');
+      if (pins.contains(hash)) {
         return true;
       }
-      final ok = pins.contains(hash);
-      if (!ok) {
-        debugPrint('[CERT_PINNING] ACHTUNG: Zertifikat-Pin-Mismatch für $certHost:$port – '
-            'möglicher MITM-Angriff! Verbindung abgelehnt.');
-        return false;
+
+      // Rotation-Fallback: Leaf-Pin passt nicht (z. B. Zertifikat wurde
+      // rotiert). Akzeptiere NUR wenn Issuer, Host und Gültigkeitszeitraum
+      // zur erwarteten Kette passen – sonst MITM → ablehnen.
+      if (_issuerFallbackMatches(targetHost, cert, certHost)) {
+        debugPrint('[CERT_PINNING] Pin-Mismatch für $certHost:$port, aber '
+            'Issuer-Fallback (erwartete CA) passend — vermutlich Leaf-'
+            'Rotation. Verbindung akzeptiert. Pin-Zentrale aktualisieren!');
+        return true;
       }
-      return true;
+
+      debugPrint('[CERT_PINNING] ACHTUNG: Zertifikat-Pin-Mismatch für '
+          '$certHost:$port – möglicher MITM-Angriff! Verbindung abgelehnt.');
+      return false;
     };
     return client;
+  }
+
+  /// Prüft den Rotation-Fallback: Zertifikat muss
+  /// 1. vom erwarteten Issuer (z. B. Google Trust Services / Amazon),
+  /// 2. für den Ziel-Host und
+  /// 3. innerhalb seines Gültigkeitszeitraums ausgestellt sein.
+  static bool _issuerFallbackMatches(
+    String targetHost,
+    X509Certificate cert,
+    String certHost,
+  ) {
+    final expectedIssuer = _pinnedIssuerByHost[targetHost];
+    if (expectedIssuer == null) return false;
+
+    final hostOk = certHost.toLowerCase() == targetHost.toLowerCase();
+    final issuerOk =
+        cert.issuer.toLowerCase().contains(expectedIssuer.toLowerCase());
+    final now = DateTime.now();
+    final validityOk =
+        cert.startValidity.isBefore(now) && cert.endValidity.isAfter(now);
+
+    return hostOk && issuerOk && validityOk;
   }
 }

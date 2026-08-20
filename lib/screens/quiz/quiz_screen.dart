@@ -264,7 +264,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         ? Image.network(
             _avatarUrl!,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 96),
+            errorBuilder: (_, _, _) => const Icon(Icons.person, size: 96),
           )
         : const Icon(Icons.person, size: 96);
 

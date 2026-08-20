@@ -1,5 +1,6 @@
 ﻿import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,9 @@ import 'package:wisp/providers/auth_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/auth_exception.dart';
+import 'package:wisp/services/mfa_service.dart';
+import 'package:wisp/services/passkey_auth.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
@@ -49,7 +53,10 @@ class SettingsScreen extends ConsumerWidget {
 
     // Altersbasierte Sicherheits-Regeln anwenden
     final userAge = profile.age;
-    debugPrint('[SETTINGS] profile.age=${profile.age}, birthDate=${profile.birthDate}, userAge=$userAge');
+    if (kDebugMode) {
+      // Geburtsdatum ist PII – nur im Debug-Modus loggen (Audit H4).
+      debugPrint('[SETTINGS] profile.age=${profile.age}, birthDate=${profile.birthDate}, userAge=$userAge');
+    }
     // Falls kein Alter bekannt (kein birthDate), Mindestalter 16 als Fallback für UI
     final effectiveAge = userAge ?? 16;
     final ageGroup = AgeSafetyRules.ageGroup(effectiveAge);
@@ -58,7 +65,9 @@ class SettingsScreen extends ConsumerWidget {
       filterMin: settings.ageRangeMin,
       filterMax: settings.ageRangeMax,
     );
-    debugPrint('[SETTINGS] ageGroup=$ageGroup, allowedAgeMin=$allowedAgeMin, allowedAgeMax=$allowedAgeMax');
+    if (kDebugMode) {
+      debugPrint('[SETTINGS] ageGroup=$ageGroup, allowedAgeMin=$allowedAgeMin, allowedAgeMax=$allowedAgeMax');
+    }
 
     // Falls die aktuellen Werte außerhalb des erlaubten Bereichs liegen, korrigieren
     if (settings.ageRangeMin != allowedAgeMin || settings.ageRangeMax != allowedAgeMax) {
@@ -138,6 +147,43 @@ class SettingsScreen extends ConsumerWidget {
                     contentPadding: EdgeInsets.zero,
                     onTap: () => context.push(AppRoutes.communityGuidelines),
                   ),
+                  if (SupabaseService.isInitialized) ...[
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.fingerprint),
+                      title: const Text('Passkey erstellen'),
+                      subtitle: const Text(
+                        'Biometrischer Login (FaceID/TouchID) ohne Passwort',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () async {
+                        try {
+                          await PasskeyAuth.register();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Passkey wurde erstellt.'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            final msg = e is AppException
+                                ? e.message
+                                : 'Passkey-Erstellung fehlgeschlagen.';
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(msg),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -286,7 +332,33 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           TextButton(
-            onPressed: () async {
+onPressed: () async {
+              // Step-up (ASVS 7.5.3): Bei aktivem MFA ist vor der
+              // Konto-Löschung eine zusätzliche TOTP-Verifikation nötig –
+              // eine reine Passwort-Session (AAL1) reicht nicht.
+              final mfa = ref.read(mfaStatusProvider);
+              if (mfa.hasVerifiedFactors && mfa.currentAal != 'aal2') {
+                final code = await _promptTotpCode(context);
+                if (code == null || !context.mounted) return; // abgebrochen
+                try {
+                  await MfaService(SupabaseService.client)
+                      .verifyChallenge(code: code);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Ungültiger oder abgelaufener Code. '
+                          'Die Löschung wurde abgebrochen.',
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                  return;
+                }
+              }
+              if (!context.mounted) return;
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -356,6 +428,38 @@ class _SectionTitle extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Fragt den 6-stelligen TOTP-Code für das Step-up vor der Konto-Löschung
+/// ab. Liefert `null`, wenn der Nutzer abgebrochen hat.
+Future<String?> _promptTotpCode(BuildContext context) {
+  final controller = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Konto bestätigen'),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        maxLength: 6,
+        decoration: const InputDecoration(
+          labelText: 'TOTP-Code (Authenticator-App)',
+          counterText: '',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Abbrechen'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+          child: const Text('Bestätigen'),
+        ),
+      ],
+    ),
+  );
 }
 
 

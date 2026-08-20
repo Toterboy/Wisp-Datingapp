@@ -58,3 +58,41 @@ supabase/.branches/
 PLAN.md
 PLAN_ERWEITERUNGEN.md
 ANALYSE.md
+# Secrets & lokale Dateien
+.env
+*.env
+rotate.sql
+
+android/key.properties
+*.keystore
+
+# =============================================================================
+# Weitere lokale Dateien/Ordner, die nicht ins Git gehören
+# =============================================================================
+
+# Versehentlich in den Repo-Root kopierte Projektkopie (leere Ordnerskelette)
+Projekte/
+
+# Windows-Explorer-/Systemdateien
+Thumbs.db
+desktop.ini
+
+# Weitere Signing-Keys / Zertifikate (JKS, PKCS#12, PEM, ...)
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+**/service-account*.json
+
+# Verteilbare Build-Artefakte (falls sie außerhalb von build/ landen)
+*.apk
+*.aab
+*.ipa
+
+# Editor-/Backup-Dateien
+*.bak
+*.orig
+
+# Node-Module (generisch, falls wieder Node-Tools im Repo liegen)
+node_modules/

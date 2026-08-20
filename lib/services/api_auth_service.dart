@@ -40,6 +40,8 @@ class ApiAuthService implements AppAuthService {
     }
   }
 
+  /// [captchaToken] wird ignoriert – der Signaling-Server hat kein
+  /// CAPTCHA-Endpoint (nur Supabase Auth unterstützt es aktuell).
   @override
   Future<UserProfile> register({
     required String name,
@@ -50,6 +52,7 @@ class ApiAuthService implements AppAuthService {
     String? inviteCode,
     double? latitude,
     double? longitude,
+    String? captchaToken,
   }) async {
     // Schlüssel müssen bereit sein, bevor wir das Bundle hochladen.
     await _encryption.initialized;
@@ -58,7 +61,10 @@ class ApiAuthService implements AppAuthService {
         '${birthDate.month.toString().padLeft(2, '0')}-'
         '${birthDate.day.toString().padLeft(2, '0')}';
 
-    debugPrint('[ApiAuthService] registriere: email=$email, gender=$gender, birthDate=$birth');
+    if (kDebugMode) {
+      // PII (E-Mail, Geburtsdatum) nur im Debug-Modus loggen (Audit H4).
+      debugPrint('[ApiAuthService] registriere: email=$email, gender=$gender, birthDate=$birth');
+    }
     final profilePayload = {
       'name': name,
       'gender': gender ?? 'unknown',
@@ -73,7 +79,10 @@ class ApiAuthService implements AppAuthService {
       'ageRangeMin': 18,
       'ageRangeMax': 99,
     };
-    debugPrint('[ApiAuthService] Profile payload: $profilePayload');
+    if (kDebugMode) {
+      // Enthält lat/lng – nur im Debug-Modus loggen (Audit H4).
+      debugPrint('[ApiAuthService] Profile payload: $profilePayload');
+    }
     final auth = await _api.register(
       email: email,
       password: password,
@@ -101,8 +110,14 @@ class ApiAuthService implements AppAuthService {
     );
   }
 
+  /// [captchaToken] wird ignoriert – der Signaling-Server hat kein
+  /// CAPTCHA-Endpoint (nur Supabase Auth unterstützt es aktuell).
   @override
-  Future<void> login({required String email, required String password}) async {
+  Future<void> login({
+    required String email,
+    required String password,
+    String? captchaToken,
+  }) async {
     final auth = await _api.login(email: email, password: password);
     await _tokens.saveTokens(
       accessToken: auth.accessToken,

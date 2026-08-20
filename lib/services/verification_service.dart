@@ -1,4 +1,6 @@
+﻿import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:wisp/services/secure_hive.dart';
 import 'package:wisp/services/supabase_service.dart';
 
 /// Model für das Verifizierungs-Video.
@@ -154,26 +157,88 @@ class VerificationService {
   /// Initialisiert den Service.
   Future<void> initialize() async {
     if (_initialized) return;
-    _box = await Hive.openBox<VerificationVideo>(_boxName);
+    // AES-verschlüsselt (GPS-Metadaten + Verifizierungsstatus, s. SecureHive).
+    _box = await SecureHive.instance.openBox<VerificationVideo>(_boxName);
     _initialized = true;
+    // Cleanup-Policy (Audit N2): Abgelaufene Videos/Dateien entfernen –
+    // passiert im Hintergrund, blockiert die Initialisierung nicht.
+    unawaited(_purgeExpired());
+  }
+
+  /// Aufbewahrungsdauer für Verifizierungs-Videos und ihre Metadaten.
+  /// Nach Ablauf werden Datei und Hive-Eintrag gelöscht (DSGVO-
+  /// Datenminimierung; ein Video wird i. d. R. innerhalb weniger Stunden
+  /// geprüft).
+  static const Duration _retention = Duration(days: 7);
+
+  /// Entfernt abgelaufene Verifizierungs-Videos:
+  /// 1. Hive-Einträge, deren recordedAt älter als [_retention] ist,
+  /// 2. Dateien `verification_*` im Temp-Verzeichnis (auch verwaiste, deren
+  ///    Box-Eintrag bereits fehlt).
+  Future<void> _purgeExpired() async {
+    try {
+      final cutoff = DateTime.now().subtract(_retention);
+
+      // 1) Box-Einträge + zugehörige Dateien.
+      final expired = <String>[];
+      for (final key in _box.keys) {
+        final video = _box.get(key);
+        if (video == null) continue;
+        if (video.recordedAt.isBefore(cutoff)) {
+          expired.add(key as String);
+          final file = File(video.filePath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        }
+      }
+      if (expired.isNotEmpty) {
+        await _box.deleteAll(expired);
+      }
+
+      // 2) Verwaiste Dateien im Temp-Verzeichnis.
+      final dir = await getTemporaryDirectory();
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last;
+        if (!name.startsWith('verification_') || !name.endsWith('.mp4')) {
+          continue;
+        }
+        final stat = await entity.stat();
+        if (stat.modified.isBefore(cutoff)) {
+          await entity.delete();
+        }
+      }
+    } catch (e) {
+      // Cleanup ist Best-Effort – darf Initialisierung/Nutzung nie brechen.
+      if (kDebugMode) {
+        debugPrint('[Verification] Cleanup fehlgeschlagen: $e');
+      }
+    }
   }
 
   /// Generiert eine zufällige Challenge für den Nutzer.
+  ///
+  /// Verwendet Random.secure() (Audit M8): Die frühere Uhrzeit-Modulo-
+  /// Variante war vorhersagbar und hätte vorab vorbereitet werden können.
   (VerificationChallengeType, String) generateChallenge() {
-    final type = _challengeTypes[DateTime.now().millisecondsSinceEpoch % _challengeTypes.length];
+    final type =
+        _challengeTypes[_secureRandom.nextInt(_challengeTypes.length)];
     String challengeData;
 
     switch (type) {
       case VerificationChallengeType.speakNumber:
-        final number = (1000 + DateTime.now().millisecondsSinceEpoch % 9000).toString();
+        final number =
+            (1000 + _secureRandom.nextInt(9000)).toString();
         challengeData = number;
         break;
       case VerificationChallengeType.makeGesture:
         const gestures = ['Zunge rausstrecken', 'Einmal blinzeln', 'Augenbrauen hochziehen'];
-        challengeData = gestures[DateTime.now().millisecondsSinceEpoch % gestures.length];
+        challengeData = gestures[_secureRandom.nextInt(gestures.length)];
         break;
       case VerificationChallengeType.turnHead:
-        challengeData = DateTime.now().millisecondsSinceEpoch % 2 == 0 ? 'links und rechts' : 'rechts und links';
+        challengeData =
+            _secureRandom.nextBool() ? 'links und rechts' : 'rechts und links';
         break;
       case VerificationChallengeType.smile:
         challengeData = 'lächeln';
@@ -182,6 +247,8 @@ class VerificationService {
 
     return (type, challengeData);
   }
+
+  static final Random _secureRandom = Random.secure();
 
   /// Holt die Anzeigetexte für eine Challenge.
   String getChallengeDescription(VerificationChallengeType type, String challengeData) {
@@ -266,16 +333,24 @@ class VerificationService {
   }
 
   /// Prüft, ob der Nutzer bereits verifiziert ist.
+  ///
+  /// HINWEIS (Audit M3): Rein lokaler UX-Zustand – manipulierbar und ohne
+  /// serverseitige Bedeutung. Authoritative Quelle ist
+  /// `profiles.is_verified` (nur durch Admins/Edge Functions setzbar,
+  /// Migration 040/verify-account).
   bool get isVerified {
     final video = getVerificationVideo();
     return video?.isVerified == true;
   }
 
-  /// Ruft die Supabase Edge Function `verify-account` auf, um die
-  /// Video-Verifizierung serverseitig abzuschließen.
+  /// Fordert die serverseitige Verifizierung an (Edge Function
+  /// `verify-account`).
   ///
-  /// Der Supabase-Client sendet den aktuellen Session-Token automatisch im
-  /// Authorization-Header, sodass die serverseitige JWT-Prüfung greift.
+  /// Seit Audit K2 ist die Funktion ADMIN-ONLY: Der Client kann
+  /// `is_verified` nicht mehr selbst setzen. Dieser Aufruf meldet den
+  /// Verifizierungswunsch; die Freigabe erfolgt nach manueller Prüfung
+  /// durch einen Admin. Rückgabe ist daher aus Client-Sicht i. d. R.
+  /// `false` (kein automatischer Verifizierungs-Erfolg mehr).
   Future<bool> verifyAccount() async {
     if (!SupabaseService.isInitialized) return false;
 
@@ -286,7 +361,7 @@ class VerificationService {
 
       if (response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
-        final success = data['success'] as bool? ?? false;
+        final success = data['updated'] as bool? ?? false;
         if (success) {
           markAsVerified(getVerificationVideo()?.filePath ?? '');
         }

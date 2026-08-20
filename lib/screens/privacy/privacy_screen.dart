@@ -79,13 +79,24 @@ class PrivacyScreen extends ConsumerWidget {
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/wisp_data_export.json');
       await file.writeAsString(json);
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'application/json')],
-          subject: 'Wisp Datenexport',
-          text: 'Dein Wisp-Datenexport (JSON).',
-        ),
-      );
+      try {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(file.path, mimeType: 'application/json')],
+            subject: 'Wisp Datenexport',
+            text: 'Dein Wisp-Datenexport (JSON).',
+          ),
+        );
+      } finally {
+        // Temporäre Export-Datei (enthält alle Profildaten) wieder
+        // löschen, damit nichts im Temp-Verzeichnis liegen bleibt
+        // (Audit N2).
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {
+          // Best effort.
+        }
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

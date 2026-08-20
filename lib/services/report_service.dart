@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -10,6 +10,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:wisp/models/message.dart';
 import 'package:wisp/models/report_models.dart';
 import 'package:wisp/providers/profile_provider.dart';
+import 'package:wisp/services/secure_hive.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
 
@@ -36,7 +37,8 @@ class ReportService {
 
   Future<void> initialize() async {
     if (_initialized) return;
-    _box = await Hive.openBox<UserReport>(_boxName);
+    // AES-verschlüsselt (Reports enthalten PII, s. SecureHive).
+    _box = await SecureHive.instance.openBox<UserReport>(_boxName);
     _initialized = true;
   }
 

@@ -53,6 +53,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _persist();
   }
 
+  /// Blendet den MFA-Einrichtungshinweis dauerhaft aus.
+  Future<void> setMfaSetupDismissed(bool value) async {
+    state = state.copyWith(mfaSetupDismissed: value);
+    await _persist();
+  }
+
   /// Legt fest, ob die eigenen Fotos erst nach Match sichtbar sind.
   Future<void> setRevealPhotosAfterMatch(bool value) async {
     state = state.copyWith(revealPhotosAfterMatch: value);

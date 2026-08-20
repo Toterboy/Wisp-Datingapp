@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wisp.app",
+      "sha256_cert_fingerprints": [
+        "37aa4f6cc1ddB8f595745eac0ace0a19c9547280fc748f0266bdd2ec7be95572"
+      ]
+    }
+  }
+]

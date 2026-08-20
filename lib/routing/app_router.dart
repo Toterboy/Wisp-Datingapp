@@ -7,9 +7,14 @@ import 'package:wisp/models/app_settings.dart';
 import 'package:wisp/providers/auth_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/services/mfa_service.dart';
+import 'package:wisp/utils/constants.dart';
 import 'package:wisp/screens/auth/login_screen.dart';
 import 'package:wisp/screens/auth/forgot_password_screen.dart';
+import 'package:wisp/screens/auth/reset_password_screen.dart';
 import 'package:wisp/screens/auth/email_verification_screen.dart';
+import 'package:wisp/screens/auth/mfa_setup_screen.dart';
+import 'package:wisp/screens/auth/mfa_challenge_screen.dart';
 import 'package:wisp/screens/core/loading_screen.dart';
 import 'package:wisp/screens/welcome/welcome_screen.dart';
 import 'package:wisp/screens/core/error_screen.dart';
@@ -52,6 +57,8 @@ class AppRoutes {
   static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String forgotPassword = '/forgot-password';
+  // Passwort-Reset (Ziel des Recovery-Deep-Links wisp://reset-password)
+  static const String resetPassword = '/reset-password';
   static const String home = '/';
   static const String findYourMatch = '/find-your-match';
   static const String interessen = '/interessen';
@@ -87,6 +94,9 @@ class AppRoutes {
   static const String verificationInfo = '/verification/info';
   static const String invitationCode = '/invitation-code';
   static const String emailVerification = '/email-verification';
+  // Zwei-Faktor-Schutz (TOTP/Authenticator-App)
+  static const String mfaSetup = '/mfa-setup';
+  static const String mfaChallenge = '/mfa-challenge';
   // Community-Regeln
   static const String communityGuidelines = '/community-guidelines';
 
@@ -128,26 +138,31 @@ class _RouterRefresh extends ChangeNotifier {
     // evaluieren lassen.
     ref.listen<AsyncValue<bool>>(
       authProvider,
-      (_, __) => notifyListeners(),
+      (_, _) => notifyListeners(),
     );
     ref.listen<AppSettings>(
       settingsProvider,
-      (_, __) => notifyListeners(),
+      (_, _) => notifyListeners(),
     );
     // Auch auf das Settings-Lade-Flag hören: Erst wenn Auth UND Settings
     // geladen sind, wird die initiale Route bestimmt.
     ref.listen<bool>(
       settingsLoadedProvider,
-      (_, __) => notifyListeners(),
+      (_, _) => notifyListeners(),
     );
     // Server-Sync (Setup-Flags nach Login) ebenfalls abwarten.
     ref.listen<bool>(
       serverSyncDoneProvider,
-      (_, __) => notifyListeners(),
+      (_, _) => notifyListeners(),
     );
     ref.listen<bool?>(
       emailConfirmedProvider,
-      (_, __) => notifyListeners(),
+      (_, _) => notifyListeners(),
+    );
+    // MFA-Status (Challenge nötig / Setup-Prompt) ebenfalls beobachten.
+    ref.listen<MfaStatus>(
+      mfaStatusProvider,
+      (_, _) => notifyListeners(),
     );
   }
 }
@@ -181,6 +196,15 @@ GoRouter createRouter(Ref ref) {
       // Auswertung erneut an, sobald beide Zustände feststehen.
       if (auth.isLoading || !settingsReady) return null;
 
+      // Passwort-Reset (Recovery-Deep-Link aus der E-Mail): Solange der
+      // Reset aussteht, ist ausschließlich der Reset-Screen erreichbar –
+      // auch während des Server-Syncs und unabhängig vom Setup-Stand.
+      if (ref.read(passwordRecoveryPendingProvider)) {
+        return state.matchedLocation == AppRoutes.resetPassword
+            ? null
+            : AppRoutes.resetPassword;
+      }
+
       final settings = ref.read(settingsProvider);
       final loggedIn = auth.valueOrNull ?? false;
       final introSeen = settings.introSeen;
@@ -201,6 +225,8 @@ GoRouter createRouter(Ref ref) {
       final goingToLogin = state.matchedLocation == AppRoutes.login;
       final goingToForgotPassword =
           state.matchedLocation == AppRoutes.forgotPassword;
+      final goingToResetPassword =
+          state.matchedLocation == AppRoutes.resetPassword;
       final goingToSettingsPrivacyOnce =
           state.matchedLocation == AppRoutes.settingsPrivacyOnce;
       final goingToOnboarding = state.matchedLocation == AppRoutes.onboarding;
@@ -224,7 +250,8 @@ GoRouter createRouter(Ref ref) {
         if (goingToWelcome && introSeen) return AppRoutes.login;
         // Wenn Intro noch nicht gesehen → von Login zur Einfuehrung schicken.
         if (goingToLogin && !introSeen) return AppRoutes.welcome;
-        if (goingToLogin || goingToForgotPassword || goingToWelcome) {
+        if (goingToLogin || goingToForgotPassword ||
+            goingToResetPassword || goingToWelcome) {
           return null;
         }
         return AppRoutes.login;
@@ -286,6 +313,32 @@ GoRouter createRouter(Ref ref) {
         return null;
       }
 
+      // Schritt 0.5: Zwei-Faktor-Schutz (TOTP/Authenticator-App).
+      //
+      // a) Verifizierte Faktoren vorhanden, Session aber nur AAL1
+      //    (Passwort-Login) -> Code-Abfrage VOR jedem anderen Screen.
+      // b) Keine Faktoren eingerichtet und Hinweis nicht ausgeblendet
+      //    -> optionaler Einrichtungs-Screen (nach der E-Mail-Bestätigung,
+      //       vor der restlichen Einrichtung). „Später" merkt sich das
+      //       lokal (mfaSetupDismissed).
+      final mfa = ref.read(mfaStatusProvider);
+      if (mfa.loaded) {
+        final location = state.matchedLocation;
+        final mfaExempt = location == AppRoutes.mfaChallenge ||
+            location == AppRoutes.mfaSetup ||
+            location == AppRoutes.emailVerification ||
+            location == AppRoutes.bugReport;
+        if (mfa.needsChallenge && !mfaExempt) {
+          return AppRoutes.mfaChallenge;
+        }
+        if (!mfa.needsChallenge &&
+            mfa.shouldPromptSetup &&
+            !settings.mfaSetupDismissed &&
+            !mfaExempt) {
+          return AppRoutes.mfaSetup;
+        }
+      }
+
       if (!settings.oneTimeSettingsCompleted) {
         if (!goingToSettingsPrivacyOnce) return AppRoutes.settingsPrivacyOnce;
         return null;
@@ -301,6 +354,21 @@ GoRouter createRouter(Ref ref) {
         return null;
       }
 
+      // Verifizierungs-Flow per Feature-Flag gesperrt (Betreiber-Entscheidung):
+      // Routen sind nicht erreichbar und leiten auf Home um.
+      // Reaktivierung: --dart-define=VERIFICATION_ENABLED=true.
+      // (Der Einladungscode als Zugangskontrolle bei der Registrierung
+      //  bleibt unabhängig davon aktiv.)
+      if (!AppConstants.verificationEnabled) {
+        final location = state.matchedLocation;
+        if (location == AppRoutes.verificationVideo ||
+            location == AppRoutes.verificationComplete ||
+            location == AppRoutes.verificationInfo ||
+            location == AppRoutes.invitationCode) {
+          return AppRoutes.home;
+        }
+      }
+
       // Ab hier ist die Einrichtung vollständig abgeschlossen.
       //
       // Intro/Auth-Screens und die EINMALIGEN Setup-Screens
@@ -314,6 +382,7 @@ GoRouter createRouter(Ref ref) {
       if (goingToWelcome ||
           goingToLogin ||
           goingToForgotPassword ||
+          goingToResetPassword ||
           goingToSettingsPrivacyOnce ||
           goingToOnboarding) {
         return AppRoutes.home;
@@ -351,6 +420,10 @@ routes: [
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) => const ResetPasswordScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.settingsPrivacyOnce,
         builder: (context, state) => const SettingsPrivacyOnceScreen(),
       ),
@@ -382,6 +455,14 @@ routes: [
       GoRoute(
         path: AppRoutes.emailVerification,
         builder: (context, state) => const EmailVerificationScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.mfaSetup,
+        builder: (context, state) => const MfaSetupScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.mfaChallenge,
+        builder: (context, state) => const MfaChallengeScreen(),
       ),
       GoRoute(
         path: AppRoutes.communityGuidelines,

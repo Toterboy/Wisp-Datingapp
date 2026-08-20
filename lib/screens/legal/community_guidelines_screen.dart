@@ -64,7 +64,7 @@ class CommunityGuidelinesScreen extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _paragraphs.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, i) {
           final rule = _paragraphs[i];
           final isIntro = i == 0;

@@ -20,22 +20,66 @@
 //      Generate new private key)
 //
 // Secrets:
-//   WISP_INTERNAL_SECRET          – muss zum Trigger-Secret (Migration 029) passen
+//   WISP_INTERNAL_SECRET          – muss zum Vault-Secret 'wisp_internal_secret'
+//                                   passen (Migration 040). KEIN hartcodierter
+//                                   Fallback: fehlt das Env, ist die Funktion
+//                                   für interne Aufrufe geschlossen (fail-closed).
 //   SUPABASE_SERVICE_ROLE_KEY     – bereits als Function-Secret vorhanden
 //   FIREBASE_SERVICE_ACCOUNT_JSON – Service-Account-Schlüssel (siehe oben)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
-const WISP_INTERNAL_SECRET =
-  Deno.env.get("WISP_INTERNAL_SECRET") ??
-  "wisp_e9dbe226a029e771c82188a6fb79b043f2910aa360bd2c16219cac4c58eee92b";
+const WISP_INTERNAL_SECRET = Deno.env.get("WISP_INTERNAL_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
+
+/** Constant-time-Vergleich (verhindert Timing-Leaks beim Secret-Check). */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+/**
+ * DB-basiertes Rate-Limit pro Absender (Audit B4).
+ * Nutzt die persistente RPC consume_rate_limit (Migration 042) –
+ * überlebt Cold Starts und ist über alle Instanzen hinweg gültig.
+ */
+const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_WINDOW_S = 60;
+
+async function isRateLimited(callerId: string): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("consume_rate_limit", {
+      p_key: `notify-user:${callerId}`,
+      p_max_hits: RATE_LIMIT_MAX,
+      p_window_seconds: RATE_LIMIT_WINDOW_S,
+    });
+    if (error) {
+      // Fail-closed: Wenn das Limit nicht geprüft werden kann, wird der
+      // Versand blockiert (Push ist Best-Effort, kein kritischer Pfad).
+      console.error("consume_rate_limit error:", error);
+      return true;
+    }
+    return data !== true;
+  } catch (e) {
+    console.error("consume_rate_limit exception:", e);
+    return true;
+  }
+}
+
+/** Serverseitig generierte Texte pro kind (kein client-kontrollierter Text). */
+const clientTextsByKind: Record<string, { title: string; body: string }> = {
+  messages: { title: "Wisp", body: "Du hast eine neue Nachricht erhalten." },
+};
 
 /** Erzeugt ein kurzlebiges FCM-Access-Token aus dem Service-Account (JWT-Flow). */
 async function getFcmAccessToken(serviceAccountJson: string): Promise<string> {
@@ -104,8 +148,11 @@ serve(async (req) => {
   // Auth: interner Trigger-Aufruf ODER authentifizierter Client (JWT).
   const internal = req.headers.get("x-wisp-internal") ?? "";
   const isInternal =
-    WISP_INTERNAL_SECRET !== "" && internal === WISP_INTERNAL_SECRET;
+    WISP_INTERNAL_SECRET !== "" &&
+    internal !== "" &&
+    timingSafeEqual(internal, WISP_INTERNAL_SECRET);
 
+  let callerId = "";
   if (!isInternal) {
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
@@ -116,6 +163,7 @@ serve(async (req) => {
           status: 401, headers: { "Content-Type": "application/json" },
         });
       }
+      callerId = data.user.id;
     } catch {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { "Content-Type": "application/json" },
@@ -134,17 +182,39 @@ serve(async (req) => {
 
   const targetUserId = String(body.target_user_id ?? "");
   const kind = String(body.kind ?? "");
-  const title = String(body.title ?? "Wisp").slice(0, 100);
-  const text = String(body.body ?? "").slice(0, 200);
-  const data = body.data && typeof body.data === "object" && body.data !== null
-    ? body.data
-    : {};
 
-  if (!targetUserId || !text) {
-    return new Response(JSON.stringify({ error: "Missing target_user_id or body" }), {
+  if (!targetUserId || !kind) {
+    return new Response(JSON.stringify({ error: "Missing target_user_id or kind" }), {
       status: 400, headers: { "Content-Type": "application/json" },
     });
   }
+
+  // Nur internen Aufrufen (DB-Trigger) ist es erlaubt, Titel/Text frei zu
+  // wählen. Clients bekommen feste, serverseitig generierte Texte - das
+  // verhindert Push-Phishing mit beliebigem Inhalt im App-Look.
+  let title: string;
+  let text: string;
+  if (isInternal) {
+    title = String(body.title ?? "Wisp").slice(0, 100);
+    text = String(body.body ?? "").slice(0, 200);
+  } else {
+    const fixed = clientTextsByKind[kind];
+    if (!fixed) {
+      // Client darf nur die unterstützten kinds auslösen.
+      return new Response(JSON.stringify({ error: "Invalid kind" }), {
+        status: 400, headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (await isRateLimited(callerId)) {
+      return new Response(JSON.stringify({ ok: false, reason: "rate_limited" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    }
+    title = fixed.title;
+    text = fixed.body;
+  }
+
+  const data: Record<string, string> = {};
 
   // Einzel-Schalter + Master serverseitig prüfen (Service-Role, RLS-frei).
   const { data: profile } = await admin

@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// App-weite Konstanten (Schlüssel, Defaults).
 class AppConstants {
   AppConstants._();
@@ -74,27 +76,101 @@ class AppConstants {
   // Build-Zeit-Konfiguration (via --dart-define)
   // ===========================================================================
 
-  /// Hugging Face API-Token für NSFW-Moderation.
-  /// Setzen via: flutter run --dart-define=HF_API_TOKEN=hf_xxx...
-  /// Ohne Token wird Moderation deaktiviert (fail-safe: Fotos werden
-  /// durchgelassen, aber im Admin-Screen markiert).
-  static final String hfApiToken = const String.fromEnvironment(
-    'HF_API_TOKEN',
-    defaultValue: '',
-  );
+  // ===========================================================================
+  // Feature-Flags (bewusst ABgeschaltet, später reaktivierbar)
+  // ===========================================================================
 
-  /// Optional: eigener Hugging Face Inference-Endpunkt (z. B. EU-Region
-  /// oder selbstgehostet). Standard ist der HF-Inference-Router
-  /// (H-09: `api-inference.huggingface.co` existiert nicht mehr und
-  /// wird über `router.huggingface.co/hf-inference/models/...` bedient).
-  static const String hfInferenceUrl = String.fromEnvironment(
-    'HF_INFERENCE_URL',
-    defaultValue: 'https://router.huggingface.co/hf-inference/models/Falconsai/nsfw_image_detection',
-  );
+  /// NSFW-Foto-Moderation (Betreiber-Entscheidung: deaktiviert).
+  ///
+  /// `false` (Default): Bilder werden ohne Prüfung durchgelassen; es wird
+  /// KEIN photo_moderation-DB-Eintrag erzeugt (keine Admin-Warteschlange).
+  /// Reaktivierung später: `--dart-define=NSFW_MODERATION_ENABLED=true`
+  /// zusammen mit der Edge-Function-Implementierung (Token serverseitig,
+  /// HuggingFaceService muss dann den Function-Call ausführen).
+  static const bool nsfwModerationEnabled =
+      bool.fromEnvironment('NSFW_MODERATION_ENABLED', defaultValue: false);
 
-  /// Optionale TURN-Server-Konfiguration für WebRTC.
-  /// Ohne TURN funktioniert P2P hinter restrictiven NATs nicht zuverlässig.
-  static const String turnServerUrl = String.fromEnvironment('TURN_SERVER_URL');
-  static const String turnUsername = String.fromEnvironment('TURN_USERNAME');
-  static const String turnCredential = String.fromEnvironment('TURN_CREDENTIAL');
+  /// Video-Verifizierung (Betreiber-Entscheidung: deaktiviert).
+  ///
+  /// `false` (Default): Der Verifizierungs-Flow (Info/Video/Complete-Routen)
+  /// ist gesperrt und leitet auf Home um; verify-account bleibt admin-only
+  /// am Server. Reaktivierung später: `--dart-define=VERIFICATION_ENABLED=true`.
+  /// Hinweis: Der Einladungscode (Zugangskontrolle bei der Registrierung)
+  /// bleibt davon UNBERÜHRT aktiv.
+  static const bool verificationEnabled =
+      bool.fromEnvironment('VERIFICATION_ENABLED', defaultValue: false);
+
+  /// Basis-URL des Supabase-Projekts (aus .env), ohne trailing slash.
+  /// Wird u. a. für die captcha-page Edge Function benötigt.
+  static String get supabaseUrlBase {
+    if (_dotenvReady) {
+      final v = dotenv.env['SUPABASE_URL']?.trim() ?? '';
+      if (v.isNotEmpty) return v.replaceAll(RegExp(r'/+$'), '');
+    }
+    return '';
+  }
+
+  // ===========================================================================
+  // CAPTCHA bei der Registrierung (Bot-Schutz)
+  // ===========================================================================
+
+  /// CAPTCHA-Anbieter: `'hcaptcha'`, `'turnstile'` (Cloudflare) oder `''`
+  /// (deaktiviert – Default).
+  ///
+  /// Quellen (in dieser Reihenfolge):
+  ///  1. `.env`-Eintrag `CAPTCHA_PROVIDER` (empfohlen – gilt automatisch
+  ///     für jeden Build/Run, keine --dart-define-Args nötig)
+  ///  2. `--dart-define=CAPTCHA_PROVIDER=...` (Fallback)
+  ///
+  /// WICHTIG (Operator): Funktioniert NUR zusammen mit der Dashboard-
+  /// Aktivierung (Authentication → CAPTCHA, gleicher Anbieter + Secret).
+  /// Ohne Dashboard-Aktivierung wird das Token vom Server ignoriert.
+  static String get captchaProvider {
+    const fromEnv = String.fromEnvironment('CAPTCHA_PROVIDER');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    if (_dotenvReady) {
+      final v = dotenv.env['CAPTCHA_PROVIDER']?.trim() ?? '';
+      if (v.isNotEmpty) return v;
+    }
+    return '';
+  }
+
+  /// Öffentlicher Sitekey des CAPTCHA-Anbieters (kein Secret!).
+  /// `.env`-Eintrag `CAPTCHA_SITEKEY` oder `--dart-define=CAPTCHA_SITEKEY=`.
+  static String get captchaSiteKey {
+    const fromEnv = String.fromEnvironment('CAPTCHA_SITEKEY');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    if (_dotenvReady) {
+      return dotenv.env['CAPTCHA_SITEKEY']?.trim() ?? '';
+    }
+    return '';
+  }
+
+  /// dotenv wird in main() vor allem anderen geladen; der Getter toleriert
+  /// Zugriffe vor dem Laden (z. B. in frühen Tests).
+  static bool get _dotenvReady {
+    try {
+      return dotenv.isInitialized;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// True, wenn CAPTCHA im Client aktiv konfiguriert ist. Das zugehörige
+  /// Secret (Turnstile/hCaptcha Secret Key) liegt ausschließlich im
+  /// Supabase Dashboard – niemals im Client.
+  static bool get captchaEnabled =>
+      (captchaProvider == 'hcaptcha' || captchaProvider == 'turnstile') &&
+      captchaSiteKey.isNotEmpty;
+
+  // HINWEIS (Sicherheit): HF_API_TOKEN / HF_INFERENCE_URL wurden ENTFERNT -
+  // ein in die App eingebettetes Token wäre aus APK/IPA extrahierbar.
+  // Die NSFW-Moderation wird später serverseitig über eine Edge Function
+  // implementiert (Token liegt dann ausschließlich als Function-Secret).
+
+  // HINWEIS (Betreiber-Entscheidung): TURN wird NICHT genutzt (keine
+  // laufenden Abos/Kosten). ICE läuft ausschließlich über STUN (europäische
+  // Server, siehe WebRTCService/ice-config Edge Function). Konsequenz:
+  // Hinter symmetrischen NATs/strikten Firewalls (z. B. Unternehmensnetze)
+  // kann ggf. keine direkte P2P-Verbindung aufgebaut werden.
 }

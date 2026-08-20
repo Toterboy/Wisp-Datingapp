@@ -9,7 +9,6 @@ import 'package:libsignal_protocol_dart/libsignal_protocol_dart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/services/encryption_service.dart';
-import 'package:wisp/utils/constants.dart';
 
 /// Service für WebRTC Peer-to-Peer Verbindungen.
 ///
@@ -29,20 +28,18 @@ class WebRTCService {
   final http.Client _httpClient;
 
   /// ICE-Fallback (NUR EU, KEIN Google), falls die ice-config Edge
-  /// Function nicht erreichbar ist. Optionaler TURN kann per
-  /// --dart-define konfiguriert werden, da sonst hinter restrictiven
-  /// NATs keine Verbindung zustande kommt.
+  /// Function nicht erreichbar ist.
+  ///
+  /// BETREIBER-ENTSCHEIDUNG: Kein TURN (keine laufenden Abos/Kosten).
+  /// Konsequenz: Hinter symmetrischen NATs/strikten Firewalls (z. B.
+  /// Unternehmensnetzen) kommt ggf. keine direkte P2P-Verbindung zustande.
+  /// Falls später TURN gewünscht ist: ice-config Edge Function um
+  /// kurzlebige TURN-REST-Credentials erweitern (siehe Git-Historie).
   static final List<Map<String, dynamic>> _fallbackIceServers = [
     {'urls': 'stun:stun.nextcloud.com:443'},  // Hetzner, DE
     {'urls': 'stun:stun.miwifi.com:3478'},    // OVH, FR
     {'urls': 'stun:stun.voipgate.com:3478'},  // DE
     {'urls': 'stun:stun.voipstunt.com:3478'}, // NL
-    if (AppConstants.turnServerUrl.isNotEmpty)
-      {
-        'urls': AppConstants.turnServerUrl,
-        if (AppConstants.turnUsername.isNotEmpty) 'username': AppConstants.turnUsername,
-        if (AppConstants.turnCredential.isNotEmpty) 'credential': AppConstants.turnCredential,
-      },
   ];
 
   /// Cache für die dynamisch geladene ICE-Konfiguration (H-03).
@@ -74,6 +71,7 @@ class WebRTCService {
   final StreamController<RTCIceConnectionState> _iceConnectionStateController = StreamController<RTCIceConnectionState>.broadcast();
 
   RealtimeChannel? _signalingChannel;
+  String? _myUserId;
   String? _currentPeerId;
   String? _signalingTopic;
   bool _isConnected = false;
@@ -181,10 +179,19 @@ class WebRTCService {
 
   /// Aktiviert die Signaling-Schicht via Supabase Realtime für [myUserId]
   /// und [peerId]. Wird von [P2PChatService.connect] aufgerufen.
+  ///
+  /// Sicherheits-Regeln (Audit H8):
+  /// - [_currentPeerId] wird HIER fest verdrahtet und ändert sich danach
+  ///   nicht mehr durch eingehende Nachrichten (kein TOCTOU/Hijacking).
+  /// - Ausgehende Nachrichten tragen als `from` die EIGENE User-ID, nicht
+  ///   die des Peers.
   Future<void> connect({
     required String myUserId,
     required String peerId,
   }) async {
+    _myUserId = myUserId;
+    _currentPeerId = peerId;
+
     // Deterministischer Kanal-Name (lexikografisch sortiert).
     final ids = [myUserId, peerId]..sort();
     _signalingTopic = 'realtime:signaling:${ids[0]}:${ids[1]}';
@@ -297,7 +304,7 @@ class WebRTCService {
 
   /// Initialisiert eine neue Peer-Verbindung als Initiator.
   Future<void> createOffer(String peerId) async {
-    _currentPeerId = peerId;
+    _currentPeerId ??= peerId;
     await _createPeerConnection();
     await _createDataChannel();
 
@@ -306,14 +313,18 @@ class WebRTCService {
 
     _sendSignaling({
       'type': 'offer',
-      'from': _currentPeerId,
+      'from': _myUserId ?? _currentPeerId,
       'sdp': offer.sdp,
     });
   }
 
   /// Erstellt eine Peer-Verbindung als Empfänger.
+  ///
+  /// Der Peer ist seit [connect] fixiert (_currentPeerId) und wird hier
+  /// NICHT mehr aus der Nachricht übernommen (Audit H8: ein Angreifer
+  /// konnte sich per gefälschtem `from` als Peer etablieren).
   Future<void> handleOffer(String peerId, String offerSdp) async {
-    _currentPeerId = peerId;
+    _currentPeerId ??= peerId;
     await _createPeerConnection();
 
     _peerConnection!.onDataChannel = (channel) {
@@ -327,7 +338,7 @@ class WebRTCService {
 
     _sendSignaling({
       'type': 'answer',
-      'from': _currentPeerId,
+      'from': _myUserId ?? _currentPeerId,
       'sdp': answer.sdp,
     });
   }
@@ -411,7 +422,7 @@ class WebRTCService {
       if (_currentPeerId != null) {
         _sendSignaling({
           'type': 'ice',
-          'from': _currentPeerId,
+          'from': _myUserId ?? _currentPeerId,
           'candidate': candidate.candidate,
           'sdpMid': candidate.sdpMid,
           'sdpMLineIndex': candidate.sdpMLineIndex,
@@ -520,6 +531,7 @@ class WebRTCService {
     _peerConnection = null;
     _dataChannel = null;
     _currentPeerId = null;
+    _myUserId = null;
     _isConnected = false;
     _remoteDescriptionSet = false;
   }

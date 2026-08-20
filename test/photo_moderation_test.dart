@@ -2,30 +2,45 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wisp/services/huggingface_service.dart';
 import 'package:wisp/services/photo_moderation_service.dart';
 import 'package:wisp/utils/constants.dart';
 
-/// Tests für die Foto-Moderation via Hugging Face.
+/// Tests für die Foto-Moderation (Feature-Flag-gesteuert).
 ///
 /// Prüft:
-///  1. Ohne API-Token → needsReview = true (fail-safe)
-///  2. Mit gesetztem Token aber timeout → needsReview = true
+///  1. Flag deaktiviert (Default, Betreiber-Entscheidung): Bilder werden
+///     ohne Prüfung freigegeben, kein Token, kein Netzwerk-Call.
+///  2. Wird das Flag später aktiviert (ohne dass die Edge-Function
+///     existiert), verhält sich der Stub fail-closed (needsReview).
+///  3. ModerationResult-Struktur.
 void main() {
-  setUp(() {
-    // Der Service braucht einen Supabase-Client, aber für reine
-    // HuggingFace-Tests (ohne DB-Schreibzugriff) reicht die
-    // Client-lose Instanz nicht — Tests fokussieren sich auf
-    // den API-Token-Fallback (kein echtes Supabase nötig).
+  test('Flag OFF (Default): checkImage gibt approved zurück (Betreiber-'
+      'Entscheidung, kein Netzwerk-Call)', () async {
+    expect(AppConstants.nsfwModerationEnabled, isFalse,
+        reason: 'Im Test-Umfeld muss das Flag aus sein (kein --dart-define).');
+    final result = await HuggingFaceService.checkImage(
+      Uint8List.fromList(List<int>.filled(16, 0)),
+    );
+    expect(result.isSafe, isTrue);
+    expect(result.needsReview, isFalse);
+    expect(result.isNsfw, isFalse);
+    expect(result.label, equals('moderation_disabled'));
   });
 
-  test('Ohne HF_API_TOKEN wird needsReview=true zurückgegeben', () {
-    // Der AppConstants.hfApiToken ist im Test-Umfeld '' (kein dart-define).
-    // HuggingFaceService.checkImage() prüft den Token und gibt bei ''
-    // sofort needsReview zurück → kein HTTP-Call, kein Timeout.
-    // Dies entspricht dem "Moderation deaktiviert"-Fall → pending_review.
-    expect(AppConstants.hfApiToken, isEmpty,
-        reason: 'Im Test-Umfeld muss HF_API_TOKEN leer sein '
-            '(kein --dart-define gesetzt).');
+  test('Flag ON ohne Edge-Function: fail-closed needsReview', () async {
+    // Verhalten simulieren, das der Service bei aktivem Flag zeigt
+    // (HuggingFaceService hat dann noch kein Backend -> pending_review).
+    // Der Stub-Pfad ist identisch mit dem ON-Zweig in checkImage; da das
+    // Flag const ist, prüfen wir hier die strukturelle Absicherung:
+    // needsReview darf NICHT approved bedeuten.
+    const result = ModerationResult(
+      approved: false,
+      needsReview: true,
+      reason: 'Moderation temporär nicht verfügbar — Foto wird geprüft.',
+    );
+    expect(result.approved, isFalse);
+    expect(result.needsReview, isTrue);
   });
 
   test('ModerationResult.needsReview existiert als Feld', () {

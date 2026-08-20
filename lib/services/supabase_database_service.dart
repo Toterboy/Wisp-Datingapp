@@ -4,6 +4,7 @@ import 'package:wisp/models/gender.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/utils/peer_id.dart';
 
 /// Datenbankzugriff über Supabase PostgREST, abgesichert durch Row Level Security (RLS).
 ///
@@ -146,18 +147,20 @@ class SupabaseDatabaseService {
   // Invite Codes (invite_codes-Tabelle)
   // =========================================================================
 
-  /// Prüft, ob ein Invite-Code gültig und noch nicht verwendet wurde.
-  Future<Map<String, dynamic>?> validateInviteCode(String code) async {
+  /// Prüft, ob ein Invite-Code gültig, unverbraucht und nicht abgelaufen ist.
+  ///
+  /// Seit Migration 040 (Audit K4) über die SECURITY DEFINER-RPC
+  /// `validate_invite_code` (boolean-Rückgabe): Die Tabelle selbst ist per
+  /// RLS nicht mehr lesbar, wodurch weder Enumeration noch Massen-Export
+  /// aller gültigen Codes möglich sind.
+  Future<bool> validateInviteCode(String code) async {
     final normalized = code.trim().toUpperCase();
-    final response = await _client
-        .from('invite_codes')
-        .select()
-        .eq('code', normalized)
-        .eq('used', false)
-        .maybeSingle();
-
-    if (response == null) return null;
-    return response;
+    if (normalized.isEmpty) return false;
+    final result = await _client.rpc(
+      'validate_invite_code',
+      params: {'p_code': normalized},
+    );
+    return result == true;
   }
 
   /// Markiert einen Invite-Code als verwendet.
@@ -188,9 +191,16 @@ class SupabaseDatabaseService {
   }
 
   /// Legt ein Match an (beidseitig).
+  ///
+  /// HINWEIS (Audit K3): Der direkte Client-INSERT in `matches` ist seit
+  /// Migration 040 serverseitig gesperrt – Matches entstehen ausschließlich
+  /// über gegenseitige Likes (create_match_if_mutual) bzw. Dating-Hour.
+  /// Diese Methode bleibt für den Demo-/Fallback-Pfad; am Server schlägt sie
+  /// ohne bestehende Gegenseitigkeit fehl (RLS).
   Future<void> createMatch(String peerId) async {
     final userId = _currentUser?.id;
     if (userId == null) throw AppException('Nicht eingeloggt');
+    if (!isValidPeerId(peerId)) throw AppException('Ungültiger Peer.');
 
     final userOneId = userId.compareTo(peerId) < 0 ? userId : peerId;
     final userTwoId = userId.compareTo(peerId) < 0 ? peerId : userId;
@@ -210,6 +220,8 @@ class SupabaseDatabaseService {
   Future<List<Map<String, dynamic>>> fetchMessages(String peerId) async {
     final userId = _currentUser?.id;
     if (userId == null) return [];
+    // Filter-Injection verhindern: Peer-ID muss UUID sein (Audit M2).
+    if (!isValidPeerId(peerId)) return [];
 
     final response = await _client
         .from('messages')
@@ -228,13 +240,16 @@ class SupabaseDatabaseService {
   }) async {
     final userId = _currentUser?.id;
     if (userId == null) throw AppException('Nicht eingeloggt');
+    if (!isValidPeerId(receiverId)) {
+      throw AppException('Ungültiger Empfänger.');
+    }
 
     await _client.from('messages').insert({
       'sender_id': userId,
       'receiver_id': receiverId,
       'content': content,
       'created_at': DateTime.now().toIso8601String(),
-      if (metadata != null) 'metadata': metadata,
+      'metadata': ?metadata,
     });
   }
 
@@ -274,6 +289,38 @@ class SupabaseDatabaseService {
         .delete()
         .eq('user_id', userId)
         .eq('liked_user_id', likedUserId);
+  }
+
+  // =========================================================================
+  // Blockieren (Bot-/Spam-Schutz, Migration 043)
+  // =========================================================================
+
+  /// Blockiert einen Nutzer serverseitig (RPC `block_user`).
+  ///
+  /// Wirkung: Löscht Likes in beide Richtungen und bestehende Matches;
+  /// künftige Likes/Matches/Dating-Hour-/Random-Chat-Paarungen mit diesem
+  /// Nutzer werden serverseitig verhindert. Dauerhaft bis zum Unblock.
+  Future<void> blockUser(String blockedUserId) async {
+    if (!isValidPeerId(blockedUserId)) {
+      throw AppException('Ungültiger Nutzer.');
+    }
+    await _client.rpc('block_user', params: {'p_blocked': blockedUserId});
+  }
+
+  /// Hebt eine Blockierung wieder auf (RPC `unblock_user`).
+  Future<void> unblockUser(String blockedUserId) async {
+    if (!isValidPeerId(blockedUserId)) {
+      throw AppException('Ungültiger Nutzer.');
+    }
+    await _client.rpc('unblock_user', params: {'p_blocked': blockedUserId});
+  }
+
+  /// Liste der von mir blockierten Nutzer-IDs (für Einstellungen/Feedback).
+  Future<List<String>> fetchBlockedUserIds() async {
+    final response = await _client.from('blocked_users').select('blocked');
+    return (response as List<dynamic>)
+        .map((row) => (row as Map)['blocked'] as String)
+        .toList();
   }
 
   /// "Meine Likes" — Profile, die ich geliked habe.

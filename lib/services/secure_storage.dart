@@ -19,6 +19,7 @@ class SecureTokenStore {
   static const _accessKey = 'auth_access_token';
   static const _refreshKey = 'auth_refresh_token';
   static const _userIdKey = 'auth_user_id';
+  static const _demoCredentialsKey = 'demo_auth_credentials';
 
   static const _androidOptions = AndroidOptions(
     // flutter_secure_storage verschlüsselt automatisch über den Keystore.
@@ -49,6 +50,27 @@ class SecureTokenStore {
       _storage.read(key: _refreshKey, aOptions: _androidOptions, iOptions: _iOSOptions);
   Future<String?> get userId =>
       _storage.read(key: _userIdKey, aOptions: _androidOptions, iOptions: _iOSOptions);
+
+  /// Demo-Modus: gesalzener Credential-Hash (`salt$hash`, siehe AuthService).
+  /// Liegt bewusst IM Keystore/Keychain statt in SharedPreferences (M10).
+  Future<String?> readDemoCredentials() => _storage.read(
+        key: _demoCredentialsKey,
+        aOptions: _androidOptions,
+        iOptions: _iOSOptions,
+      );
+
+  Future<void> writeDemoCredentials(String value) => _storage.write(
+        key: _demoCredentialsKey,
+        value: value,
+        aOptions: _androidOptions,
+        iOptions: _iOSOptions,
+      );
+
+  Future<void> deleteDemoCredentials() => _storage.delete(
+        key: _demoCredentialsKey,
+        aOptions: _androidOptions,
+        iOptions: _iOSOptions,
+      );
 
   /// Löscht alle Tokens (Logout / Account-Löschung). Bewusst "best-effort":
   /// Bei Fehlern (z. B. gesperrtes Gerät) wird geloggt, aber nicht abgestürzt.

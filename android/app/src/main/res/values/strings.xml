@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Digital Asset Links für Passkeys/Credential Manager.
+         Verknüpft diese App mit der RP-Domain auth.wispdating.de.
+         Die Zieldatei muss unter
+         https://auth.wispdating.de/.well-known/assetlinks.json liegen. -->
+    <string name="asset_statements" translatable="false">[{
+      \"include\": \"https://auth.wispdating.de/.well-known/assetlinks.json\"
+    }]</string>
+</resources>

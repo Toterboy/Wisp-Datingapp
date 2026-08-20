@@ -137,7 +137,7 @@ class _OwnLikesTabState extends ConsumerState<_OwnLikesTab> {
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _likes.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, i) {
           final like = _likes[i];
           final profile = like.profile;
@@ -261,7 +261,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _likes.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, i) {
           final like = _likes[i];
           final profile = like.profile;

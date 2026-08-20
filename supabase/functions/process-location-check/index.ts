@@ -81,7 +81,7 @@ serve(async (req) => {
     // 1) Alte Position aus der Datenbank lesen
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .select("location_lat, location_lng")
+      .select("location_lat, location_lng, location_checked_at")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -102,6 +102,7 @@ serve(async (req) => {
 
     const previousLat = (data["location_lat"] as number) ?? null;
     const previousLon = (data["location_lng"] as number) ?? null;
+    const previousCheckedAt = (data["location_checked_at"] as string) ?? null;
 
     if (previousLat == null || previousLon == null) {
       // Keine alte Position vorhanden, daher keine Prüfung möglich.
@@ -112,6 +113,7 @@ serve(async (req) => {
           location_lat: newLatitude,
           location_lng: newLongitude,
           is_location_suspicious: false,
+          location_checked_at: new Date().toISOString(),
         })
         .eq("user_id", userId);
 
@@ -136,6 +138,59 @@ serve(async (req) => {
           headers: { "Content-Type": "application/json" },
         }
       );
+    }
+
+    // 1b) Speed-Plausibilität (M3): Ein "inkrementelles Herumwandern"
+    // (viele kleine Sprünge < 15 km) wird erkannt, wenn die zurückgelegte
+    // Distanz zur vergangenen Zeit physikalisch unplausibel ist
+    // (> 300 km/h). In diesem Fall wird die Position NICHT übernommen
+    // (sonst könnte ein Angreifer seine Basislinie schrittweise verschieben)
+    // und der Account als verdächtig markiert.
+    if (previousCheckedAt) {
+      const elapsedMs =
+        Date.now() - new Date(previousCheckedAt).getTime();
+      if (Number.isFinite(elapsedMs) && elapsedMs > 0) {
+        const { data: speedCheck } = await supabaseAdmin.functions.invoke(
+          "check-location",
+          {
+            body: {
+              lat1: previousLat,
+              lon1: previousLon,
+              lat2: newLatitude,
+              lon2: newLongitude,
+            },
+            headers: { "x-internal-secret": INTERNAL_SECRET },
+          },
+        );
+        const distanceKm =
+          (speedCheck as CheckLocationResponse | null)?.distanceKm ?? null;
+        if (distanceKm != null) {
+          const speedKmh =
+            distanceKm / (elapsedMs / 3_600_000);
+          if (speedKmh > 300) {
+            const { error: suspiciousError } = await supabaseAdmin
+              .from("profiles")
+              .update({ is_location_suspicious: true })
+              .eq("user_id", userId);
+            if (suspiciousError) {
+              console.error("Fehler beim Markieren als verdächtig:", suspiciousError);
+            }
+            return new Response(
+              JSON.stringify({
+                userId,
+                distanceKm,
+                isSuspicious: true,
+                updated: false,
+                reason: "implausible_speed",
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+        }
+      }
     }
 
     // 2) Intern check-location aufrufen (kein HTTP-Loopback, daher ist das
@@ -183,6 +238,7 @@ serve(async (req) => {
         location_lat: newLatitude,
         location_lng: newLongitude,
         is_location_suspicious: isSuspicious,
+        location_checked_at: new Date().toISOString(),
       })
       .eq("user_id", userId);
 

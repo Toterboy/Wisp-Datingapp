@@ -61,6 +61,10 @@ class AppSettings {
   /// Dating Hour Intro (Regeln + Erklärung) bereits gesehen?
   final bool datingHourIntroSeen;
 
+  /// MFA-Einrichtungshinweis dauerhaft ausgeblendet?
+  /// (Nutzer hat „Später“ auf dem 2FA-Setup-Screen gewählt.)
+  final bool mfaSetupDismissed;
+
   const AppSettings({
     this.blindModeEnabled = true,
     this.revealPhotosAfterMatch = true,
@@ -80,6 +84,7 @@ class AppSettings {
     this.notifyMessages = true,
     this.notifyDatingHour = true,
     this.datingHourIntroSeen = false,
+    this.mfaSetupDismissed = false,
   });
 
   /// Standard-Einstellungen für einen neuen Nutzer.
@@ -110,6 +115,7 @@ class AppSettings {
       notifyMessages: json['notifyMessages'] as bool? ?? true,
       notifyDatingHour: json['notifyDatingHour'] as bool? ?? true,
       datingHourIntroSeen: json['datingHourIntroSeen'] as bool? ?? false,
+      mfaSetupDismissed: json['mfaSetupDismissed'] as bool? ?? false,
     );
   }
 
@@ -133,6 +139,7 @@ class AppSettings {
         'notifyMessages': notifyMessages,
         'notifyDatingHour': notifyDatingHour,
         'datingHourIntroSeen': datingHourIntroSeen,
+        'mfaSetupDismissed': mfaSetupDismissed,
       };
 
   /// Immutabele Kopie mit veränderten Werten.
@@ -155,6 +162,7 @@ class AppSettings {
     bool? notifyMessages,
     bool? notifyDatingHour,
     bool? datingHourIntroSeen,
+    bool? mfaSetupDismissed,
   }) {
     return AppSettings(
       blindModeEnabled: blindModeEnabled ?? this.blindModeEnabled,
@@ -179,6 +187,7 @@ class AppSettings {
       notifyMessages: notifyMessages ?? this.notifyMessages,
       notifyDatingHour: notifyDatingHour ?? this.notifyDatingHour,
       datingHourIntroSeen: datingHourIntroSeen ?? this.datingHourIntroSeen,
+      mfaSetupDismissed: mfaSetupDismissed ?? this.mfaSetupDismissed,
     );
   }
 }

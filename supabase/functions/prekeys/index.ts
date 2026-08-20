@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Von Supabase automatisch injected (niemals manuell setzen!)
@@ -31,14 +31,6 @@ function isRateLimited(key: string): boolean {
   return timestamps.length > RATE_LIMIT;
 }
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
-}
-
 interface PreKeyBundle {
   identityKeyPublic: string;
   registrationId: number;
@@ -50,10 +42,9 @@ interface PreKeyBundle {
 }
 
 serve(async (req) => {
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders() });
-  }
+  // CORS: Bewusst KEINE CORS-Header (Audit M7) – die Funktion wird nur von
+  // der nativen App aufgerufen; Browser-Zugriffe werden dadurch geblockt.
+  // OPTIONS fällt ins Method-not-allowed (405).
 
   const url = new URL(req.url);
   const pathParts = url.pathname.split("/").filter(Boolean);
@@ -62,7 +53,7 @@ serve(async (req) => {
   if (isRateLimited(rateLimitKey(req))) {
     return new Response(
       JSON.stringify({ error: "Too many requests" }),
-      { status: 429, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+      { status: 429, headers: { "Content-Type": "application/json" } },
     );
   }
 
@@ -74,7 +65,7 @@ serve(async (req) => {
     if (!userId || userId === "prekeys") {
       return new Response(
         JSON.stringify({ error: "userId erforderlich." }),
-        { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -88,20 +79,20 @@ serve(async (req) => {
       console.error("PreKey-Fetch DB-Fehler:", error);
       return new Response(
         JSON.stringify({ error: "Datenbankfehler beim Abruf." }),
-        { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }
 
     if (!data) {
       return new Response(
         JSON.stringify({ error: "Kein PreKey-Bundle für diesen Nutzer gefunden." }),
-        { status: 404, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 404, headers: { "Content-Type": "application/json" } },
       );
     }
 
     return new Response(
       JSON.stringify(data.bundle),
-      { status: 200, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+      { status: 200, headers: { "Content-Type": "application/json" } },
     );
   }
 
@@ -113,7 +104,7 @@ serve(async (req) => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Nicht authentifiziert." }),
-        { status: 401, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 401, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -123,7 +114,7 @@ serve(async (req) => {
     if (authError || !authData?.user) {
       return new Response(
         JSON.stringify({ error: "Ungültiger Token." }),
-        { status: 401, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 401, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -133,7 +124,7 @@ serve(async (req) => {
     if (isRateLimited(rateLimitKey(req, userId))) {
       return new Response(
         JSON.stringify({ error: "Too many requests" }),
-        { status: 429, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 429, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -143,7 +134,7 @@ serve(async (req) => {
     } catch {
       return new Response(
         JSON.stringify({ error: "Ungültiges JSON im Body." }),
-        { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -163,7 +154,7 @@ serve(async (req) => {
       if (value === undefined || value === null || typeof value !== expectedType) {
         return new Response(
           JSON.stringify({ error: `Feld ${field} fehlt oder hat ungültigen Typ.` }),
-          { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
     }
@@ -180,18 +171,18 @@ serve(async (req) => {
       console.error("PreKey-Upsert DB-Fehler:", upsertError);
       return new Response(
         JSON.stringify({ error: "Datenbankfehler beim Speichern." }),
-        { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+        { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }
 
     return new Response(
       JSON.stringify({ ok: true }),
-      { status: 200, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+      { status: 200, headers: { "Content-Type": "application/json" } },
     );
   }
 
   return new Response(
     JSON.stringify({ error: "Method not allowed" }),
-    { status: 405, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+    { status: 405, headers: { "Content-Type": "application/json" } },
   );
 });

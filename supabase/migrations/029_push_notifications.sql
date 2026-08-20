@@ -23,11 +23,15 @@ ALTER TABLE public.profiles
 -- 2) pg_net (asynchrone HTTP-Aufrufe)
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- 4) Internes Secret: Konstante in der Trigger-Funktion (muss mit dem
---    Function-Secret WISP_INTERNAL_SECRET der Edge Function übereinstimmen;
---    bei Rotation beide Stellen aktualisieren).
+-- 4) Internes Secret: Wird seit Migration 040 NICHT mehr hier gepflegt,
+--    sondern liegt im Supabase Vault ('wisp_internal_secret') und muss
+--    zusätzlich als Function-Secret WISP_INTERNAL_SECRET gesetzt sein.
+--    (Das hier frühere hartcodierte Secret gilt als KOMPROMITTIERT, da es
+--    eingecheckt war, und wurde entfernt.)
 
 -- 3) Trigger-Funktion
+--    HINWEIS: Durch Migration 040 ersetzt (liest das Secret aus Vault,
+--    fail-closed). Diese Definition ist nur noch Historie.
 CREATE OR REPLACE FUNCTION public.notify_push_trigger()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -36,8 +40,12 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_url text := 'https://jftuigjbmmuvrckbchqo.supabase.co/functions/v1/notify-user';
-  v_secret text := 'wisp_e9dbe226a029e771c82188a6fb79b043f2910aa360bd2c16219cac4c58eee92b';
+  -- Bewusst NULL: echtes Secret liegt seit Migration 040 im Vault.
+  v_secret text := NULL;
 BEGIN
+  IF v_secret IS NULL THEN
+    RETURN NEW;
+  END IF;
   IF TG_TABLE_NAME = 'matches' THEN
     PERFORM net.http_post(
       url := v_url,
