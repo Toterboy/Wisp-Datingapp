@@ -1,6 +1,6 @@
-# Wisp
+# WispDating
 
-Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt Aussehen**. Wisp setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen.
+Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt des Aussehens**. Wisp setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen.
 
 Das Projekt befindet sich in aktiver Entwicklung und ist noch nicht vollständig funktional. Beiträge und Feedback sind willkommen.
 
@@ -8,7 +8,8 @@ Das Projekt befindet sich in aktiver Entwicklung und ist noch nicht vollständig
 
 ## Über die App
 
-Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod (State Management) und go_router (Navigation) im Material-3-Design. Backend ist Supabase (Auth, Postgres, Storage, Edge Functions, Realtime); Chat-Nachrichten laufen Ende-zu-Ende-verschlüsselt über das Signal Protocol, die Verbindung direkt Peer-to-Peer per WebRTC.
+WispDating ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod (State Management) und go_router (Navigation) im Material-3-Design. Backend ist Supabase (Auth, Postgres, Storage, Edge Functions, Realtime); Chat-Nachrichten laufen Ende-zu-Ende-verschlüsselt über das Signal Protocol, die Verbindung direkt Peer-to-Peer per WebRTC.
+WispDating ist vollständig kostenlos Nutzbar und soll eine echte Alternative zu Apps wie Tinder und co. darstellen.
 
 ---
 
@@ -16,12 +17,12 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 
 ### Registrierung & Einrichtung
 
-- **Einladungscode-Pflicht** bei der Registrierung (Bot-Schutz) – Codes werden vom Entwickler vergeben oder durch Einladungslinks von bestehenden Nutzern generiert
-- **Registrierung** mit Name, E-Mail (Domain-Validierung), Passwort, Geburtsdatum (Tag/Monat/Jahr), Geschlecht
-- **Einmalige Standort-Abfrage** zur Fake-Account-Erkennung
+- **Einladungscode-Pflicht** bei der Registrierung (Bot-Schutz) – Codes werden vom Entwickler vergeben oder durch Einladungslinks von bestehenden Nutzern generiert (Aktuell nicht implementiert)
+- **Registrierung** mit Name, E-Mail (Muss verifiziert werden), Passwort, Geburtsdatum (Tag/Monat/Jahr), Geschlecht
+- **Einmalige Standort-Abfrage** zur Fake-Account-Erkennung (Nicht vollständig)
 - **Persönlichkeitstest** (MBTI-Style, z. B. ENTP, INFJ)
-- **Einmalige Settings-/Privacy-Auswahl** nach der Registrierung
-- **Willkommens-Screen** nur beim allerersten App-Start
+- **Settings-/Privacy-Auswahl** nach der Registrierung
+- **Willkommens-Screen** beim allerersten App-Start
 
 ### Entdecken
 
@@ -67,7 +68,6 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 
 - Blind Mode (Fotos erst nach Match), Foto-Freigabe nach Match, Profil-Sichtbarkeit, Dark Mode, Altersbereich, Entfernung (km/Bundesland/ganz Deutschland), Benachrichtigungen
 - **Privacy-Screen**: echte JSON-Exportfunktion (Profil, Einstellungen, Präferenzen, Mood) zum Teilen/Speichern sowie Auflistung der Auftragsverarbeiter (Supabase, Google/Firebase, Hugging Face, Apple)
-- Admin-Bereich (nur mit `ADMIN_UUID`-dart-define aktiv): verwaltete Nutzer-Reports mit pseudonymisierten (gehashten) Reporter-IDs
 
 ---
 
@@ -107,55 +107,6 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 | Lokale Speicherung   | Hive (verschlüsselt), flutter_secure_storage       |
 | Standort             | `geolocator`, `geocoding`                          |
 | Benachrichtigungen   | `flutter_local_notifications`, Firebase Cloud Messaging |
-
----
-
-## Projektstruktur
-
-```
-lib/
-├── models/          # user_profile, match, message, app_settings, gender,
-│                    # personality_type, dating_hour_models, find_match_models,
-│                    # spice_question, user_mood, report_models, invitation_code, ...
-├── services/        # supabase_*, encryption, webrtc, p2p_chat, signaling,
-│                    # dating_hour, server_time, prekey, content/photo_moderation,
-│                    # report, invitation_code, bug_report, notification, ...
-├── providers/       # auth, chat, profile, settings, user_preferences, spice_question
-├── screens/
-│   ├── core/        # main_navigation, error, loading
-│   ├── swipe/       # find_your_match, random_chat, mode selection
-│   ├── chat/  dating_hour/  quiz/  spice/  mood/  qr/  interests/
-│   ├── home/  profile/  settings/  privacy/  admin/  bug_report/
-│   ├── onboarding/  # personality_test, settings_privacy_once
-│   ├── auth/  welcome/  verification/  legal/
-├── routing/         # app_router.dart
-├── theme/           # app_theme.dart
-├── utils/           # cert_pinning, age_safety_rules, age_calculator,
-│                    # constants, demo_mode, formatters, validators, ...
-├── widgets/         # app_logo, buttons, profile_widgets, states, ...
-├── app.dart
-└── main.dart
-```
-
----
-
-## Build & Deployment
-
-```bash
-# Admin-UUID setzen (sonst bleiben Admin-Funktionen deaktiviert):
-flutter build apk --dart-define=ADMIN_UUID=<echte-supabase-user-id>
-# Für Web:
-flutter build web --dart-define=ADMIN_UUID=<echte-supabase-user-id>
-```
-
-Ohne `--dart-define=ADMIN_UUID` startet die App ohne Admin-Zugang — ein fail-safe, der verhindert, dass ein vergessener Platzhalter versehentlich Admin-Rechte freigibt.
-
-Weitere Optionen:
-
-- `--dart-define=DEMO_MODE=true` – erzwingt den Demo-Mode (Mock-Daten; Release-Builds ignorieren ihn und nutzen immer das echte Backend)
-- `--dart-define=TURN_SERVER=...` / `TURN_USERNAME=...` / `TURN_PASSWORD=...` – optionaler eigener TURN-Server für die WebRTC-Fallback-Kette (ohne Google)
-
-Konfiguration (Supabase-URL, Anon-Key, Admin-UUID) erfolgt über `.env` (Vorlage: `.env.example`, gitignored). Die Supabase-Migrationen liegen unter `supabase/migrations/`; Edge Functions unter `supabase/functions/`.
 
 ---
 
