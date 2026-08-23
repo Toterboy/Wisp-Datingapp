@@ -3,7 +3,7 @@
 ![CI](https://github.com/Thoralf/blind_date_app/actions/workflows/ci.yml/badge.svg)
 [![Lizenz: AGPL v3](https://img.shields.io/badge/Lizenz-AGPL_v3-blue.svg)](LICENSE)
 
-Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt Aussehen**. WispDating setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen.
+Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt Aussehen**. WispDating setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen. Entsteht eine Verbindung, heißt das bei uns **„Funke"**.
 
 Das Projekt ist vollständig kostenlos nutzbar und soll eine echte Alternative zu Tinder & Co. darstellen. Es befindet sich in aktiver Entwicklung und ist noch nicht vollständig funktional. Beiträge und Feedback sind willkommen:
 [Beitragen](CONTRIBUTING.md) · [Verhaltenskodex](CODE_OF_CONDUCT.md) · [Sicherheitslücken melden](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Entscheidungen (ADR)](docs/adr/) · [Build & F-Droid](docs/BUILD.md)
@@ -19,7 +19,16 @@ Das Projekt ist vollständig kostenlos nutzbar und soll eine echte Alternative z
 
 ## Über die App
 
-Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod (State Management) und go_router (Navigation) im Material-3-Design. Backend ist Supabase (Auth, Postgres, Storage, Edge Functions, Realtime); Chat-Nachrichten laufen Ende-zu-Ende-verschlüsselt über das Signal Protocol, die Verbindung direkt Peer-to-Peer per WebRTC.
+WispDating ist für Android konzipiert (iOS/Web/Desktop folgen) und basiert auf Flutter, Riverpod (State Management) und go_router (Navigation) im Material-3-Design. Backend ist Supabase (Auth, Postgres, Storage, Edge Functions, Realtime); Chat-Nachrichten laufen Ende-zu-Ende-verschlüsselt über das Signal Protocol, die Verbindung direkt Peer-to-Peer per WebRTC.
+
+## Downloads
+
+| Variante | Datei | Push |
+| --- | --- | --- |
+| Standard (empfohlen) | `WispDating-v0.6.0-play.apk` | Firebase/FCM |
+| Google-frei (F-Droid-Stil) | `WispDating-v0.6.0-fdroid.apk` | optional via UnifiedPush |
+
+Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/releases). Hinweis: Beide Varianten nutzen dieselbe App-ID und können nicht parallel installiert werden.
 
 ---
 
@@ -34,24 +43,24 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 - **Passkey einrichten** (überspringbarer Schritt; WebAuthn, Anmeldung ohne E-Mail/Passwort möglich)
 - **Persönlichkeitstest** (MBTI-Style, z. B. ENTP, INFJ)
 - **Gewohnheiten** (Rauchen, Alkohol, Drogen) als eigener Einrichtungsschritt
-- **Settings-/Privacy-Auswahl** nach der Registrierung
+- **Settings-/Privacy-Auswahl** nach der Registrierung – inklusive **Erscheinungsbild**: 6 Farbwelten (Classic WispDating, Ozean, Wald, Sonnenuntergang, Lavendel, Schiefer), jederzeit änderbar
 - **Willkommens-Screen** beim allerersten App-Start
 
 ### Entdecken
 
-- **Find your Match** – Blind-Matching „Persönlichkeit zuerst": Fotos sind erst nach einem Match sichtbar (Blind Mode ist standardmäßig aktiv). Beim ersten Öffnen verlangt die App eine eigene Vorstellung (Text UND Audio sind Pflicht). Der gewichtete Matching-Score berücksichtigt Entfernung, gemeinsame Interessen, Persönlichkeits-Kompatibilität (MBTI-Matrix) und Alter; strikte Geschlechts- und Altersfilter.
+- **Find your Match** – Blind-Matching „Persönlichkeit zuerst": Fotos sind erst nach einem Funke sichtbar (Blind Mode ist standardmäßig aktiv). Beim ersten Öffnen verlangt die App eine eigene Vorstellung (Text UND Audio sind Pflicht). Der gewichtete Matching-Score berücksichtigt Entfernung, gemeinsame Interessen, Persönlichkeits-Kompatibilität (MBTI-Matrix) und Alter; strikte Geschlechts- und Altersfilter.
 - **Zufallschat** – automatische Zuordnung zu einem Peer-to-Peer-Textchat basierend auf Alter-/Distanz-Einstellungen
 - **QR Code** – eigenes Profil als QR-Code teilen, fremde Codes scannen oder manuell eingeben; der angezeigte 8-stellige Code ist serverseitig auflösbar (manuelle Eingabe findet den echten Nutzer)
 - **Dating Hour (Event-Modus)** – jeden Samstag 20:00–21:00 Uhr:
   - Beitritt jederzeit möglich (serverzeitsynchron, Manipulation der Geräteuhr wird erkannt); Aktualisieren ist rein lesend, Beitritt NUR über „Ich bin dabei" mit Bestätigungsdialog
   - Zwei zufällig zugeordnete Personen chatten direkt E2E-verschlüsselt (ohne Profilansicht)
-  - Nach 5 Minuten: beide können ein Match „Annehmen" oder „Ablehnen"
-  - Match nur, wenn BEIDE annehmen; freundlich formulierte Ablehnungs-Nachricht bei Absage
+  - Nach 5 Minuten: beide können einen Funke „Annehmen" oder „Ablehnen"
+  - Funke nur, wenn BEIDE annehmen; freundlich formulierte Ablehnungs-Nachricht bei Absage
   - Individuelle Präferenzen (Alter, Geschlecht, besondere Eigenschaft) vor Event-Start einstellbar (serverseitig gespeichert)
 
-### Quiz „Wie gut kenn ich mein Match"
+### Quiz „Wie gut kennst du dein Gegenüber?"
 
-- Bei Find-your-Match-Matches sind Chat, Bilder, Sprachnachrichten und Anrufe erst nach bestandenem Quiz freigeschaltet (serverseitig erzwungen)
+- Bei über Find your Match entstandenen Funken sind Chat, Bilder, Sprachnachrichten und Anrufe erst nach bestandenem Quiz freigeschaltet (serverseitig erzwungen)
 - Drei Stufen: unscharf/schwarzweiß → scharf/schwarzweiß → farbig (final); Foto-Freischaltung wird serverseitig geprüft
 - Beide Partner müssen dieselbe Frage richtig beantworten; Cooldown nach Fehlversuch (standardmäßig 5 Minuten)
 
@@ -63,12 +72,12 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 - Text-, Bild- und Sprachnachrichten
 - Audio-Anrufe innerhalb der App
 - Navigation zum Profil durch Klick auf Name/Profilbild
-- „Nutzer melden"-Funktion (die letzten 3 Nachrichten inkl. Medien werden – explizit kenntlich gemacht – zur Prüfung übermittelt) und „Match auflösen"-Button (mit Sicherheitsabfrage)
+- „Nutzer melden"-Funktion (die letzten 3 Nachrichten inkl. Medien werden – explizit kenntlich gemacht – zur Prüfung übermittelt) und „Funke beenden"-Button (mit Sicherheitsabfrage)
 
 ### Aktuelles & Interessen
 
-- Übersicht über neue Nachrichten, neue Likes und neue Matches
-- **Interessen-Tab** mit getrennten Bereichen: vergebene Likes (zurückziehbar), erhaltene Likes (mit Vorstellung anhören; Match bestätigen oder ablehnen) und Matches (mit Quiz-Hinweis)
+- Übersicht über neue Nachrichten, neue Likes und neue Funken
+- **Interessen-Tab** mit getrennten Bereichen: vergebene Likes (zurückziehbar), erhaltene Likes (mit Vorstellung anhören; Funke bestätigen oder ablehnen) und Funken (mit Quiz-Hinweis)
 - Zugriff auf Einstellungen über Zahnrad-Icon; zentraler „Entdecken"-Button
 
 ### Mood
@@ -87,7 +96,11 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 
 ### Einstellungen & Datenschutz
 
-- Blind Mode (Fotos erst nach Match), Foto-Freigabe nach Match, Profil-Sichtbarkeit, Dark Mode, Altersbereich, Entfernung (km/Bundesland/ganz Deutschland), Benachrichtigungen (Master- plus Einzel-Schalter)
+- Blind Mode (Fotos erst nach Funke), Foto-Freigabe nach Funke, Profil-Sichtbarkeit, Dark Mode, Altersbereich, Entfernung (km/Bundesland/ganz Deutschland), Benachrichtigungen (Master- plus Einzel-Schalter)
+- **Bild-Blur im Chat**: eingehende Bilder standardmäßig verpixelt, Freischalten nur nach Bestätigung; Bilder direkt meldbar
+- **E2E-Identität sichern/wiederherstellen**: passwortverschlüsseltes Backup der Signal-Identität für den Gerätewechsel
+- **Push ohne Google (UnifiedPush)**: optionale Alternative zu Firebase (benötigt eine Distributor-App wie ntfy)
+- **Safety Center**: Hilfe bei Belästigung/Stalking, In-App-Maßnahmen erklärt
 - **Zwei-Faktor-Authentisierung (TOTP)** – QR-Code scannen oder Schlüssel manuell eintragen, einmalige Bestätigung per Code
 - **Passkey erstellen** für passwortlose Anmeldung
 - **Account löschen** – löscht den Account serverseitig UND alle lokalen Daten vollständig (DSGVO)
@@ -103,7 +116,7 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 - **Peer-Pinning** im Signaling-Routing: Nachrichten fremder Absender werden verworfen
 - **Cert Pinning** für Supabase- und Hugging-Face-Endpunkte (per-Host-Map, unbekannte Hosts fail-open mit Warnung); auch Signaling-/ICE-Aufrufe nutzen den gepinnten Client
 - **PreKey-Bundles** sind nur mit gültigem Nutzer-JWT abrufbar (keine User-Enumeration per Anon-Key)
-- **Push-Benachrichtigungen** transportieren nur Metadaten (nie Inhalte), werden serverseitig gegen Benachrichtigungs-Schalter geprüft und nur an Nutzer mit realer Beziehung zugestellt (Match oder eigener Like)
+- **Push-Benachrichtigungen** transportieren nur Metadaten (nie Inhalte), werden serverseitig gegen Benachrichtigungs-Schalter geprüft und nur an Nutzer mit realer Beziehung zugestellt (Funke oder eigener Like)
 - **Serverseitige Freigabe-Prüfungen**: Foto-Freischaltung erst bei Quiz-Stufe 2, Partner-Profil-Freischaltung mit expliziter Feld-Whitelist (exakte Koordinaten und FCM-Tokens verlassen den Server nie)
 - **Datenschutz bei Standortdaten**: Distanzangaben sind auf 5-km-Schritte gerundet, Suchradius maximal 200 km; exakte Koordinaten werden nie an andere Nutzer übertragen
 - **Rate-Limits** serverseitig u. a. für Likes, Push-Versand, QR-Code-Abfragen, Invite-Code-Tests und Entsperrungsanträge (persistente DB-Buckets)
@@ -112,13 +125,15 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 - **Lokale Speicherung**: Tokens und profilbezogene PII ausschließlich im Keystore/Keychain (`flutter_secure_storage`), Hive-Daten AES-verschlüsselt, Cloud-Backups deaktiviert (`allowBackup=false`)
 - **Härtete SQL-Schicht**: RLS auf allen Tabellen, SECURITY DEFINER-Funktionen mit gehärtetem `search_path`, Blockier-Prüfung bei Likes, Rate-limited Existenzabfragen
 - **Release-Signierung**: Build bricht fehl, wenn kein Keystore konfiguriert ist (kein stiller Debug-Fallback)
+- **Bild-Schutz**: eingehende Chat-Bilder standardmäßig verpixelt, Freischaltung nur nach Bestätigung; Meldungen landen in einer manuellen Moderations-Warteschlange
+- **Verschlüsseltes Key-Backup**: die Signal-Identität wird passwortbasiert gesichert (PBKDF2 + AES-256-GCM, frische IVs) – der Server sieht das Backup nie unverschlüsselt
 - **Pseudonymisierung**: Reporter-IDs werden gehasht (SHA-256), kein PII in lokalen Hive-Keys
 - **Serverzeit** als Single Source of Truth für die Dating Hour (Anti-Cheat gegen Manipulation der Geräteuhr); Warn-Banner im Event-Screen bei unverifizierter Serverzeit
 - **Altersschutz-System:**
   - Ab 20 Jahren keine Sichtbarkeit von 16-/17-Jährigen mehr
   - Minderjährige (16–17) können ihren Filter nur bis max. 20 Jahre einstellen
   - Profilfotos von 16–17-Jährigen nur für Gleichaltrige sichtbar
-  - Profilfotos von 18–19-Jährigen nur nach Match sichtbar (nicht deaktivierbar)
+  - Profilfotos von 18–19-Jährigen nur nach Funke sichtbar (nicht deaktivierbar)
   - Automatische Freischaltung aller Funktionen mit Erreichen des 20. Lebensjahres
 - **Foto-Moderation**: NSFW-Prüfung über ein Hugging-Face-Inference-Modell (EU-Router, cert-gepinnt) – aktuell **standardmäßig deaktiviert** (Aktivierung per Build-Flag, siehe „Hinweis zum Entwicklungsstand"); Moderationsergebnisse landen in einer Admin-Warteschlange
 - **Session-Restore** synchron (kein Netzwerk beim App-Start), serverseitige Validierung im Hintergrund
@@ -136,9 +151,10 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 | Backend              | Supabase (Auth, Postgres, Storage, Edge Functions, Realtime) |
 | Verschlüsselung      | Signal Protocol (`libsignal_protocol_dart`)        |
 | Peer-to-Peer         | WebRTC (`flutter_webrtc`)                          |
-| Authentisierung      | Passkeys (`passkeys`), TOTP-Zweitfaktor (Supabase MFA), Firebase Cloud Messaging |
+| Authentisierung      | Passkeys (`passkeys`), TOTP-Zweitfaktor (Supabase MFA), Firebase Cloud Messaging (nur `play`-Variante) |
+| Push (Google-frei)   | UnifiedPush (`unifiedpush`, F-Droid-Variante)      |
 | Moderation           | Hugging Face Inference (EU-Router)                 |
-| Medien               | `image_picker`, `camera`, `video_player`, `record`, `just_audio` |
+| Medien               | `image_picker`, `image_cropper`, `camera`, `video_player`, `record`, `just_audio` |
 | Scannen/QR           | `mobile_scanner`, `qr_flutter`                     |
 | Teilen               | `share_plus`                                       |
 | Lokale Speicherung   | Hive (verschlüsselt), flutter_secure_storage       |
@@ -149,12 +165,11 @@ Wisp ist für Android, iOS und Web konzipiert und basiert auf Flutter, Riverpod 
 
 ## Hinweis zum Entwicklungsstand
 
-Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.5.0). Folgende Bereiche sind noch nicht final:
+Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.6.0). Folgende Bereiche sind noch nicht final:
 
 - **Automatischer Gesichtsabgleich** (Profilbild vs. Verifizierungs-Video) → z. B. selbstgehostete Open-Source-Modelle wie DeepStack oder Face Recognition (selbst gehostet, datenschutzfreundlich, EU-fähig)
-- **NSFW-Foto-Moderation** – *teilweise umgesetzt*: Client-seitige Prüfung beim Bildversand im Chat inklusive Admin-Warteschlange (`photo_moderation`) existiert; standardmäßig deaktiviert und ohne serverseitigen Modellaufruf (die geplante Edge Function mit `HF_API_TOKEN` als Secret fehlt noch). Bei Aktivierung ohne Server gilt fail-closed: alles landet zur manuellen Prüfung in der Admin-Ansicht. Eine automatische Account-Sperre bei Wiederholungsverstößen ist vorgesehen, wird aktuell aber manuell ausgesprochen.
+- **NSFW-Foto-Moderation** – *teilweise umgesetzt*: Der Schutz läuft aktuell über den Bild-Blur im Chat plus Meldungen, die der Support manuell prüft. Die automatische Prüfung über ein Hugging-Face-Modell ist vorbereitet, aber standardmäßig deaktiviert (serverseitige Edge Function mit `HF_API_TOKEN` fehlt noch). Eine automatische Account-Sperre bei Wiederholungsverstößen ist vorgesehen, wird aktuell aber manuell ausgesprochen.
 - **Fake-Account-Erkennung per Standort** – *teilweise umgesetzt*: Vorhanden sind Datenmodell und Manipulationsschutz (Verifizierungs-Felder sind clientseitig nicht schreibbar), Edge Functions mit Plausibilitätsprüfung (unrealistische Positionswechsel >15 km bzw. >300 km/h werden als verdächtig markiert) und eine lokale verschlüsselte Speicherung. **Noch offen:** der serverseitige Abgleich, ob an derselben Position bereits andere Accounts existieren, die Validierung von GPS gegen das angegebene Bundesland/Land, eine Admin-Ansicht zur Prüfung markierter Accounts sowie Konsequenzen (z. B. Einschränkungen bei Verdacht).
-- **Entfernungsanzeige**: Andere Nutzer sehen die Entfernung nur als gerundeten km-Wert in 5-km-Schritten (serverseitig berechnet); der exakte Standort verlässt den Server nie.
 
 ---
 
