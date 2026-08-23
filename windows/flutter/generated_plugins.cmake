@@ -13,11 +13,8 @@ list(APPEND FLUTTER_PLUGIN_LIST
   passkeys_windows
   permission_handler_windows
   record_windows
-  screen_retriever_windows
   share_plus
   url_launcher_windows
-  webcrypto
-  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

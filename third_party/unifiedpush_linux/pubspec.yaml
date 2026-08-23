@@ -1,0 +1,16 @@
+name: unifiedpush_linux
+description: >
+  Stub-Override fuer WispDating: Die Linux-Implementierung von UnifiedPush
+  zieht webpush_encryption -> webcrypto (Native Assets, CMake-Bedarf) und
+  blockiert damit Tests/Builds auf Windows. Linux-Desktop ist kein
+  Ziel-Target; Android wird ueber unifiedpush_android bedient.
+version: 1.0.0
+
+environment:
+  sdk: ^3.9.0
+
+flutter:
+  plugin:
+    platforms:
+      linux:
+        dartPluginClass: none

@@ -155,6 +155,11 @@ dependency_overrides:
   # Flutter-KGP-Warnung aus. Siehe third_party/passkeys_android.
   passkeys_android:
     path: third_party/passkeys_android
+  # Stub: unifiedpush_linux zieht webpush_encryption -> webcrypto
+  # (Native Assets mit CMake-Bedarf) und bricht dadurch Tests/Builds auf
+  # Windows. Linux-Desktop ist kein Target - siehe third_party/unifiedpush_linux.
+  unifiedpush_linux:
+    path: third_party/unifiedpush_linux
 
 flutter_launcher_icons:
   # Legacy-Android-Icon (mipmap-*): volles Basis-PNG (weisser Hintergrund +
