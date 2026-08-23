@@ -89,3 +89,47 @@ class SecureTokenStore {
 final secureTokenStoreProvider = Provider<SecureTokenStore>((ref) {
   return SecureTokenStore();
 });
+
+/// Verschlüsselte Speicherung des eigenen Profils (Audit M-Storage).
+///
+/// Das Profil enthält PII (Geburtsdatum, GPS-Koordinaten, Bio,
+/// Persönlichkeitsergebnis) und gehört daher NICHT in den Klartext-
+/// [SharedPreferences]. Derselbe Keystore-/Keychain-Weg wie
+/// [SecureTokenStore].
+class SecureProfileStore {
+  static const _profileKey = 'user_profile_secure';
+
+  static const _androidOptions = AndroidOptions();
+  static const _iOSOptions = IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+  );
+
+  final FlutterSecureStorage _storage;
+
+  SecureProfileStore([FlutterSecureStorage? storage])
+      : _storage = storage ?? const FlutterSecureStorage();
+
+  Future<String?> read() => _storage.read(
+        key: _profileKey,
+        aOptions: _androidOptions,
+        iOptions: _iOSOptions,
+      );
+
+  Future<void> write(String json) => _storage.write(
+        key: _profileKey,
+        value: json,
+        aOptions: _androidOptions,
+        iOptions: _iOSOptions,
+      );
+
+  Future<void> delete() => _storage.delete(
+        key: _profileKey,
+        aOptions: _androidOptions,
+        iOptions: _iOSOptions,
+      );
+}
+
+/// Provider für den [SecureProfileStore].
+final secureProfileStoreProvider = Provider<SecureProfileStore>((ref) {
+  return SecureProfileStore();
+});

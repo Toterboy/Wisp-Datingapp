@@ -1,7 +1,7 @@
 name: wisp
 description: Eine moderne, datenschutzfreundliche Dating-App mit Blind Mode (Persönlichkeit zuerst).
 publish_to: 'none'
-version: 0.4.0+1
+version: 0.6.0+2
 
 environment:
   sdk: ^3.9.0
@@ -10,6 +10,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # cupertino_icons: Wird von keinem Code direkt genutzt, aber mindestens
+  # ein Paket importiert flutter/cupertino.dart transitiv - der Icon-Tree-
+  # Shaker erwartet dann den Font ("Expected to find fonts for ...").
+  # Mit dieser Dependency ist die Font-Referenz aufgeloest; ungenutzte
+  # Glyphen werden beim Release ohnehin weggeschnitten.
+  cupertino_icons: ^1.0.8
 
   # State Management
   flutter_riverpod: ^2.6.1
@@ -117,6 +123,8 @@ dependencies:
   record: ^7.1.1
   just_audio: ^0.10.6
   webview_flutter: ^4.14.1
+  image_cropper: ^12.2.1
+  unifiedpush: ^6.2.0
 
 dev_dependencies:
   flutter_test:
@@ -142,6 +150,11 @@ dependency_overrides:
     path: third_party/flutter_webrtc
   mobile_scanner:
     path: third_party/mobile_scanner
+  # KGP-freier Fork: passkeys_android zieht upstream bedingungslos
+  # kotlin-android an (trotz reinem Java-Quellcode) und loest damit die
+  # Flutter-KGP-Warnung aus. Siehe third_party/passkeys_android.
+  passkeys_android:
+    path: third_party/passkeys_android
 
 flutter_launcher_icons:
   # Legacy-Android-Icon (mipmap-*): volles Basis-PNG (weisser Hintergrund +

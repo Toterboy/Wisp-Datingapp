@@ -1,0 +1,27 @@
+WispDating dreht das Prinzip klassischer Dating-Apps um: Persönlichkeit zuerst.
+
+Fotos sieht man erst, wenn zwei Menschen sich wirklich kennengelernt haben – über Text- und Audio-Vorstellungen und ein kleines Quiz übereinander. So steht nicht das perfekt ausgeleuchtete Profilbild im Mittelpunkt, sondern der Mensch dahinter.
+
+HIGHLIGHTS
+
+• Find your Match: Kandidaten ohne Foto, dafür mit Vorstellung zum Lesen und Anhören
+• Quiz-Freischaltung: Bilder gibt es erst nach bestandenem Quiz auf beiden Seiten (serverseitig erzwungen)
+• Zufallschat: anonym mit einem zufälligen Menschen schreiben
+• QR-Code: euch persönlich verbinden – scannen, zeigen oder Code eintippen
+• Dating Hour: wöchentliches Event mit 5-Minuten-Gesprächen; Match nur bei beidseitigem „Ja"
+
+PRIVATSPHÄRE KEIN ZUSATZ, SONDERN ARCHITEKTUR
+
+• Ende-zu-Ende-Verschlüsselung aller Nachrichten, Bilder und Anrufe (Signal Protocol)
+• Direkte Geräte-zu-Gerät-Verbindung per WebRTC – der Server sieht keine Inhalte
+• Standort wird nie weitergegeben: andere sehen nur „ca. X km entfernt"
+• Keine Werbe- oder Tracking-SDKs, EU-Infrastruktur, offener Quellcode
+
+SICHERHEIT FÜR ALLE
+
+• Altersschutz: Minderjährige sind für Erwachsene unsichtbar
+• Eingehende Chat-Bilder standardmäßig verpixelt, Freischaltung nur nach Bestätigung
+• Melden und Blockieren mit persönlicher Prüfung durch den Support
+• Optional: Zwei-Faktor-Authentisierung und Passkeys
+
+WispDating ist freie Software (AGPLv3). Der komplette Code ist öffentlich einsehbar.

@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/theme/app_theme.dart';
-
 /// Wurzel-Widget der App.
 ///
 /// Baut das Theme (Light/Dark je nach Einstellung) und den Router auf.
@@ -30,16 +29,17 @@ class App extends ConsumerWidget {
 
     final settings = ref.watch(settingsProvider);
     final router = ref.watch(routerProvider);
+    final theme = WispTheme.fromName(settings.themeName);
 
     final brightness = settings.useDarkMode == null
         ? null
         : (settings.useDarkMode! ? Brightness.dark : Brightness.light);
 
     return MaterialApp.router(
-      title: 'Wisp',
+      title: 'WispDating',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.light(theme: theme),
+      darkTheme: AppTheme.dark(theme: theme),
       themeMode: brightness == null
           ? ThemeMode.system
           : (brightness == Brightness.dark

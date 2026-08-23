@@ -1,0 +1,36 @@
+name: Bug melden
+description: Ein Fehler in WispDating – danke für die Meldung!
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Danke! Bitte keine Sicherheitslücken hier melden (siehe SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: App-Version
+      description: Einstellungen → unten sichtbar (z. B. 0.5.0)
+      placeholder: "0.5.0"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zum Reproduzieren
+      placeholder: |
+        1. … öffnen
+        2. … tippen
+        3. Fehler erscheint
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartetes Verhalten
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Sonstiges
+      description: Screenshots, Gerät, Android-Version – gerne anhängen.

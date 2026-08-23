@@ -3,22 +3,23 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    id("com.google.gms.google-services")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // Google-Services wird NICHT statisch angewendet (siehe unten) - nur
+    // die "play"-Variante bekommt Firebase; die "fdroid"-Variante bleibt
+    // komplett frei von proprietären Abhängigkeiten.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 // Release-Signierung über android/key.properties (NICHT committen – steht in
 // .gitignore). Enthält keyAlias, keyPassword, storeFile, storePassword.
-// Fehlt die Datei (z. B. frischer Clone), fallen Release-Builds auf die
-// Debug-Keys zurück (robuste Variante: Build bricht NICHT ab, sondern
-// warnt; signiert damit aber NICHT Play-Store-tauglich).
+// Fehlt die Datei, schlägt der Release-Build FEHL (kein stiller Debug-
+// Keystore-Fallback mehr – ein versehentlich debug-signiertes Release wäre
+// nicht Play-Store-tauglich und sicherheitsrelevant). Für lokale Release-
+// Testsignierungen explizit: -PWisp.allowDebugSigning=true ODER
+// Umgebungsvariable WISP_ALLOW_DEBUG_SIGNING=true.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-} else {
-    logger.warn("WARNUNG: android/key.properties fehlt – Release-Build wird mit dem DEBUG-Keystore signiert (nur für lokale Tests, NICHT für den Play Store geeignet).")
 }
 
 android {
@@ -55,16 +56,45 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Ohne --flavor wird die "play"-Variante gebaut (Firebase aktiv) -
+        // der normale Entwicklungsflow bleibt damit unverändert.
+        missingDimensionStrategy("distribution", "play")
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            // Google Play: Firebase/FCM aktiv (google-services.json).
+        }
+        create("fdroid") {
+            dimension = "distribution"
+            // F-Droid: KEIN Firebase, kein google-services-Plugin.
+            // Push optional später via UnifiedPush.
+        }
     }
 
     buildTypes {
         release {
-            // Release mit dem echten Keystore signieren, wenn key.properties
-            // vorhanden ist; sonst Debug-Keys (lokale Tests).
+            // Release mit dem echten Keystore signieren. Ohne key.properties
+            // wird der Build abgebrochen (kein stiller Debug-Fallback);
+            // Ausnahme nur mit explizitem Opt-out für lokale Tests.
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                val allowDebugSigning =
+                    System.getenv("WISP_ALLOW_DEBUG_SIGNING") == "true" ||
+                        (project.findProperty("wisp.allowDebugSigning") as? String) == "true"
+                if (allowDebugSigning) {
+                    logger.warn("WARNUNG: Release wird mit dem DEBUG-Keystore signiert (nur für lokale Tests).")
+                    signingConfig = signingConfigs.getByName("debug")
+                } else {
+                    throw GradleException(
+                        "Release-Build ohne android/key.properties nicht erlaubt. " +
+                            "Lege android/key.properties an (siehe README/.env.example) oder " +
+                            "signiere lokal bewusst mit -PWisp.allowDebugSigning=true."
+                    )
+                }
             }
         }
     }
@@ -80,6 +110,25 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
+// Konfliktlösung: androidx.credentials zieht JVM-tink, unifiedpush_android
+// tink-android - identische Klassen in zwei Jars. Die JVM-Variante fliegt
+// raus, die neuere Android-Variante wird erzwungen.
+configurations.all {
+    exclude(group = "com.google.crypto.tink", module = "tink")
+    resolutionStrategy {
+        force("com.google.crypto.tink:tink-android:1.23.0")
+    }
+}
+
 flutter {
     source = "../.."
+}
+
+// Google-Services für ALLE Varianten außer explizit "fdroid" anwenden
+// (Default-Entwicklungsflow = play). Erkennung über die von Flutter/Gradle
+// übergebenen Task-Namen (assemblePlay*, assembleFdroid*, ...).
+val tasksRequested = gradle.startParameter.taskNames.joinToString(" ")
+val isFdroidBuild = tasksRequested.contains("fdroid", ignoreCase = true)
+if (!isFdroidBuild) {
+    apply(plugin = "com.google.gms.google-services")
 }

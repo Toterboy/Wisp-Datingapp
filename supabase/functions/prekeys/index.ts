@@ -61,11 +61,39 @@ serve(async (req) => {
   // Die Edge-Function-URL ist /functions/v1/prekeys, der Pfad danach
   // enthält ggf. die userId. Beispiel: .../prekeys/abc-123
   if (req.method === "GET" && pathParts.length >= 1) {
+    // Audit E3: Auch der Bundle-Abruf erfordert einen gültigen JWT.
+    // Ohne Prüfung genügte der öffentliche Anon-Key am Gateway, um
+    // PreKey-Bundles abzurufen und existierende User-IDs zu enumerieren.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Nicht authentifiziert." }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    const callerToken = authHeader.slice(7);
+    const { data: callerAuth, error: callerError } = await supabaseAdmin.auth
+      .getUser(callerToken);
+    if (callerError || !callerAuth?.user) {
+      return new Response(
+        JSON.stringify({ error: "Ungültiger Token." }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const userId = pathParts[pathParts.length - 1];
     if (!userId || userId === "prekeys") {
       return new Response(
         JSON.stringify({ error: "userId erforderlich." }),
         { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Zusätzliches Rate-Limit pro authentifiziertem User.
+    if (isRateLimited(rateLimitKey(req, callerAuth.user.id))) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests" }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
       );
     }
 

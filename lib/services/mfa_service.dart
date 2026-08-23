@@ -53,6 +53,25 @@ class MfaService {
   Future<({String factorId, String qrUri, String secret})> startTotpEnroll({
     String friendlyName = 'Wisp',
   }) async {
+    // Verwaiste, unbestätigte Faktoren vorher entfernen: Jede abgebrochene
+    // Einrichtung (Screen verlassen, App geschlossen) hinterlässt einen
+    // unverified Faktor. Supabase lehnt neue enrollments ab, sobald das
+    // Faktor-Limit erreicht ist ("Einrichtung konnte nicht gestartet
+    // werden"). Deshalb: aufräumen, dann neu anlegen.
+    try {
+      final existing = await _client.auth.mfa.listFactors();
+      for (final f in existing.all) {
+        if (f.status != FactorStatus.verified) {
+          await _client.auth.mfa.unenroll(f.id);
+        }
+      }
+    } catch (e) {
+      // Aufräumen ist Best-Effort: Kein Grund, den Start abzubrechen.
+      if (kDebugMode) {
+        debugPrint('[MfaService] Aufräumen alter Faktoren fehlgeschlagen: $e');
+      }
+    }
+
     final response = await _client.auth.mfa.enroll(
       issuer: 'Wisp',
       friendlyName: friendlyName,
@@ -62,11 +81,39 @@ class MfaService {
     if (totp == null) {
       throw StateError('TOTP-Enrollment fehlgeschlagen (keine Daten).');
     }
+    final secret = totp.secret;
+    if (secret.isEmpty) {
+      throw StateError('TOTP-Enrollment ohne Secret unvollständig.');
+    }
     return (
       factorId: response.id,
-      qrUri: totp.qrCode,
-      secret: totp.secret,
+      // Eigener otpauth://-URI aus dem Secret: Supabase liefert in qrCode
+      // eine SVG-Grafik (data:image/svg+xml;...), die QrImageView nicht
+      // als QR rendern kann. Authenticator-Apps erwarten den Standard-URI.
+      qrUri: buildOtpAuthUri(secret, email: currentEmail),
+      secret: secret,
     );
+  }
+
+  String? get currentEmail {
+    try {
+      return _client.auth.currentUser?.email;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Baut den Standard-otpauth-URI, den jede Authenticator-App versteht.
+  @visibleForTesting
+  static String buildOtpAuthUri(String secret, {String? email}) {
+    const issuer = 'Wisp';
+    final account =
+        (email == null || email.isEmpty) ? 'Nutzer' : email;
+    return 'otpauth://totp/${Uri.encodeComponent(issuer)}:'
+        '${Uri.encodeComponent(account)}'
+        '?secret=$secret'
+        '&issuer=${Uri.encodeComponent(issuer)}'
+        '&algorithm=SHA1&digits=6&period=30';
   }
 
   /// Verifiziert die TOTP-Einrichtung mit dem ersten Code aus der

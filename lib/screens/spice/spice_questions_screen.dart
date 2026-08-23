@@ -45,7 +45,7 @@ class _SpiceQuestionsScreenState extends ConsumerState<SpiceQuestionsScreen> {
               maxLength: 200,
               maxLines: 3,
               decoration: const InputDecoration(
-                hintText: 'Schreib deine Antwort…',
+                hintText: 'Schreib deine Antwort⬦',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -90,7 +90,7 @@ class _SpiceQuestionsScreenState extends ConsumerState<SpiceQuestionsScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Antwort gesendet. Dein Match antwortet bald.'),
+          content: Text('Antwort gesendet. Dein Gegenüber antwortet bald.'),
         ),
       );
     }
@@ -225,14 +225,14 @@ class _QuestionCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Warte auf die Antwort deines Matches…',
+                'Warte auf die Antwort deines Matches⬦',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ] else ...[
               Text(
-                'Deine Antwort wird erst aufgedeckt, wenn dein Match '
+                'Deine Antwort wird erst aufgedeckt, wenn dein Gegenüber '
                 'ebenfalls geantwortet hat.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,

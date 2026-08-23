@@ -11,6 +11,7 @@ import 'package:geolocator/geolocator.dart';
 
 import 'package:wisp/services/secure_hive.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/services/supabase_storage_service.dart';
 
 /// Model für das Verifizierungs-Video.
 class VerificationVideo {
@@ -343,36 +344,55 @@ class VerificationService {
     return video?.isVerified == true;
   }
 
-  /// Fordert die serverseitige Verifizierung an (Edge Function
-  /// `verify-account`).
+  /// Reicht das aufgezeichnete Verifizierungs-Video SERVERSEITIG ein.
   ///
-  /// Seit Audit K2 ist die Funktion ADMIN-ONLY: Der Client kann
-  /// `is_verified` nicht mehr selbst setzen. Dieser Aufruf meldet den
-  /// Verifizierungswunsch; die Freigabe erfolgt nach manueller Prüfung
-  /// durch einen Admin. Rückgabe ist daher aus Client-Sicht i. d. R.
-  /// `false` (kein automatischer Verifizierungs-Erfolg mehr).
-  Future<bool> verifyAccount() async {
+  /// Ablauf (Migration 052):
+  ///   1. Video-Bytes werden in den PRIVATEN Bucket
+  ///      `verification-videos/<userId>/video.mp4` hochgeladen
+  ///      (Storage-Policy erlaubt nur den eigenen Ordner).
+  ///   2. Die Edge Function `verify-account` (action: "submit") vermerkt
+  ///      Pfad + Status 'pending' im Profil.
+  ///   3. Ein Admin prueft das Video (kurzlebige signierte URL via
+  ///      `verification-media`) und gibt es frei oder lehnt ab. Bei
+  ///      Ablehnung wird das Video serverseitig geloescht (DSGVO).
+  ///
+  /// Rückgabe: true, wenn die Einreichung angenommen wurde (Status pending).
+  Future<bool> submitVerification() async {
     if (!SupabaseService.isInitialized) return false;
 
+    final video = getVerificationVideo();
+    if (video == null) return false;
+
     try {
+      // 1) Privater Upload.
+      final file = File(video.filePath);
+      if (!await file.exists()) return false;
+      final bytes = await file.readAsBytes();
+
+      final storage = SupabaseStorageService(SupabaseService.client);
+      await storage.uploadVerificationVideo(bytes);
+
+      // 2) Serverseitige Einreichung vermerken.
       final response = await SupabaseService.client.functions.invoke(
         'verify-account',
+        body: {'action': 'submit'},
       );
 
       if (response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
-        final success = data['updated'] as bool? ?? false;
-        if (success) {
-          markAsVerified(getVerificationVideo()?.filePath ?? '');
-        }
-        return success;
+        return data['status'] == 'pending';
       }
-
       return false;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[VerificationService] Error: $e');
+        debugPrint('[VerificationService] Submit fehlgeschlagen: $e');
       }
+      // Hochgeladenes Video bei Fehler wieder entfernen, damit keine
+      // Waisen im Bucket bleiben.
+      try {
+        final storage = SupabaseStorageService(SupabaseService.client);
+        await storage.deleteVerificationVideo();
+      } catch (_) {}
       return false;
     }
   }

@@ -126,6 +126,13 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _persist();
   }
 
+  /// Dating Hour: Automatische Teilnahme am nächsten Event aktivieren
+  /// bzw. deaktivieren (Abfrage nach Ende eines Events).
+  Future<void> setDatingHourAutoJoin(bool value) async {
+    state = state.copyWith(datingHourAutoJoin: value);
+    await _persist();
+  }
+
   /// Übernimmt die Setup-Flags vom Server (nach Login/Session-Restore).
   ///
   /// Der Server gewinnt bei "abgeschlossen" – so erscheint die Einrichtung
@@ -183,6 +190,18 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   /// Einzel-Schalter: Erinnerung, wenn die Dating Hour gleich beginnt.
   Future<void> setNotifyDatingHour(bool enabled) async {
     state = state.copyWith(notifyDatingHour: enabled);
+    await _persist();
+  }
+
+  /// Bilder im Chat standardmäßig verpixelt anzeigen?
+  Future<void> setBlurChatImages(bool enabled) async {
+    state = state.copyWith(blurChatImages: enabled);
+    await _persist();
+  }
+
+  /// Farbschema wechseln (WispTheme-Name).
+  Future<void> setThemeName(String name) async {
+    state = state.copyWith(themeName: name);
     await _persist();
   }
 

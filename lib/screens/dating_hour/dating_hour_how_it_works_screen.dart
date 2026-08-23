@@ -34,8 +34,8 @@ class DatingHourHowItWorksScreen extends ConsumerWidget {
       'oder beenden möchtest.',
     ),
     _HowItWorksItem(
-      'Matches',
-      'Wenn beide sich für eine Verlängerung entscheiden, wird ein Match '
+      'Funken',
+      'Wenn beide sich für eine Verlängerung entscheiden, entsteht ein Funke '
       'erstellt und ihr könnt weiter chatten.',
     ),
   ];

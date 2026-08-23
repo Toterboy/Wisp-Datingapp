@@ -59,7 +59,15 @@ serve(async (req) => {
     // JWT-Authentifizierung (verify_jwt = true in config.toml)
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    // Defense-in-Depth: Ungültiger Token wird abgelehnt, auch wenn das
+    // Gateway verify_jwt=true bereits prüft.
+    const { data: authData, error: authError } = await supabaseAdmin.auth
+      .getUser(token);
+    if (authError || !authData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json" },
+      });
+    }
 
     const body = await req.json();
     const descriptionRaw = (body.description ?? "").toString();
@@ -109,7 +117,8 @@ serve(async (req) => {
     // HTML-escaped Werte (gegen Stored XSS)
     const description = escapeHtml(descriptionRaw.trim());
     const deviceInfo = escapeHtml(deviceInfoRaw.trim());
-    const userId = user ? escapeHtml(user.id) : "unbekannt";
+    const user = authData.user;
+    const userId = escapeHtml(user.id);
     const now = new Date().toISOString();
 
     const htmlContent = `<!DOCTYPE html>
@@ -189,6 +198,21 @@ serve(async (req) => {
     }
 
     const result = await brevoResp.json();
+
+    // Report zusaetzlich zeilenbasiert speichern (Migration 052), damit
+    // der Admin-Screen ihn anzeigen kann. Best-Effort: Scheitert der
+    // Insert, ist die Email trotzdem raus - der Versand bleibt erfolgreich.
+    try {
+      await supabaseAdmin.from("bug_reports").insert({
+        user_id: user?.id ?? null,
+        description: descriptionRaw,
+        device_info: deviceInfoRaw,
+        attachment_count: attachments.length,
+      });
+    } catch (dbErr) {
+      console.error("bug_reports insert failed:", dbErr);
+    }
+
     return new Response(JSON.stringify({ success: true, messageId: result.messageId }), {
       status: 200, headers: { "Content-Type": "application/json" },
     });

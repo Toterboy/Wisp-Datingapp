@@ -1,25 +1,36 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:wisp/utils/avatar_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:wisp/models/gender.dart';
+import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/models/profile_visibility.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/auth_exception.dart';
+import 'package:wisp/services/location_check_service.dart';
 import 'package:wisp/services/location_verification_service.dart';
+import 'package:wisp/services/mfa_service.dart';
+import 'package:wisp/services/passkey_auth.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/gender_preference_selector.dart';
+import 'package:wisp/widgets/habitude_selector.dart';
+import 'package:wisp/widgets/intro_editor.dart';
 import 'package:wisp/widgets/selectable_tile.dart';
+import 'package:wisp/widgets/theme_picker.dart';
 
 /// Einmaliger Einstellungen- & Privatsphäre-Screen direkt nach der Anmeldung.
 /// Danach sind diese Einstellungen jederzeit in den normalen Einstellungen änderbar.
@@ -40,7 +51,30 @@ class _SettingsPrivacyOnceScreenState
   bool _isDetectingLocation = false;
   String? _locationError;
   String? _locationValidationError;
-  static const int _pageCount = 3;
+  static const int _pageCount = 8;
+  static const int _profilePage = 2;
+  static const int _introPage = 3;
+  static const int _habitudesPage = 6;
+
+  // Schritt "Deine Vorstellung" (überspringbar): Werte des IntroEditor.
+  String _introText = '';
+  String? _introAudioPath;
+
+  // Schritt "Profil & Interessen": Bio, Bundesland, Interessen, Avatar.
+  final _bioCtrl = TextEditingController();
+  String? _selectedState;
+  Set<String> _selectedInterests = {};
+  bool _uploadingAvatar = false;
+  Uint8List? _avatarBytes;
+
+  // Schritt "Passkey" (überspringbar).
+  bool _passkeyBusy = false;
+  bool _passkeyCreated = false;
+
+  // Schritt "Gewohnheiten" (Rauchen, Alkohol, Drogen).
+  HabitudeLevel? _smoking;
+  HabitudeLevel? _alcohol;
+  HabitudeLevel? _drugs;
 
   @override
   void initState() {
@@ -49,12 +83,22 @@ class _SettingsPrivacyOnceScreenState
     if (prefs.location != null && _locationCtrl.text.isEmpty) {
       _locationCtrl.text = prefs.location!;
     }
+    // Vorhandene Konsum-Präferenzen vorbelegen, falls bereits gesetzt.
+    final profile = ref.read(profileProvider);
+    _smoking = profile.smoking;
+    _alcohol = profile.alcohol;
+    _drugs = profile.drugs;
+    // Profil-Seite vorbelegen (falls bereits Daten vorhanden sind).
+    _bioCtrl.text = profile.bio;
+    _selectedState = profile.state;
+    _selectedInterests = {...profile.interests};
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     _locationCtrl.dispose();
+    _bioCtrl.dispose();
     super.dispose();
   }
 
@@ -84,6 +128,9 @@ class _SettingsPrivacyOnceScreenState
   }
 
   void _prevPage() {
+    if (_currentPage == _habitudesPage) {
+      unawaited(_saveHabitudes());
+    }
     if (_currentPage > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -93,11 +140,157 @@ class _SettingsPrivacyOnceScreenState
   }
 
   void _nextPage() {
+    // Beim Verlassen der Profil-Seite Bio/Bundesland/Interessen speichern.
+    if (_currentPage == _profilePage) {
+      unawaited(_saveProfileExtras());
+    }
+    // Beim Verlassen der Vorstellungs-Seite die Eingaben best-effort
+    // speichern – der Schritt ist überspringbar, deshalb kein Zwang.
+    if (_currentPage == _introPage) {
+      _saveIntro();
+    }
+    if (_currentPage == _habitudesPage) {
+      unawaited(_saveHabitudes());
+    }
     if (_currentPage < _pageCount - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+    }
+  }
+
+  /// Speichert Text + Audio der Vorstellung (best effort, optionaler
+  /// Schritt). Identische Mechanik wie im Find-your Match-Screen.
+  Future<void> _saveIntro() async {
+    final text = _introText.trim();
+    if (text.isEmpty && _introAudioPath == null) return;
+    try {
+      await ref.read(profileProvider.notifier).update(
+            introText: text,
+            introAudioPath: _introAudioPath,
+            clearIntroAudio: _introAudioPath == null,
+          );
+      if (SupabaseService.isInitialized) {
+        await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+          'intro_text': text,
+          'intro_audio_path': _introAudioPath,
+        });
+      }
+    } catch (e) {
+      debugPrint('[SettingsPrivacyOnce] Intro-Speichern fehlgeschlagen: $e');
+    }
+  }
+
+  /// Speichert die Konsum-Präferenzen (Rauchen, Alkohol, Drogen) lokal
+  /// und best-effort serverseitig. Beeinflusst den Find-your-Match-Filter.
+  Future<void> _saveHabitudes() async {
+    try {
+      await ref.read(profileProvider.notifier).update(
+            smoking: _smoking,
+            alcohol: _alcohol,
+            drugs: _drugs,
+          );
+      if (SupabaseService.isInitialized) {
+        await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+          'smoking': _smoking?.toServer(),
+          'alcohol': _alcohol?.toServer(),
+          'drugs': _drugs?.toServer(),
+        });
+      }
+    } catch (e) {
+      debugPrint('[SettingsPrivacyOnce] Habituden-Speichern fehlgeschlagen: $e');
+    }
+  }
+
+  /// Speichert Bio, Bundesland und Interessen der Profil-Seite lokal UND
+  /// serverseitig (gleiche Felder wie "Profil bearbeiten").
+  Future<void> _saveProfileExtras() async {
+    try {
+      await ref.read(profileProvider.notifier).update(
+            bio: _bioCtrl.text.trim(),
+            stateStr: _selectedState,
+            interests: _selectedInterests.toList(),
+          );
+      if (SupabaseService.isInitialized) {
+        await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+          'bio': _bioCtrl.text.trim(),
+          'state': _selectedState,
+          'interests': _selectedInterests.toList(),
+        });
+      }
+    } catch (e) {
+      debugPrint('[SettingsPrivacyOnce] Profil-Extras speichern '
+          'fehlgeschlagen: $e');
+    }
+  }
+
+  /// Profilbild auswaehlen, quadratisch zuschneiden und in den privaten
+  /// avatars-Bucket laden (identisch zu "Profil bearbeiten").
+  Future<void> _pickAvatar() async {
+    if (_uploadingAvatar) return;
+    setState(() => _uploadingAvatar = true);
+    try {
+      final bytes = await pickAndCropAvatar();
+      if (bytes == null) return;
+
+      // Lokale Vorschau sofort zeigen.
+      if (mounted) setState(() => _avatarBytes = bytes);
+      final storage = ref.read(supabaseStorageServiceProvider);
+      final path = await storage.uploadAvatar(bytes);
+      await ref.read(profileProvider.notifier).update(photos: [path]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profilbild hochgeladen.')),
+        );
+      }
+    } catch (e) {
+      debugPrint('[SettingsPrivacyOnce] Avatar-Upload fehlgeschlagen: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Upload fehlgeschlagen. Du kannst das Bild '
+                  'jederzeit später im Profil festlegen.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
+  /// Richtet einen Passkey ein (überspringbarer Schritt). Fehler werden
+  /// angezeigt, blockieren aber nicht – "Weiter" geht immer.
+  Future<void> _setupPasskey() async {
+    if (_passkeyBusy || _passkeyCreated) return;
+    setState(() => _passkeyBusy = true);
+    try {
+      await PasskeyAuth.register();
+      if (!mounted) return;
+      setState(() => _passkeyCreated = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passkey eingerichtet. Du kannst dich künftig damit '
+              'anmelden.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      debugPrint('[SettingsPrivacyOnce] Passkey-Setup fehlgeschlagen: $e');
+      // Nur die bereinigte Meldung zeigen - keine Plugin-/WebAuthn-Interna.
+      final msg = e is AppException
+          ? e.message
+          : 'Passkey-Setup fehlgeschlagen oder abgebrochen. Du kannst es '
+              'später jederzeit in den Einstellungen nachholen.';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _passkeyBusy = false);
     }
   }
 
@@ -117,6 +310,7 @@ class _SettingsPrivacyOnceScreenState
     if (_locationCtrl.text.trim().isNotEmpty) {
       await prefsNotifier.setLocation(_locationCtrl.text.trim());
     }
+    await _saveHabitudes();
     await settingsNotifier.completeOneTimeSettings();
     // Setup-Stand zusätzlich serverseitig sichern, damit die Einrichtung
     // nach Neuinstallation/neuem Login nicht erneut erscheint.
@@ -180,13 +374,17 @@ class _SettingsPrivacyOnceScreenState
         return;
       }
 
-      // Sicherheitscheck: Prüfe ob bereits ein verifizierter Standort
-      // von einem anderen Account an dieser Position existiert.
+      // Plausibilitaets-Check gegen die BISHERIGEN Standorte dieses
+      // Geraets (lokal). Ein serverseitiger Abgleich mit fremden Accounts
+      // existiert bewusst nicht - der Server prueft separat eigene
+      // Positions-Spruenge (>15 km / >300 km/h) via process-location-check.
       if (await locationService.isLocationSuspicious(position)) {
         setState(() {
           _isDetectingLocation = false;
-          _locationError = 'Achtung: An diesem Standort wurde bereits ein '
-              'anderer Account verifiziert. Mehrfachaccounts sind untersagt.';
+          _locationError = 'Hinweis: Dieser Standort weicht deutlich von '
+              'deinen bisherigen Standorten auf diesem Ger\u00e4t ab. '
+              'Falls das stimmt, w\u00e4hle ihn trotzdem - andernfalls '
+              'gib deinen Ort bitte manuell ein.';
         });
         return;
       }
@@ -194,6 +392,29 @@ class _SettingsPrivacyOnceScreenState
       final locationText = '${position.latitude.toStringAsFixed(3)}, '
           '${position.longitude.toStringAsFixed(3)}';
       _locationCtrl.text = locationText;
+
+      // Koordinaten lokal UND serverseitig persistieren - sonst koennen
+      // Entfernungen zu anderen Nutzern nicht berechnet werden.
+      await ref.read(profileProvider.notifier).update(
+            locationLat: position.latitude,
+            locationLng: position.longitude,
+          );
+      if (SupabaseService.isInitialized) {
+        try {
+          final userId = SupabaseService.client.auth.currentUser?.id;
+          if (userId != null) {
+            unawaited(
+              ref.read(locationCheckServiceProvider).processLocationCheck(
+                    userId: userId,
+                    newLatitude: position.latitude,
+                    newLongitude: position.longitude,
+                  ),
+            );
+          }
+        } catch (_) {
+          // Best-Effort: Standort-Sync darf den Flow nicht blockieren.
+        }
+      }
 
       setState(() {
         _isDetectingLocation = false;
@@ -333,23 +554,50 @@ class _SettingsPrivacyOnceScreenState
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
-                          SelectableTile<bool?>(
-                            value: null,
-                            groupValue: settings.useDarkMode,
+                          // String-Keys statt bool?-Werten: Radio mit
+                          // null-Value funktioniert nicht zuverlaessig
+                          // (Tap wird verschluckt). Mapping:
+                          // 'system' -> null, 'light' -> false, 'dark' -> true.
+                          SelectableTile<String>(
+                            value: 'system',
+                            groupValue: settings.useDarkMode == null
+                                ? 'system'
+                                : (settings.useDarkMode!
+                                    ? 'dark'
+                                    : 'light'),
                             title: 'System',
-                            onChanged: (v) => notifier.setDarkMode(v),
+                            onChanged: (_) => notifier.setDarkMode(null),
                           ),
-                          SelectableTile<bool?>(
-                            value: false,
-                            groupValue: settings.useDarkMode,
+                          SelectableTile<String>(
+                            value: 'light',
+                            groupValue: settings.useDarkMode == null
+                                ? 'system'
+                                : (settings.useDarkMode!
+                                    ? 'dark'
+                                    : 'light'),
                             title: 'Hell',
-                            onChanged: (v) => notifier.setDarkMode(v),
+                            onChanged: (_) => notifier.setDarkMode(false),
                           ),
-                          SelectableTile<bool?>(
-                            value: true,
-                            groupValue: settings.useDarkMode,
+                          SelectableTile<String>(
+                            value: 'dark',
+                            groupValue: settings.useDarkMode == null
+                                ? 'system'
+                                : (settings.useDarkMode!
+                                    ? 'dark'
+                                    : 'light'),
                             title: 'Dunkel',
-                            onChanged: (v) => notifier.setDarkMode(v),
+                            onChanged: (_) => notifier.setDarkMode(true),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Farbwelt',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          ThemePicker(
+                            selectedName: settings.themeName,
+                            onChanged: (t) =>
+                                notifier.setThemeName(t.name),
                           ),
                         ],
                       ),
@@ -435,24 +683,26 @@ class _SettingsPrivacyOnceScreenState
                              },
                            ),
                            const SizedBox(height: 20),
-                           if (userPrefs.distanceFilterMode == DistanceFilterMode.distanceKm) ...[
-                             Text(
-                               'Maximale Entfernung: ${settings.maxDistanceKm} km',
-                               style: Theme.of(context).textTheme.titleMedium,
-                             ),
-                             const SizedBox(height: 8),
-                             Slider(
-                               value: settings.maxDistanceKm.toDouble(),
-                               min: 1,
-                               max: AppConstants.maxDistanceKm.toDouble(),
-                               divisions: AppConstants.maxDistanceKm - 1,
-                               label: '${settings.maxDistanceKm} km',
-                               onChanged: (v) => notifier.setMaxDistanceKm(
-                                 v.round(),
-                               ),
-                             ),
-                             const SizedBox(height: 20),
-                           ],
+                            if (userPrefs.distanceFilterMode == DistanceFilterMode.distanceKm) ...[
+                              Text(
+                                // Gleiche Quelle wie "Profil bearbeiten"
+                                // (userPreferences), damit beide Screens
+                                // immer denselben Wert zeigen.
+                                'Maximale Entfernung: ${userPrefs.maxDistanceKm} km',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              Slider(
+                                value: userPrefs.maxDistanceKm.toDouble(),
+                                min: 1,
+                                max: AppConstants.maxDistanceKm.toDouble(),
+                                divisions: AppConstants.maxDistanceKm - 1,
+                                label: '${userPrefs.maxDistanceKm} km',
+                                onChanged: (v) => userPrefsNotifier
+                                    .setMaxDistanceKm(v.round()),
+                              ),
+                              const SizedBox(height: 20),
+                            ],
                            if (userPrefs.distanceFilterMode == DistanceFilterMode.state) ...[
                              const SizedBox(height: 20),
                               TextFormField(
@@ -492,85 +742,76 @@ class _SettingsPrivacyOnceScreenState
                              style: Theme.of(context).textTheme.titleMedium,
                            ),
                            const SizedBox(height: 12),
-                           Row(
-                             children: [
-                               Expanded(
-                                child: TextFormField(
-                                  controller: _locationCtrl,
-                                  keyboardType: TextInputType.text,
-                                  decoration: InputDecoration(
-                                    labelText: 'Dein Standort / Stadt',
-                                    hintText: 'z. B. Berlin',
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.primary,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        width: 2,
-                                      ),
-                                    ),
+                            // GPS-Button als suffixIcon: immer perfekt
+                            // ausgerichtet, auch bei grosser Schrift (a11y).
+                            TextFormField(
+                              controller: _locationCtrl,
+                              keyboardType: TextInputType.text,
+                              decoration: InputDecoration(
+                                labelText: 'Dein Standort / Stadt',
+                                hintText: 'z. B. Berlin',
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).colorScheme.primary,
                                   ),
-                                     onChanged: (v) async {
-                                       final trimmed = v.trim();
-                                       if (trimmed.isEmpty) {
-                                         userPrefsNotifier.setLocation(null);
-                                         _locationValidationError = null;
-                                         return;
-                                       }
-                                       final locationService = ref.read(locationVerificationServiceProvider);
-                                       if (await locationService.hasLocationPermission()) {
-                                         final isValid = await _validateLocationText(trimmed);
-                                         if (!isValid) {
-                                           _locationCtrl.clear();
-                                           userPrefsNotifier.setLocation(null);
-                                           setState(() {
-                                             _locationValidationError = 'Der Ort liegt mehr als 15 km von deinem aktuellen Standort entfernt.';
-                                           });
-                                           return;
-                                         }
-                                       }
-                                       setState(() {
-                                         _locationValidationError = null;
-                                       });
-                                     },
-                                 ),
-                               ),
-                               const SizedBox(width: 12),
-                               IconButton(
-                                 onPressed: _isDetectingLocation ? null : _detectLocation,
-                                 icon: _isDetectingLocation
-                                     ? const SizedBox(
-                                         width: 20,
-                                         height: 20,
-                                         child: CircularProgressIndicator(strokeWidth: 2),
-                                       )
-                                     : const Icon(Icons.my_location),
-                                 tooltip: 'Standort erkennen',
-                               ),
-                             ],
-                           ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    width: 2,
+                                  ),
+                                ),
+                                suffixIcon: _isDetectingLocation
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(14),
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        ),
+                                      )
+                                    : IconButton(
+                                        tooltip:
+                                            'Standort erkennen (GPS)',
+                                        onPressed: _detectLocation,
+                                        icon:
+                                            const Icon(Icons.my_location),
+                                      ),
+                              ),
+                              onChanged: (v) async {
+                                final trimmed = v.trim();
+                                if (trimmed.isEmpty) {
+                                  userPrefsNotifier.setLocation(null);
+                                  _locationValidationError = null;
+                                  return;
+                                }
+                                final locationService = ref.read(locationVerificationServiceProvider);
+                                if (await locationService.hasLocationPermission()) {
+                                  final isValid = await _validateLocationText(trimmed);
+                                  if (!isValid) {
+                                    _locationCtrl.clear();
+                                    userPrefsNotifier.setLocation(null);
+                                    setState(() {
+                                      _locationValidationError = 'Der Ort liegt mehr als 15 km von deinem aktuellen Standort entfernt.';
+                                    });
+                                    return;
+                                  }
+                                }
+                                setState(() {
+                                  _locationValidationError = null;
+                                });
+                              },
+                            ),
                             if (_locationError != null) ...[
                               const SizedBox(height: 8),
-                              Text(
-                                _locationError!,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.error,
-                                    ),
-                              ),
+                              _LocationNotice(text: _locationError!),
                             ],
                             if (_locationValidationError != null) ...[
                               const SizedBox(height: 8),
-                              Text(
-                                _locationValidationError!,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.error,
-                                    ),
-                              ),
+                              _LocationNotice(text: _locationValidationError!),
                             ],
                             const SizedBox(height: 20),
                            Text(
@@ -598,7 +839,285 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                    // Page 4: Community Richtlinien
+                    // Page 3: Profil & Interessen (Bio, Bundesland, Bild)
+                    _Page(
+                      title: 'Dein Profil',
+                      subtitle:
+                          'Ein Bild, ein paar Worte über dich und deine '
+                          'Interessen helfen anderen, dich kennenzulernen. '
+                          'Alles optional und später änderbar.',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ---- Profilbild ----
+                          Center(
+                            child: Column(
+                              children: [
+                                Stack(
+                                  alignment: Alignment.bottomRight,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 44,
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer,
+                                      backgroundImage: _avatarBytes != null
+                                          ? MemoryImage(_avatarBytes!)
+                                          : null,
+                                      child: _avatarBytes == null
+                                          ? const Icon(Icons.person, size: 44)
+                                          : null,
+                                    ),
+                                    SizedBox(
+                                      height: 32,
+                                      width: 32,
+                                      child: IconButton.filledTonal(
+                                        padding: EdgeInsets.zero,
+                                        iconSize: 18,
+                                        onPressed: _uploadingAvatar
+                                            ? null
+                                            : _pickAvatar,
+                                        icon: _uploadingAvatar
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                        strokeWidth: 2))
+                                            : const Icon(Icons.add_a_photo),
+                                        tooltip: 'Profilbild wählen',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          // ---- Bio ----
+                          TextFormField(
+                            controller: _bioCtrl,
+                            maxLines: 3,
+                            maxLength: 300,
+                            decoration: const InputDecoration(
+                              labelText: 'Über mich (Bio)',
+                              hintText: 'z. B. Hobbys, was dir wichtig ist',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // ---- Bundesland ----
+                          DropdownButtonFormField<String>(
+                            initialValue:
+                                (_selectedState == null || _selectedState!.isEmpty)
+                                    ? null
+                                    : _selectedState,
+                            decoration: const InputDecoration(
+                              labelText: 'Bundesland (optional)',
+                            ),
+                            hint: const Text('Bitte wählen'),
+                            items: kGermanStates
+                                .map((s) => DropdownMenuItem(
+                                      value: s,
+                                      child: Text(s),
+                                    ))
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedState = v),
+                          ),
+                          const SizedBox(height: 20),
+                          // ---- Interessen ----
+                          Text('Interessen',
+                              style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: AppConstants.presetInterests.map((i) {
+                              final selected =
+                                  _selectedInterests.contains(i);
+                              return FilterChip(
+                                label: Text(i),
+                                selected: selected,
+                                onSelected: (on) => setState(() {
+                                  on
+                                      ? _selectedInterests.add(i)
+                                      : _selectedInterests.remove(i);
+                                }),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Page 4: Deine Vorstellung (Text + Audio, überspringbar)
+                    _Page(
+                      title: 'Deine Vorstellung',
+                      subtitle:
+                          'Erzähl von dir – als Text und gesprochen. Beides '
+                          'wird anderen gezeigt, bevor sie dein Foto sehen. '
+                          'Du kannst diesen Schritt auch überspringen.',
+                      child: IntroEditor(
+                        initialText: _introText,
+                        initialAudioPath: _introAudioPath,
+                        required: false,
+                        onChanged: (text, audioPath) {
+                          setState(() {
+                            _introText = text;
+                            _introAudioPath = audioPath;
+                          });
+                        },
+                      ),
+                    ),
+                    // Page 4: Passkey (überspringbar)
+                    _Page(
+                      title: 'Passkey einrichten',
+                      subtitle:
+                          'Melde dich künftig ohne Passwort an – per '
+                          'Fingerabdruck oder Gesicht. Optional, du kannst '
+                          'diesen Schritt überspringen.',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Icon(Icons.key, size: 48),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Ein Passkey ist die sicherste und bequemste '
+                            'Anmeldeart: Kein Passwort, das du merken oder '
+                            'vergessen kannst – und schwerer zu stehlen als '
+                            'ein Passwort.',
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed:
+                                _passkeyBusy || _passkeyCreated
+                                    ? null
+                                    : _setupPasskey,
+                            icon: _passkeyBusy
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Icon(_passkeyCreated
+                                    ? Icons.check_circle
+                                    : Icons.fingerprint),
+                            label: Text(
+                              _passkeyCreated
+                                  ? 'Passkey eingerichtet'
+                                  : 'Passkey jetzt einrichten',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Du kannst die Einrichtung jederzeit später in '
+                            'den Einstellungen nachholen.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Page 5: Zwei-Faktor-Schutz (überspringbar)
+                    _Page(
+                      title: 'Konto absichern',
+                      subtitle:
+                          'Melde dich künftig zusätzlich mit einem Code aus '
+                          'einer Authenticator-App an. Optional, du kannst '
+                          'diesen Schritt überspringen.',
+                      child: Builder(
+                        builder: (context) {
+                          final mfaActive = ref
+                              .watch(mfaStatusProvider)
+                              .hasVerifiedFactors;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Icon(
+                                mfaActive
+                                    ? Icons.verified_user
+                                    : Icons.shield_outlined,
+                                size: 48,
+                                color: mfaActive
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                mfaActive
+                                    ? 'Zwei-Faktor-Schutz ist aktiv. Bei '
+                                        'jedem Login wirst du nach dem '
+                                        'Code aus deiner Authenticator-App '
+                                        'gefragt.'
+                                    : 'Ein zweiter Faktor schützt dein '
+                                        'Konto, selbst wenn dein Passwort '
+                                        'gestohlen wird. Du brauchst eine '
+                                        'Authenticator-App (z. B. Google '
+                                        'Authenticator, Aegis oder 2FAS).',
+                              ),
+                              const SizedBox(height: 24),
+                              FilledButton.icon(
+                                onPressed: mfaActive
+                                    ? null
+                                    : () => context.push(AppRoutes.mfaSetup),
+                                icon: Icon(mfaActive
+                                    ? Icons.check_circle
+                                    : Icons.qr_code),
+                                label: Text(mfaActive
+                                    ? '2FA eingerichtet'
+                                    : 'Jetzt einrichten'),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Du kannst die Einrichtung jederzeit später '
+                                'in den Einstellungen nachholen.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    // Page 6: Gewohnheiten (Rauchen, Alkohol, Drogen)
+                    _Page(
+                      title: 'Gewohnheiten',
+                      subtitle: 'Wie stehst du zu Rauchen, Alkohol und Drogen? '
+                          'Diese Angaben beeinflussen, wen du bei '
+                          '"Find your Match" siehst.',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Es werden nur Personen gezeigt, die maximal so '
+                            'viel konsumieren wie du. Du kannst das später in '
+                            'den Einstellungen oder im Profil ändern.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          HabitudeSelector(
+                            topic: HabitudeTopic.smoking,
+                            value: _smoking,
+                            onChanged: (v) =>
+                                setState(() => _smoking = v),
+                          ),
+                          const SizedBox(height: 16),
+                          HabitudeSelector(
+                            topic: HabitudeTopic.alcohol,
+                            value: _alcohol,
+                            onChanged: (v) =>
+                                setState(() => _alcohol = v),
+                          ),
+                          const SizedBox(height: 16),
+                          HabitudeSelector(
+                            topic: HabitudeTopic.drugs,
+                            value: _drugs,
+                            onChanged: (v) => setState(() => _drugs = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Page 7: Community Richtlinien
                     _Page(
                       title: 'Community Richtlinien',
                       subtitle:
@@ -749,12 +1268,54 @@ class _Page extends StatelessWidget {
             Expanded(
               child: Scrollbar(
                 child: SingleChildScrollView(
-                  child: child,
-                ),
-              ),
+                  // Platz für die Tastatur: Der Inhalt bleibt so über dem
+                  // Keyboard scrollbar, statt dahinter zu verschwinden.
+                  padding: EdgeInsets.only(
+                     bottom: MediaQuery.viewInsetsOf(context).bottom,
+                   ),
+                   child: child,
+                 ),
+               ),
+             ),
+           ],
+         ),
+       ),
+     );
+   }
+}
+
+/// Dezent gestylter Hinweis-/Fehlerkasten fuer Standort-Meldungen
+/// (statt roher roter Einzeilen-Texte).
+class _LocationNotice extends StatelessWidget {
+  const _LocationNotice({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: scheme.onErrorContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                    height: 1.35,
+                  ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

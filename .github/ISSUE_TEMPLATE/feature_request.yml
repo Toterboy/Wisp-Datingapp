@@ -1,0 +1,25 @@
+name: Feature-Wunsch
+description: Eine Idee, die WispDating besser machen würde
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem löst die Idee?
+      placeholder: "Als … möchte ich …, weil …"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Vorschlag
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Datenschutz
+      description: Passt die Idee zum Konzept (E2E, Datenminimierung, keine Cloud-Pflicht)?
+      options:
+        - label: Ich habe bedacht, dass WispDating datenschutzminimalistisch bleibt
+          required: true

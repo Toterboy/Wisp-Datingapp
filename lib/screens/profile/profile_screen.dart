@@ -15,8 +15,8 @@ import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/widgets/profile_widgets.dart';
 
-/// Profil-Anzeige des eigenen Nutzers mit Schnellzugriff auf Bearbeiten,
-/// Einstellungen, Spenden und Empfehlen.
+/// Profil-Anzeige des eigenen Nutzers mit Schnellzugriff auf Bearbeiten
+/// und Einstellungen.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -50,12 +50,7 @@ class ProfileScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Center(
-              child: CircleAvatar(
-                radius: 52,
-                child: Icon(Icons.person, size: 56),
-              ),
-            ),
+            const Center(child: _OwnAvatar()),
             const SizedBox(height: 16),
             Center(
               child: Row(
@@ -99,7 +94,7 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('über mich',
+                      Text('Über mich',
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text(
@@ -132,7 +127,7 @@ class ProfileScreen extends ConsumerWidget {
             Card(
               child: SwitchListTile(
                 title: const Text('Persönlichkeit vor Aussehen'),
-                subtitle: const Text('Fotos erst nach Match anzeigen'),
+                subtitle: const Text('Fotos erst nach Funke anzeigen'),
                 value: settings.blindModeEnabled,
                 onChanged: (v) =>
                     ref.read(settingsProvider.notifier).toggleBlindMode(v),
@@ -390,7 +385,7 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('über mich',
+                    Text('Über mich',
                           style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
                       Text(
@@ -569,6 +564,42 @@ class _OwnIntroAudioPlayerState extends ConsumerState<_OwnIntroAudioPlayer> {
             )
           : Icon(_playing ? Icons.stop : Icons.play_arrow),
       label: Text(_playing ? 'Stopp' : 'Audio-Vorstellung anhören'),
+    );
+  }
+}
+
+/// Signierte URL für das EIGENE Profilbild (Owner-RLS erlaubt direkten
+/// Zugriff - kein match-media nötig, welches Self-Requests ablehnt).
+final _ownAvatarUrlProvider =
+    FutureProvider.autoDispose.family<String?, String>((ref, path) async {
+  try {
+    return await ref
+        .read(supabaseStorageServiceProvider)
+        .getSignedAvatarUrl(path);
+  } catch (_) {
+    return null;
+  }
+});
+
+class _OwnAvatar extends ConsumerWidget {
+  const _OwnAvatar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final photos = ref.watch(profileProvider).photos;
+    final path = photos.isNotEmpty ? photos.first : null;
+    final url = path == null
+        ? null
+        : ref.watch(_ownAvatarUrlProvider(path)).valueOrNull;
+
+    final placeholder = Icon(Icons.person,
+        size: 56, color: Theme.of(context).colorScheme.onSurfaceVariant);
+
+    return CircleAvatar(
+      radius: 52,
+      backgroundImage:
+          (url != null && url.isNotEmpty) ? NetworkImage(url) : null,
+      child: (url == null || url.isEmpty) ? placeholder : null,
     );
   }
 }

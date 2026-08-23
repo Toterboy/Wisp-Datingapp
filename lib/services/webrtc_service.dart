@@ -5,10 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:libsignal_protocol_dart/libsignal_protocol_dart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/services/encryption_service.dart';
+import 'package:wisp/utils/cert_pinning.dart';
 
 /// Service für WebRTC Peer-to-Peer Verbindungen.
 ///
@@ -81,8 +83,19 @@ class WebRTCService {
   /// Signaling-Kaperung; keine Renegotiation in dieser Architektur).
   bool _remoteDescriptionSet = false;
 
+  /// HTTP-Client MIT Zertifikat-Pinning für ice-config und das
+  /// Signaling-Broadcast (Audit: beide Endpunkte laufen gegen denselben
+  /// Supabase-Host wie der ApiClient - derselbe Pin-Schutz gilt).
   WebRTCService(this._encryptionService, {http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+      : _httpClient = httpClient ?? _buildPinnedClient();
+
+  static http.Client _buildPinnedClient() {
+    if (kIsWeb) {
+      // Web kann kein dart:io-Pinning (siehe ApiClient).
+      return http.Client();
+    }
+    return IOClient(CertPinning.pinnedHttpClient());
+  }
 
   /// Lädt die ICE-Konfiguration von der ice-config Edge Function.
   ///
@@ -223,7 +236,8 @@ class WebRTCService {
       final supabaseUrl = Supabase.instance.client.rest.url;
       final token = Supabase.instance.client.auth.currentSession?.accessToken;
       if (token == null) return;
-      await http.post(
+      // Gepinnter Client (kein statisches http.post).
+      await _httpClient.post(
         Uri.parse('$supabaseUrl/realtime/v1/api/broadcast'),
         headers: {
           'Authorization': 'Bearer $token',

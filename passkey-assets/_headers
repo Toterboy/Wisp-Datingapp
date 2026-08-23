@@ -9,5 +9,5 @@
 /apple-app-site-association
   Content-Type: application/json
 
-/captcha.html
+/index.html
   Content-Type: text/html; charset=utf-8

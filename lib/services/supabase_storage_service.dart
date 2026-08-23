@@ -80,9 +80,12 @@ class SupabaseStorageService {
       log('[SupabaseStorageService] Upload avatar: bucket=$_bucket size=${data.length}');
     }
 
+    // upsert: Erneutes Hochladen (neues Bild) ueberschreibt das alte -
+    // ohne upsert wuerde der zweite Upload mit 409 scheitern.
     await _client.storage.from(_bucket).uploadBinary(
           path,
           Uint8List.fromList(data),
+          fileOptions: const FileOptions(upsert: true),
         );
 
     return path;
@@ -154,6 +157,51 @@ class SupabaseStorageService {
     }
 
     await _client.storage.from(_bucket).remove([path]);
+  }
+
+  // =========================================================================
+  // Verifizierungs-Video (privater Bucket, nur eigener Ordner per RLS).
+  // =========================================================================
+
+  static const _verificationBucket = 'verification-videos';
+
+  /// Lädt das Verifizierungs-Video in den PRIVATEN Bucket und gibt den
+  /// Storage-Pfad zurück (`{userId}/video.mp4`). Lesen kann die Datei nur
+  /// der Eigentümer; Admins erhalten kurzlebige signierte URLs über die
+  /// Edge Function `verification-media`.
+  Future<String> uploadVerificationVideo(List<int> data) async {
+    final userId = _currentUser?.id;
+    if (userId == null) {
+      throw AppException('Nicht eingeloggt.');
+    }
+    if (data.isEmpty) {
+      throw AppException('Das Video ist leer.');
+    }
+
+    final path = '$userId/video.mp4';
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Upload verification video: '
+          'size=${data.length}');
+    }
+
+    await _client.storage.from(_verificationBucket).uploadBinary(
+          path,
+          Uint8List.fromList(data),
+          fileOptions: const FileOptions(contentType: 'video/mp4'),
+        );
+
+    return path;
+  }
+
+  /// Entfernt das eigene Verifizierungs-Video (z. B. bei Abbruch).
+  Future<void> deleteVerificationVideo() async {
+    final userId = _currentUser?.id;
+    if (userId == null) {
+      throw AppException('Nicht eingeloggt.');
+    }
+    await _client.storage.from(_verificationBucket).remove([
+      '$userId/video.mp4',
+    ]);
   }
 }
 

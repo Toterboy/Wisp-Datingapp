@@ -95,10 +95,14 @@ class AppConstants {
   /// `false` (Default): Der Verifizierungs-Flow (Info/Video/Complete-Routen)
   /// ist gesperrt und leitet auf Home um; verify-account bleibt admin-only
   /// am Server. Reaktivierung später: `--dart-define=VERIFICATION_ENABLED=true`.
-  /// Hinweis: Der Einladungscode (Zugangskontrolle bei der Registrierung)
-  /// bleibt davon UNBERÜHRT aktiv.
   static const bool verificationEnabled =
       bool.fromEnvironment('VERIFICATION_ENABLED', defaultValue: false);
+
+  /// F-Droid-Build: komplett ohne Firebase/FCM kompiliert und zur Laufzeit
+  /// deaktiviert. Build mit:
+  ///   flutter build apk --release --flavor fdroid --dart-define=FDROID=true
+  static const bool fdroidBuild =
+      bool.fromEnvironment('FDROID', defaultValue: false);
 
   /// Basis-URL des Supabase-Projekts (aus .env), ohne trailing slash.
   /// Wird u. a. für die captcha-page Edge Function benötigt.
@@ -174,3 +178,24 @@ class AppConstants {
   // Hinter symmetrischen NATs/strikten Firewalls (z. B. Unternehmensnetze)
   // kann ggf. keine direkte P2P-Verbindung aufgebaut werden.
 }
+
+/// Deutsche Bundesländer (Vollnamen, für die Auswahl im Profil und in der
+/// Einrichtung - zentrale Definition, damit beide Screens identisch sind).
+const kGermanStates = <String>[
+  'Baden-Württemberg',
+  'Bayern',
+  'Berlin',
+  'Brandenburg',
+  'Bremen',
+  'Hamburg',
+  'Hessen',
+  'Mecklenburg-Vorpommern',
+  'Niedersachsen',
+  'Nordrhein-Westfalen',
+  'Rheinland-Pfalz',
+  'Saarland',
+  'Sachsen',
+  'Sachsen-Anhalt',
+  'Schleswig-Holstein',
+  'Thüringen',
+];

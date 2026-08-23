@@ -51,6 +51,7 @@ class ProfileDetailScreen extends ConsumerStatefulWidget {
 
 class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
   UserProfile? _profile;
+  double? _distanceKm;
 
   @override
   void initState() {
@@ -75,6 +76,13 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
         // Kein Supabase verfügbar oder User nicht gefunden.
       }
     }
+
+    // Distanz in km (5-km-Schritte, serverseitig berechnet) - optional.
+    try {
+      final db = ref.read(supabaseDatabaseServiceProvider);
+      final distance = await db.fetchDistanceKm(userId);
+      if (mounted) setState(() => _distanceKm = distance);
+    } catch (_) {}
 
     if (mounted) setState(() => _profile = profile);
   }
@@ -151,13 +159,48 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
             ),
             const SizedBox(height: 16),
             Center(
-              child: Text(
-                '${profile.name}${profile.age != null && profile.age! > 0 ? ', ${profile.age}' : ''}'
-                '${genderLabel.isNotEmpty ? ' · $genderLabel' : ''}'
-                '${profile.city.isNotEmpty ? ' · ${profile.city}' : ''}',
-                style: Theme.of(context).textTheme.titleMedium,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      '${profile.name}${profile.age != null && profile.age! > 0 ? ', ${profile.age}' : ''}'
+                      '${genderLabel.isNotEmpty ? ' · $genderLabel' : ''}'
+                      '${(profile.state ?? '').isNotEmpty ? ' · ${profile.state}' : ''}'
+                      '${profile.city.isNotEmpty && (profile.state ?? '').isEmpty ? ' · ${profile.city}' : ''}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  // Verifiziert-Badge (serverseitig durch Admin-Freigabe).
+                  if (profile.isVerified) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Verifiziert',
+                      child: Icon(
+                        Icons.verified,
+                        size: 20,
+                        color: Colors.lightBlue.shade400,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
+            if (_distanceKm != null) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  // Nur die gerundete Entfernung - nie der exakte Standort.
+                  _distanceKm!.round() == 0
+                      ? 'unter 5 km entfernt'
+                      : 'ca. ${_distanceKm!.round()} km entfernt',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+              ),
+            ],
             if (profile.personalityType != null) ...[
               const SizedBox(height: 8),
               Center(
@@ -200,7 +243,7 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('über mich',
+                    Text('Über mich',
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text(

@@ -54,7 +54,10 @@ class SupabaseDatabaseService {
         .select(
           'user_id, name, gender, gender_preferences, birth_date, bio, '
           'interests, personality_type, max_distance_km, age_range_min, '
-          'age_range_max, is_verified, is_location_suspicious, created_at, updated_at',
+          'age_range_max, smoking, alcohol, drugs, is_verified, '
+          'is_location_suspicious, city, state, country, intro_text, '
+          'intro_audio_path, location_lat, location_lng, mood, created_at, '
+          'updated_at',
         )
         .eq('user_id', userId)
         .maybeSingle();
@@ -87,7 +90,15 @@ class SupabaseDatabaseService {
       'location_lng': response['location_lng'],
       'is_verified': response['is_verified'],
       'is_location_suspicious': response['is_location_suspicious'],
+      'city': response['city'] ?? '',
+      'state': response['state'],
+      'country': response['country'] ?? 'Deutschland',
+      'introText': response['intro_text'] ?? '',
+      'introAudioPath': response['intro_audio_path'],
       'mood': response['mood'],
+      'smoking': response['smoking'],
+      'alcohol': response['alcohol'],
+      'drugs': response['drugs'],
     };
     return UserProfile.fromJson(mapped);
   }
@@ -143,37 +154,55 @@ class SupabaseDatabaseService {
     return Map<String, dynamic>.from(response);
   }
 
+  /// Abgerundete Distanz in km vom eigenen Profil zum Zielprofil
+  /// (RPC `profile_distance_km`, 5-km-Schritte). Null ohne Koordinaten.
+  Future<double?> fetchDistanceKm(String userId) async {
+    try {
+      final result = await _client.rpc(
+        'profile_distance_km',
+        params: {'p_other': userId},
+      );
+      if (result is num) return result.toDouble();
+      return null;
+    } catch (_) {
+      // Distanz ist optional - Fehler still ignorieren.
+      return null;
+    }
+  }
+
   // =========================================================================
-  // Invite Codes (invite_codes-Tabelle)
+  // Admin-Funktionen (alle RPCs pruefen is_current_user_admin serverseitig,
+  // fail-closed - der Client-Check ist nur Kosmetik).
   // =========================================================================
 
-  /// Prüft, ob ein Invite-Code gültig, unverbraucht und nicht abgelaufen ist.
-  ///
-  /// Seit Migration 040 (Audit K4) über die SECURITY DEFINER-RPC
-  /// `validate_invite_code` (boolean-Rückgabe): Die Tabelle selbst ist per
-  /// RLS nicht mehr lesbar, wodurch weder Enumeration noch Massen-Export
-  /// aller gültigen Codes möglich sind.
-  Future<bool> validateInviteCode(String code) async {
-    final normalized = code.trim().toUpperCase();
-    if (normalized.isEmpty) return false;
-    final result = await _client.rpc(
-      'validate_invite_code',
-      params: {'p_code': normalized},
+  Future<List<Map<String, dynamic>>> _adminList(String rpc) async {
+    final response = await _client.rpc(rpc);
+    return List<Map<String, dynamic>>.from(response as List<dynamic>);
+  }
+
+  /// Alle Nutzer-Meldungen ("Nutzer melden").
+  Future<List<Map<String, dynamic>>> fetchUserReports() =>
+      _adminList('admin_list_user_reports');
+
+  /// Meldung als bearbeitet markieren.
+  Future<void> resolveUserReport(String reportId) async {
+    await _client.rpc(
+      'admin_resolve_user_report',
+      params: {'p_report_id': reportId},
     );
-    return result == true;
   }
 
-  /// Markiert einen Invite-Code als verwendet.
-  ///
-  /// Nutzt die SECURITY DEFINER-RPC, damit der Client den Code nicht selbst
-  /// als verwendet markieren kann (Schutz gegen Self-Redeeming).
-  Future<void> markInviteCodeAsUsed(String code, String userId) async {
-    final normalized = code.trim().toUpperCase();
-    await _client.rpc('mark_invite_code_used', params: {
-      'p_code': normalized,
-      'p_user_id': userId,
-    });
-  }
+  /// Bug-Reports (DB-Kopie der per Email versendeten Reports).
+  Future<List<Map<String, dynamic>>> fetchBugReports() =>
+      _adminList('admin_list_bug_reports');
+
+  /// Ausstehende Verifizierungen (Video wartet auf Freigabe).
+  Future<List<Map<String, dynamic>>> fetchPendingVerifications() =>
+      _adminList('admin_list_pending_verifications');
+
+  /// Gebannte Email-Adressen (Anzeige).
+  Future<List<Map<String, dynamic>>> fetchBannedEmails() =>
+      _adminList('admin_list_banned_emails');
 
   // =========================================================================
 
@@ -251,6 +280,28 @@ class SupabaseDatabaseService {
       'created_at': DateTime.now().toIso8601String(),
       'metadata': ?metadata,
     });
+  }
+
+  /// Prüft, ob eine E-Mail-Adresse auf der Plattform gesperrt ist
+  /// (Migration 045: public.banned_emails). Liefert den hinterlegten
+  /// Sperr-Grund, falls vorhanden. Die RPC ist pre-auth (anon) aufrufbar
+  /// und serverseitig gedrosselt.
+  Future<({bool banned, String? reason})> checkEmailBanStatus(
+    String email,
+  ) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty) return (banned: false, reason: null);
+    final result = await _client.rpc(
+      'check_email_ban_status',
+      params: {'p_email': normalized},
+    );
+    if (result is Map) {
+      return (
+        banned: result['banned'] == true,
+        reason: result['reason'] as String?,
+      );
+    }
+    return (banned: false, reason: null);
   }
 
   // =========================================================================

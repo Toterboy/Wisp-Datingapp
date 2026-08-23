@@ -235,7 +235,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
     // In Produktion sollte hier das echte Profil des Partners geladen werden.
     final partnerProfile = UserProfile(
       id: partnerId,
-      name: 'Dein Match',
+      name: 'Dein Gegenüber',
       bio: '',
       interests: [],
     );
@@ -244,7 +244,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Es ist ein Match! Chat wird geöffnet...')),
+        const SnackBar(content: Text('Ein Funke ist übersprungen! Chat wird geöffnet...')),
       );
       await Future.delayed(const Duration(milliseconds: 1500));
       if (mounted) {
@@ -262,7 +262,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
           children: [
             Icon(Icons.favorite_border, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
-            const Text('Kein Match'),
+            const Text('Kein Funke'),
           ],
         ),
         content: Text(message),
@@ -423,7 +423,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
             Icon(Icons.favorite, color: Colors.white),
             SizedBox(width: 8),
             Text(
-              'Es ist ein Match!',
+              'Ein Funke ist übersprungen!',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ],
@@ -440,7 +440,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
           Icon(Icons.favorite_border, color: Colors.white),
           SizedBox(width: 8),
           Text(
-            'Kein Match, aber weiter so!',
+            'Kein Funke diesmal – aber weiter so!',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
         ],
@@ -745,7 +745,7 @@ class _DecisionButtons extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Beide müssen "Annehmen" drücken für ein Match.',
+              'Beide müssen "Annehmen" drücken für einen Funken.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

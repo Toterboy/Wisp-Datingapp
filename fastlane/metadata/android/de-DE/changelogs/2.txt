@@ -1,0 +1,13 @@
+﻿Erste Beta mit Themes, Key-Backup, Safety Center und Bild-Blur!
+
+• 6 Farbschemata (Classic WispDating, Ozean, Wald, Sonnenuntergang, Lavendel, Schiefer)
+• Verschlüsseltes E2E-Key-Backup für den Gerätewechsel
+• Safety Center mit Hilfetelefonen und Stalking-Leitfaden
+• Chat-Bilder standardmäßig verpixelt + Melde-Funktion
+• Push ohne Google via UnifiedPush (F-Droid-Variante)
+• Registrierung jetzt ohne Einladungscode
+• Kein Online-Status, kein "schreibt..." - bewusst präsenz-frei
+• Desktop/Web: NavigationRail auf breiten Screens
+
+Sicherheit: Profil-Daten in den Keystore, Backups deaktiviert,
+serverseitige Härtrunden (Rate-Limits, Feld-Whitelist u. v. m.).

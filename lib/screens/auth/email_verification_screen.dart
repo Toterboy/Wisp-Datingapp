@@ -8,6 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisp/providers/auth_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/utils/constants.dart';
+import 'package:wisp/widgets/captcha_challenge.dart';
 
 /// Screen zur Bestätigung der E-Mail-Adresse nach der Registrierung.
 ///
@@ -41,18 +43,21 @@ class _EmailVerificationScreenState
   /// Cooldown bis zum nächsten erlaubten "Erneut senden".
   static const _resendCooldownDuration = Duration(seconds: 60);
 
-  /// Start-Wartezeit bis zum ersten Auto-Login-Versuch.
-  static const _autoLoginInitialDelaySeconds = 5;
+  /// Start-Wartezeit bis zum ersten Auto-Login-Versuch (schont das
+  /// Auth-Rate-Limit: Häufige stille Login-Versuche sorgten dafür, dass
+  /// echte Registrierungs-/Login-Versuche mit "Zu viele Anfragen"
+  /// abgelehnt wurden).
+  static const _autoLoginInitialDelaySeconds = 10;
 
   /// Maximales Alter der im Speicher gehaltenen Registrierungs-Credentials
   /// (E-Mail + Passwort). Danach wird der stille Login eingestellt.
   static const _autoLoginCredentialsMaxAge = Duration(minutes: 15);
 
   /// Maximale Wartezeit zwischen zwei Auto-Login-Versuchen (Backoff).
-  /// Begrenzter Backoff: Das Auth-Rate-Limit wurde auf 300/h angehoben,
-  /// daher darf der stille Login deutlich öfter probieren (schnellere
-  /// Erkennung der Bestätigung nach dem Mail-Klick).
-  static const _autoLoginMaxDelaySeconds = 20;
+  /// Längere Abstände (30 s) statt schnellem Polling, um das pro-Minute-
+  /// Limit nicht zu erschöpfen. Nach dem Zurückkehren aus der
+  /// Bestätigungs-Mail wird ohnehin sofort ein Versuch gestartet.
+  static const _autoLoginMaxDelaySeconds = 30;
 
   @override
   void initState() {
@@ -90,9 +95,14 @@ class _EmailVerificationScreenState
     // Die Bestätigung passiert meist im Browser: Beim Zurückkehren in die
     // App sofort prüfen. Im Hintergrund nicht pollen â€“ schont das
     // Auth-Rate-Limit-Budget und den Akku.
-    if (state == AppLifecycleState.resumed) {
+if (state == AppLifecycleState.resumed) {
       _autoLoginDelaySeconds = _autoLoginInitialDelaySeconds;
-      _attemptAutoLogin();
+      // Der Nutzer kommt i. d. R. gerade aus der Bestätigungs-Mail zurück:
+      // Genau jetzt EINE Captcha-Challenge anbieten (Server verlangt bei
+      // aktivierter Dashboard-CAPTCHA auch für den stillen Login ein
+      // Token) und dann mit Token anmelden. Vorher scheiterte der stille
+      // Login still an captcha_failed -> "es geht nicht weiter".
+      _attemptAutoLogin(withCaptcha: AppConstants.captchaEnabled);
     } else {
       _autoLoginTimer?.cancel();
     }
@@ -118,7 +128,7 @@ class _EmailVerificationScreenState
         Timer(Duration(seconds: _autoLoginDelaySeconds), _attemptAutoLogin);
   }
 
-  Future<void> _attemptAutoLogin() async {
+Future<void> _attemptAutoLogin({bool withCaptcha = false}) async {
     // Keine überlappenden Versuche (jeder Versuch kostet Rate-Limit-Budget).
     if (_autoLoginInProgress) return;
     if (!mounted || !SupabaseService.isInitialized) return;
@@ -137,12 +147,26 @@ final creds = ref.read(pendingVerificationCredentialsProvider);
 
     _autoLoginInProgress = true;
     try {
+      // Bei aktivierter Dashboard-CAPTCHA verlangt der Server auch für
+      // den stillen Login ein Token. Nur auf expliziten Wunsch (User ist
+      // gerade aus der Mail zurückgekehrt) eine Challenge zeigen – die
+      // stillen Timer-Versuche laufen ohne Token weiter und scheitern
+      // leise, bis die Bestätigung + Challenge durch ist.
+      String? captchaToken;
+      if (withCaptcha && AppConstants.captchaEnabled && mounted) {
+        captchaToken = await showCaptchaChallenge(context);
+        if (captchaToken == null) {
+          // Abgebrochen: normal weiter im Backoff, kein Endlos-Retry.
+          return;
+        }
+      }
       // silentLogin statt login(): Der Status bleibt bei einem Fehler
       // unverändert, damit der Router den Nutzer nicht als "ausgeloggt"
       // behandelt und zum Login-Screen wirft.
       await ref.read(authProvider.notifier).silentLogin(
             email: creds.email,
             password: creds.password,
+            captchaToken: captchaToken,
           );
       // Erfolg: silentLogin hat die Credentials geleert und die Session
       // erzeugt. emailConfirmedProvider erkennt die Bestätigung und
@@ -163,20 +187,63 @@ final creds = ref.read(pendingVerificationCredentialsProvider);
     }
   }
 
+  /// Manueller "Weiter"-Weg, nachdem der Nutzer die Mail bestätigt hat.
+  ///
+  /// Wichtig, weil der stille Auto-Login nur beim App-Wechsel (resumed)
+  /// eine Captcha-Challenge zeigen kann: Bleibt die App während der
+  /// Bestätigung offen (oder wurde die Mail auf einem anderen Gerät
+  /// geöffnet), gäbe es sonst keinen Ausweg vom Screen. Sind die
+  /// Registrierungs-Credentials (max. 15 Min) nicht mehr da, führt der
+  /// reguläre Login zum Ziel – die Challenge gibt es dort ebenfalls.
+  Future<void> _manualContinue() async {
+    final creds = ref.read(pendingVerificationCredentialsProvider);
+    if (creds == null ||
+        DateTime.now().difference(creds.createdAt) >
+            _autoLoginCredentialsMaxAge) {
+      // Kein stiller Login mehr möglich: reguläre Anmeldung anbieten.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Bitte melde dich jetzt mit E-Mail und Passwort an – '
+                'deine E-Mail-Adresse ist bereits bestätigt.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.go(AppRoutes.login);
+      }
+      return;
+    }
+    await _attemptAutoLogin(withCaptcha: AppConstants.captchaEnabled);
+  }
+
   Future<void> _resend() async {
     if (_resending || _showSent || _cooldownSeconds > 0) return;
     setState(() => _resending = true);
 
-    try {
+try {
       final email =
           _capturedEmail ?? SupabaseService.client.auth.currentUser?.email;
       if (email == null || email.isEmpty) {
         throw Exception(
             'Keine Emailadresse gefunden. Bitte registriere dich erneut.');
       }
+      // Bei aktivierter Dashboard-CAPTCHA verlangt auch der Resend-
+      // Endpoint ein Token – vorher schlug "Erneut senden" mit
+      // captcha_failed fehl.
+      String? captchaToken;
+      if (AppConstants.captchaEnabled) {
+        captchaToken = await showCaptchaChallenge(context);
+        if (captchaToken == null) {
+          // Nutzer hat die Challenge abgebrochen – kein Versand.
+          if (mounted) setState(() => _resending = false);
+          return;
+        }
+      }
       await SupabaseService.client.auth.resend(
         type: OtpType.signup,
         email: email,
+        captchaToken: captchaToken,
       );
       if (!mounted) return;
 
@@ -316,6 +383,21 @@ final creds = ref.read(pendingVerificationCredentialsProvider);
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+            // Manueller Weiter-Weg nach der Bestätigung: löst die
+            // Capttha-Challenge + stillen Login aus (oder führt zum
+            // Login-Screen, falls die Registrierungs-Daten abgelaufen
+            // sind). Ohne diesen Button hing der Screen, wenn die App
+            // während der Mail-Bestätigung offen blieb.
+            FilledButton.icon(
+              onPressed:
+                  (isConfirmed == true || _autoLoginInProgress || _resending)
+                      ? null
+                      : _manualContinue,
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Ich habe die Mail bestätigt – Weiter'),
+            ),
+            const SizedBox(height: 8),
             const SizedBox(height: 8),
             // Hinweis: DNS-Filter/VPNs können den Bestätigungslink blockieren.
             Container(

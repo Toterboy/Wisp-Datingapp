@@ -19,7 +19,6 @@ import 'package:wisp/services/secure_location_storage.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/models/signal_key_models.dart';
 import 'package:wisp/models/photo_moderation_models.dart';
-import 'package:wisp/models/invitation_code_model.dart';
 import 'package:wisp/models/report_models.dart';
 import 'package:wisp/utils/constants.dart';
 
@@ -111,7 +110,10 @@ Future<void> main() async {
   // Push ist optional und darf den App-Start niemals verzögern. Ohne Timeout
   // kann Firebase.initializeApp() auf Geräten ohne Google-Dienste oder bei
   // blockiertem Netz minutenlang hängen -> Splash/ANR ("App startet nicht").
-  unawaited(_initializeFirebase());
+  // F-Droid-Build (--dart-define=FDROID=true): Firebase komplett aus.
+  if (!AppConstants.fdroidBuild) {
+    unawaited(_initializeFirebase());
+  }
 
   // Migration (Keystore-Zugriff) ebenfalls erst nach dem ersten Frame:
   // EncryptedSharedPreferences-Lesevorgänge können auf manchen Geräten
@@ -234,6 +236,5 @@ void _registerHiveAdapters() {
   // Supabase). Daher keine Hive-Adapter nötig.
   Hive.registerAdapter(PhotoModerationFlagAdapter());
   Hive.registerAdapter(UserModerationRecordAdapter());
-  Hive.registerAdapter(InvitationCodeAdapter());
   Hive.registerAdapter(UserReportAdapter());
 }

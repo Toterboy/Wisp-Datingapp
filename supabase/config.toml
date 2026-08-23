@@ -26,6 +26,12 @@ verify_jwt = true
 [functions.verify-account]
 verify_jwt = true
 
+# verification-media: signierte URLs fuer Verifizierungs-Videos (nur Admin).
+# Gateway-Pruefung zusaetzlich zur manuellen is_admin-Pruefung in der
+# Function selbst (Defense-in-Depth).
+[functions.verification-media]
+verify_jwt = true
+
 [functions.server-time]
 # Muss anonym aufrufbar sein, da die App beim Start (vor Login) die
 # Serverzeit synchronisieren möchte. Die Funktion gibt nur die aktuelle
@@ -66,6 +72,15 @@ verify_jwt = false
 # bei Client-Aufrufen). Gateway-JWT-Pruefung ist deshalb deaktiviert.
 [functions.notify-user]
 verify_jwt = false
+
+# request-unban: Entsperrungsantrag fuer gesperrte E-Mail-Adressen.
+# Der Nutzer ist bewusst NICHT eingeloggt (Konto gesperrt) -> verify_jwt
+# deaktiviert. Eigene Absicherung in der Funktion: nur Eintraege aus
+# banned_emails werden akzeptiert, IP-Rate-Limit (5/h) + persistente
+# Rate-Limits pro E-Mail (3/h via consume_rate_limit).
+[functions.request-unban]
+verify_jwt = false
+enabled = true
 
 # --- Passkeys (WebAuthn) ---
 # Aktiviert Passkey-Login/Registrierung in Supabase Auth. Die nativen Apps

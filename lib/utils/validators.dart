@@ -90,6 +90,41 @@ class Validators {
     return null;
   }
 
+  /// Passwort bei der Registrierung: erfüllt die Server-Policy
+  /// (Password Strength Policy im Supabase-Dashboard): mindestens 8
+  /// Zeichen, Groß- und Kleinbuchstaben, mindestens eine Zahl und ein
+  /// Sonderzeichen. Häufige Passwörter aus einer Blockliste werden
+  /// abgelehnt.
+  ///
+  /// Sammelt ALLE fehlenden Anforderungen und nennt sie gemeinsam –
+  /// sonst sieht der Nutzer nur die erste fehlende Regel und weiß nicht,
+  /// was noch alles verlangt wird.
+  static String? registrationPassword(String? value) {
+    final v = value ?? '';
+    if (v.isEmpty) return 'Bitte gib ein Passwort ein';
+    final missing = <String>[];
+    if (v.length < 8) missing.add('8 Zeichen');
+    if (!v.contains(RegExp('[a-zäöüß]'))) {
+      missing.add('einen Kleinbuchstaben');
+    }
+    if (!v.contains(RegExp('[A-ZÄÖÜ]'))) {
+      missing.add('einen Großbuchstaben');
+    }
+    if (!v.contains(RegExp('[0-9]'))) {
+      missing.add('eine Zahl');
+    }
+    if (!v.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/~`]'))) {
+      missing.add('ein Sonderzeichen');
+    }
+    if (missing.isNotEmpty) {
+      return 'Das Passwort braucht: ${missing.join(', ')}';
+    }
+    if (commonPasswords.contains(v.toLowerCase())) {
+      return 'Dieses Passwort ist zu häufig. Bitte wähle ein sichereres.';
+    }
+    return null;
+  }
+
   /// Gibt eine textuelle Passwort-Stärke zurück (für UI-Feedback).
   static String passwordStrength(String value) {
     var score = 0;

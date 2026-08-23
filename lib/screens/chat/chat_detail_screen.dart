@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,8 @@ import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
+import 'package:wisp/widgets/audio_review_sheet.dart';
+import 'package:wisp/widgets/meet_intent_card.dart';
 import 'package:wisp/widgets/profile_widgets.dart';
 
 /// 1:1-Chat-Detailansicht mit Nachrichtenverlauf und Eingabefeld.
@@ -51,6 +54,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Timer? _recordTimer;
   // E: Ladezustand für Bild-Upload.
   bool _uploadingImage = false;
+
+  /// Bilder im Chat standardmäßig verpixeln (Einstellung, Default an)?
+  bool get _blurChatImages =>
+      ref.watch(settingsProvider).blurChatImages;
 
   // Echte E2E-P2P-Verbindung (Signaling + WebRTC + PreKey).
   P2PChatService? _p2p;
@@ -507,6 +514,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     if (_recording) {
       _recordTimer?.cancel();
 
+      // WICHTIG: Sekunden VOR dem Reset sichern – vorher stand der Reset
+      // vor der Prüfung, sodass jede Aufnahme als "unter 1 Sekunde"
+      // verworfen wurde (Sprachnachrichten kamen nie durch).
+      final seconds = _recordSeconds;
+
       // Aufnahme beenden.
       final path = _recordingPath;
       setState(() {
@@ -525,10 +537,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         final exists = await file.exists();
         if (!exists) return;
 
-        final bytes = await file.readAsBytes();
-
-        // Mindestlänge prüfen.
-        final seconds = _recordSeconds;
+        // Mindestlänge prüfen (mit der gesicherten, echten Dauer).
         if (seconds < 1) {
           await file.delete();
           if (mounted) {
@@ -541,6 +550,26 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           return;
         }
 
+        // Anhören vor dem Senden: Review-Sheet mit Player. Erst nach
+        // Bestätigung wird die Nachricht (E2E-verschlüsselt) gesendet.
+        if (!mounted) {
+          await file.delete();
+          return;
+        }
+        final send = await showAudioReviewSheet(
+          context: context,
+          path: effectivePath,
+          durationSeconds: seconds,
+          minimumSeconds: 1,
+          confirmLabel: 'Senden',
+        );
+        if (send != true) {
+          await file.delete();
+          return;
+        }
+
+        final bytes = await file.readAsBytes();
+
         final match = _match;
         if (match == null) {
           await file.delete();
@@ -551,7 +580,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         await _p2p?.sendBinary(
           Uint8List.fromList(bytes),
           contentType: 'audio/m4a',
-          metadata: {'durationSeconds': _recordSeconds},
+          metadata: {'durationSeconds': seconds},
         );
 
         // Lokale Vorschau anzeigen.
@@ -562,7 +591,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           text: '',
           timestamp: DateTime.now(),
           mediaUrl: effectivePath,
-          durationSeconds: _recordSeconds,
+          durationSeconds: seconds,
           type: MessageType.voice,
         );
         ref.read(chatProvider.notifier).addMessage(match.id, localMsg, ref: ref);
@@ -755,6 +784,24 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  /// Meldet ein einzelnes Bild als unangemessenen Inhalt.
+  ///
+  /// Der Bildverweis + Chat-Kontext landen in der user_reports-Tabelle
+  /// (Admin-Screen „Meldungen"); die Prüfung erfolgt manuell durch den
+  /// Betreiber. Inhalte selbst bleiben E2E - übertragen wird nur die
+  /// Nachrichtenreferenz, wie bei jeder Meldung transparent im Dialog.
+  void _reportImage(Message msg) {
+    final match = _match;
+    if (match == null) return;
+    showReportUserDialog(
+      context: context,
+      ref: ref,
+      reportedUserId: match.partner.id,
+      reportedUserName: match.partner.name,
+      messages: [msg],
+    );
+  }
+
   /// Zeigt den Bestätigungsdialog zum Blockieren eines Nutzers
   /// (Bot-/Spam-Schutz, Migration 043).
   ///
@@ -772,8 +819,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ],
         ),
         content: Text(
-          '$peerName wird dauerhaft blockiert: Der Match wird gelöscht und '
-          'diese Person kann dich nicht mehr liken, matchen oder dir '
+          '$peerName wird dauerhaft blockiert: Der Funke wird beendet und '
+          'diese Person kann dich nicht mehr liken, einen Funke setzen oder dir '
           'Nachrichten senden. Die Blockierung kann später über den '
           'Support-Dialog nicht aufgehoben werden – nur du selbst kannst '
           'sie in den Einstellungen entfernen.',
@@ -830,11 +877,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red),
             SizedBox(width: 8),
-            Text('Match auflösen?'),
+            Text('Funke beenden?'),
           ],
         ),
         content: const Text(
-          'Möchtest du dieses Match wirklich auflösen? '
+          'Möchtest du diesen Funke wirklich beenden? '
           'Der Chat wird dauerhaft gelöscht und kann nicht wiederhergestellt werden.',
         ),
         actions: [
@@ -857,7 +904,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       final success = ref.read(chatProvider.notifier).dissolveMatch(match.id);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Match wurde aufgelöst')),
+          const SnackBar(content: Text('Funke beendet')),
         );
         if (mounted) context.go(AppRoutes.interessen);
       }
@@ -888,6 +935,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
+            tooltip: 'Zurück zu den Funken',
             onPressed: () => context.go(AppRoutes.interessen),
           ),
           title: const Text('Chat'),
@@ -902,7 +950,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () => context.go(AppRoutes.interessen),
-                child: const Text('Zurück zu den Matches'),
+                child: const Text('Zurück zu den Funken'),
               ),
             ],
           ),
@@ -926,11 +974,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(AppRoutes.interessen),
-        ),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Zurück zu den Funken',
+            onPressed: () => context.go(AppRoutes.interessen),
+          ),
         // G/H: Tap auf Name/Avatar -> Profil des Gegenübers.
         // Bewusst push() statt go(), damit der "Zurück"-Pfeil im
         // Profil-Screen wieder exakt zu DIESEM Chat zurückkehrt (und nicht
@@ -951,12 +1000,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(partner.name),
-                    // J: Online-/Offline-Status statt dauerhaftem
-                    // "Fotos freigeschaltet"-Hinweis im Header.
-                    const _OnlineStatus(
-                      // Mock-Partner gelten im Prototyp als "online".
-                      lastSeen: null,
-                    ),
+                    // Bewusst KEIN Online-Status / „schreibt…“ /
+                    // Lesebestätigung - siehe ADR-0007 (Präsenz-frei).
                   ],
                 ),
               ),
@@ -1014,8 +1059,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             icon: const Icon(Icons.call),
                       tooltip: 'Audio Anruf',
             onPressed: _call,
-          ),
-          PopupMenuButton<String>(
+          ),          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'Weitere Optionen',
             onSelected: (value) {
@@ -1033,7 +1077,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   leading: Icon(Icons.block),
                   title: Text('Nutzer blockieren'),
                   subtitle: Text(
-                    'Keine Nachrichten, Likes oder Matches mehr von dieser Person.',
+                    'Keine Nachrichten, Likes oder Funken mehr von dieser Person.',
                   ),
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -1042,7 +1086,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 value: 'dissolve',
                 child: ListTile(
                   leading: Icon(Icons.link_off),
-                  title: Text('Match auflösen'),
+                  title: Text('Funke beenden'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -1053,7 +1097,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       body: Column(
         children: [
           if (!isPhotosVisible)
-            const BlindPhotoPlaceholder(label: 'Fotos nach Match sichtbar'),
+            const BlindPhotoPlaceholder(label: 'Fotos nach Funke sichtbar'),
+          MeetIntentCard(
+            matchId: widget.matchId,
+            partnerName: partner.name,
+          ),
           Expanded(
             child: messages.isEmpty
                 ? const Center(
@@ -1079,7 +1127,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                         alignment: mine
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
-                        child: _MessageBubble(msg: msg, mine: mine),
+                        child: _MessageBubble(
+                          msg: msg,
+                          mine: mine,
+                          blurEnabled: _blurChatImages,
+                          onReportImage: _reportImage,
+                        ),
                       );
                     },
                   ),
@@ -1192,10 +1245,21 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 /// Sprechende Blase für Text-, Bild- und Sprachnachrichten mit
 /// Playback-Unterstützung für Voice.
 class _MessageBubble extends StatefulWidget {
-  const _MessageBubble({required this.msg, required this.mine});
+  const _MessageBubble({
+    required this.msg,
+    required this.mine,
+    required this.blurEnabled,
+    required this.onReportImage,
+  });
 
   final Message msg;
   final bool mine;
+
+  /// Bilder (fremder Seite) standardmäßig verpixelt anzeigen?
+  final bool blurEnabled;
+
+  /// Meldet dieses Bild als unangemessenen Inhalt.
+  final void Function(Message msg) onReportImage;
 
   @override
   State<_MessageBubble> createState() => _MessageBubbleState();
@@ -1205,6 +1269,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
   AudioPlayer? _player;
   bool _playing = false;
   StreamSubscription<PlayerState>? _stateSub;
+
+  /// Vom Nutzer nach Warnung freigegebene Bilder (Session-lokal).
+  bool _revealed = false;
 
   /// Bereits angesehene View-Once-Bilder (Session-lokal).
   /// Wird beim App-Neustart zurückgesetzt – das ist beabsichtigt,
@@ -1266,6 +1333,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
     final textColor = mine
         ? Colors.white
         : Theme.of(context).colorScheme.onSurfaceVariant;
+    // Blur-Zustand einmal pro Build berechnen (siehe Bild-Zweig).
+    final blurred = widget.blurEnabled && !widget.mine && !_revealed;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -1280,27 +1349,80 @@ class _MessageBubbleState extends State<_MessageBubble> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Schutz vor unangemessenen Inhalten: Bilder der
+                  // Gegenseite sind standardmäßig verpixelt (Einstellung
+                  // "blurChatImages", Default an). Freigabe nur nach
+                  // ausdrücklicher Bestätigung.
                   GestureDetector(
-                    onTap: () => widget.mine
-                        ? _showFullscreenImage(context, msg)
-                        : msg.viewOnce
-                            ? _showViewOnceImage(context, msg)
-                            : _showFullscreenImage(context, msg),
-                    child: Stack(
+                    onTap: () {
+                      if (blurred) {
+                        _confirmRevealImage();
+                        return;
+                      }
+                      if (widget.mine) {
+                        _showFullscreenImage(context, msg);
+                      } else if (msg.viewOnce) {
+                        _showViewOnceImage(context, msg);
+                      } else {
+                        _showFullscreenImage(context, msg);
+                      }
+                    },
+                    onLongPress: () => _showImageActions(context, blurred),
+                    child: Semantics(
+                      label: blurred
+                          ? 'Verpixelt Bildnachricht. Doppeltippen zum '
+                              'Anzeigen nach Warnung, lang drücken zum Melden.'
+                          : 'Bildnachricht. Doppeltippen für Vollbild, '
+                              'lang drücken zum Melden.',
+                      button: true,
+                      child: Stack(
                       children: [
-                        Container(
-                          width: 180,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: const LinearGradient(
-                              colors: [Colors.purple, Colors.blue],
+                        ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: blurred ? 16 : 0,
+                            sigmaY: blurred ? 16 : 0,
+                          ),
+                          child: Container(
+                            width: 180,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              gradient: const LinearGradient(
+                                colors: [Colors.purple, Colors.blue],
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.image,
+                                  color: Colors.white, size: 40),
                             ),
                           ),
-                          child: const Center(
-                            child: Icon(Icons.image, color: Colors.white, size: 40),
-                          ),
                         ),
+                        if (blurred)
+                          Positioned(
+                            bottom: 6,
+                            left: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(6)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.visibility_off,
+                                      size: 12, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Text('Verpixelt',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10)),
+                                ],
+                              ),
+                            ),
+                          ),
                         if (msg.viewOnce)
                           Positioned(
                             top: 6,
@@ -1325,6 +1447,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                             ),
                           ),
                       ],
+                      ),
                     ),
                   ),
                   if (msg.text.isNotEmpty)
@@ -1358,6 +1481,69 @@ class _MessageBubbleState extends State<_MessageBubble> {
             style: TextStyle(color: textColor),
           ),
       },
+    );
+  }
+
+  /// Bestätigt das Entzerren eines verpixelten Bildes mit Warnhinweis.
+  void _confirmRevealImage() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bild anzeigen?'),
+        content: const Text(
+          'Dieses Bild ist verpixelt, um dich vor unangemessenen Inhalten '
+          'zu schützen. Es kann Inhalte enthalten, die du als störend '
+          'empfindest.\n\nDu kannst es danach direkt melden.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() => _revealed = true);
+            },
+            child: const Text('Anzeigen'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Aktionsmenü für Bilder: Melden und ggf. Freigeben.
+  void _showImageActions(BuildContext context, bool blurred) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.flag_outlined, color: Colors.red),
+              title: const Text('Bild melden'),
+              subtitle: const Text(
+                'Wird mit Kontext an den Support übermittelt.',
+              ),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                widget.onReportImage(widget.msg);
+              },
+            ),
+            if (blurred)
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined),
+                title: const Text('Bild anzeigen'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  _confirmRevealImage();
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1492,47 +1678,6 @@ class _MessageBubbleState extends State<_MessageBubble> {
   }
 }
 
-/// J: Zeigt den Online-/Offline-Status der Gegenperson im Chat-Header.
-///
-/// [lastSeen] ist null -> "Online" (grün). Ansonsten
-/// "Zuletzt online vor X Min/Std." Im Prototyp haben Mock-Partner keinen
-/// lastSeen-Wert und gelten daher als online.
-class _OnlineStatus extends StatelessWidget {
-  const _OnlineStatus({this.lastSeen});
-
-  final DateTime? lastSeen;
-
-  @override
-  Widget build(BuildContext context) {
-    final online = lastSeen == null;
-    final text = online ? 'Online' : _formatLastSeen(lastSeen!);
-    return Row(
-      children: [
-        Icon(
-          Icons.circle,
-          size: 8,
-          color: online ? Colors.green : Colors.grey,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            color: online ? Colors.green : Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatLastSeen(DateTime lastSeen) {
-    final diff = DateTime.now().difference(lastSeen);
-    if (diff.inMinutes < 1) return 'Zuletzt online gerade eben';
-    if (diff.inMinutes < 60) return 'Zuletzt online vor ${diff.inMinutes} Min.';
-    if (diff.inHours < 24) return 'Zuletzt online vor ${diff.inHours} Std.';
-    return 'Zuletzt online vor ${diff.inDays} Tagen';
-  }
-}
 
 /// J: Einmalige, zentrierte System-Hinweis-Zeile im Chat-Verlauf
 /// (z. B. "Fotos wurden freigeschaltet").
@@ -1563,4 +1708,3 @@ class _SystemNotice extends StatelessWidget {
     );
   }
 }
-

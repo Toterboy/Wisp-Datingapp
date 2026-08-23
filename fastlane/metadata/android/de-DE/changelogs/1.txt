@@ -1,0 +1,12 @@
+﻿Erste öffentliche Beta!
+
+• Find your Match: Blind-Matching mit Text- und Audio-Vorstellung
+• Quiz-Freischaltung: Fotos erst nach bestandenem Quiz (beidseitig)
+• Zufallschat, QR-Verbindung und Dating Hour
+• Ende-zu-Ende-Verschlüsselung für Chats, Bilder und Anrufe
+• 2FA (Authenticator-App) und Passkeys
+• Entfernungsanzeige in km ohne Preisgabe des Standorts
+• Bild-Blur im Chat mit Melde-Funktion
+• Verschlüsseltes E2E-Key-Backup (Gerätewechsel)
+
+Feedback über den Bug-Report in den Einstellungen willkommen!

@@ -8,9 +8,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 //
 // Berechtigungen:
 //  - kind=avatar: nur wenn ein Match zwischen Aufrufer und Ziel existiert.
-//    (Anzeige im Quiz erfolgt clientseitig unscharf/SW bis unlockLevel 2;
-//    der Server erlaubt den Download ab Match, die Stufe steuert die
-//    Darstellung.)
+//    Bei "Find your Match"-Matches zusätzlich erst ab Quiz-Stufe 2
+//    (serverseitig erzwungen, Audit E2).
 //  - kind=intro: Intro-Vorstellungen sind das "Aushängeschild" im Modus
 //    "Find your Match" und werden VOR dem Like angehört (Kandidaten-Deck).
 //    Daher ist das Intro für authentifizierte Nutzer abrufbar, solange das
@@ -45,18 +44,31 @@ function json(body: unknown, status = 200) {
   });
 }
 
-/** Existiert ein Match GENAU zwischen user und target? */
-async function hasMatchBetween(user: string, target: string): Promise<boolean> {
+/** Match GENAU zwischen user und target - oder null. */
+async function getMatchBetween(
+  user: string,
+  target: string,
+): Promise<{ id: number; created_via: string } | null> {
   const { data } = await supabaseAdmin
     .from("matches")
-    .select("id")
+    .select("id, created_via")
     .or(
       `and(user_one_id.eq.${user},user_two_id.eq.${target}),` +
         `and(user_one_id.eq.${target},user_two_id.eq.${user})`,
     )
     .limit(1)
     .maybeSingle();
-  return !!data;
+  return data ?? null;
+}
+
+/** Quiz-Freischaltstufe eines Matches (0, falls kein State existiert). */
+async function quizUnlockLevel(matchId: number): Promise<number> {
+  const { data } = await supabaseAdmin
+    .from("match_quiz_state")
+    .select("unlock_level")
+    .eq("match_id", matchId)
+    .maybeSingle();
+  return (data?.unlock_level as number | undefined) ?? 0;
 }
 
 serve(async (req) => {
@@ -93,9 +105,18 @@ serve(async (req) => {
     }
 
     if (kind === "avatar") {
-      const allowed = await hasMatchBetween(user.id, targetUserId);
-      if (!allowed) {
+      const match = await getMatchBetween(user.id, targetUserId);
+      if (!match) {
         return json({ error: "Kein Match" }, 403);
+      }
+      // Audit E2: Bei Find-your-Match-Matches wird das scharfe Foto erst
+      // nach Quiz-Stufe 2 freigegeben - serverseitig erzwungen, nicht mehr
+      // nur clientseitig unscharf dargestellt.
+      if (match.created_via === "find_match") {
+        const level = await quizUnlockLevel(match.id);
+        if (level < 2) {
+          return json({ error: "Quiz nicht bestanden" }, 403);
+        }
       }
     } else {
       // Intro: Zielprofil muss existieren und eine Vorstellung haben.

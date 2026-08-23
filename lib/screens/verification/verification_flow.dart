@@ -9,133 +9,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/verification_service.dart';
 import 'package:wisp/services/location_verification_service.dart';
-import 'package:wisp/services/invitation_code_service.dart';
-
-/// Screen für Einladungscode-Eingabe (bei Registrierung).
-class InvitationCodeScreen extends ConsumerStatefulWidget {
-  const InvitationCodeScreen({super.key});
-
-  @override
-  ConsumerState<InvitationCodeScreen> createState() => _InvitationCodeScreenState();
-}
-
-class _InvitationCodeScreenState extends ConsumerState<InvitationCodeScreen> {
-  final _controller = TextEditingController();
-  bool _isValidating = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _validateAndContinue() async {
-    final code = _controller.text.trim().toUpperCase();
-    if (code.isEmpty) {
-      setState(() => _error = 'Bitte gib einen Einladungscode ein.');
-      return;
-    }
-
-    setState(() {
-      _isValidating = true;
-      _error = null;
-    });
-
-    try {
-      final service = ref.read(invitationCodeServiceProvider);
-      final isValid = await service.validateCode(code);
-
-      setState(() => _isValidating = false);
-
-      if (isValid) {
-        // Code speichern für Registrierung
-        // In Produktion: An Server senden, hier lokal
-        if (mounted) {
-          context.go(AppRoutes.verificationInfoPath(code));
-        }
-      } else {
-        setState(() => _error = 'Ungültiger oder bereits verbrauchter Code.');
-      }
-    } catch (e) {
-      setState(() {
-        _isValidating = false;
-        _error = 'Fehler bei der Prüfung: $e';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Einladungscode')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 32),
-              Icon(
-                Icons.lock_outline,
-                size: 64,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Einladungscode eingeben',
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Um dich zu registrieren, brauchst du einen gültigen Einladungscode. '
-                'Diesen erhältst du von einem verifizierten Nutzer oder vom App Team.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _controller,
-                textCapitalization: TextCapitalization.characters,
-                decoration: InputDecoration(
-                  labelText: 'Einladungscode',
-                  hintText: 'Dein Einladungscode',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  prefixIcon: const Icon(Icons.vpn_key),
-                  errorText: _error,
-                ),
-                onSubmitted: (_) => _validateAndContinue(),
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _isValidating ? null : _validateAndContinue,
-                child: _isValidating
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Weiter'),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Kein Code? Frage einen Freund, der die App schon nutzt, '
-                'nach einem Einladungslink, oder warte auf öffentliche Codes.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// Info-Screen VOR der Video Verifizierung.
 class VerificationInfoScreen extends ConsumerWidget {
@@ -202,10 +75,10 @@ class VerificationInfoScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 12),
                       const _InfoBullet('Das Video wird **lokal verschlüsselt** gespeichert.'),
-                      const _InfoBullet('Es dient **nur** dem Abgleich mit deinen Profilbildern (Gesichtserkennung).'),
+                      const _InfoBullet('Nach dem Einreichen liegt es in einem **privaten Speicher** – nur der Support kann es zur Prüfung ansehen.'),
+                      const _InfoBullet('Es dient der **persönlichen Prüfung durch den Support** (Mensch-Verifizierung).'),
                       const _InfoBullet('Es wird **niemals** öffentlich angezeigt oder an Dritte weitergegeben.'),
-                      const _InfoBullet('Du kannst es **jederzeit** in den Einstellungen löschen.'),
-                      const _InfoBullet('Für die Produktion ist ein **automatisierter Gesichtsabgleich** geplant (ML Kit / Cloud Vision).'),
+                      const _InfoBullet('Du kannst es jederzeit löschen; bei Ablehnung wird es automatisch entfernt.'),
                     ],
                   ),
                 ),
@@ -374,11 +247,14 @@ class _VerificationVideoScreenState extends ConsumerState<VerificationVideoScree
     final service = ref.read(verificationServiceProvider);
     final locationService = ref.read(locationVerificationServiceProvider);
 
-    // Standort abfragen
+    // Standort abfragen (optional - Permission kann verweigert sein).
     Position? location;
     if (await locationService.hasLocationPermission()) {
       location = await locationService.getCurrentLocation();
-      await locationService.saveVerificationLocation(location!);
+      // getCurrentLocation kann trotz Permission null liefern (Timeout).
+      if (location != null) {
+        await locationService.saveVerificationLocation(location);
+      }
     }
 
     // Video speichern
@@ -389,11 +265,25 @@ class _VerificationVideoScreenState extends ConsumerState<VerificationVideoScree
       location: location,
     );
 
-    // Serverseitige Verifizierung via Edge Function auslösen.
-    await service.verifyAccount();
+    // Privater Upload + serverseitige Einreichung (Status pending).
+    // Der Success-Screen wird nur bei bestätigter Einreichung gezeigt;
+    // sonst gibt es eine ehrliche Fehlermeldung.
+    final submitted = await service.submitVerification();
 
-    if (mounted) {
+    if (!mounted) return;
+    if (submitted) {
       context.go(AppRoutes.verificationComplete);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Einreichen fehlgeschlagen. Bitte prüfe deine Internetverbindung '
+            'und versuche es erneut.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() => _isRecording = false);
     }
   }
 
@@ -579,14 +469,16 @@ class VerificationSuccessScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'Verifizierung abgeschlossen! âœ…',
+                'Video eingereicht!',
                 style: Theme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
-                'Dein Video wurde sicher gespeichert. '
-                'Du kannst jetzt die App vollumfänglich nutzen.',
+                'Dein Video wurde sicher übermittelt und liegt jetzt in einem '
+                'privaten Speicher. Der Support prüft es persönlich – sobald '
+                'es freigegeben ist, erscheint das Verifiziert-Zeichen in '
+                'deinem Profil.',
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),

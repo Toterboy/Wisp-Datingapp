@@ -12,6 +12,7 @@ import 'package:wisp/utils/constants.dart';
 import 'package:wisp/screens/auth/login_screen.dart';
 import 'package:wisp/screens/auth/forgot_password_screen.dart';
 import 'package:wisp/screens/auth/reset_password_screen.dart';
+import 'package:wisp/screens/auth/unban_request_screen.dart';
 import 'package:wisp/screens/auth/email_verification_screen.dart';
 import 'package:wisp/screens/auth/mfa_setup_screen.dart';
 import 'package:wisp/screens/auth/mfa_challenge_screen.dart';
@@ -40,6 +41,7 @@ import 'package:wisp/screens/dating_hour/dating_hour_how_it_works_screen.dart';
 import 'package:wisp/screens/dating_hour/dating_hour_preferences_screen.dart';
 import 'package:wisp/screens/dating_hour/dating_hour_rules_screen.dart';
 import 'package:wisp/screens/verification/verification_flow.dart';
+import 'package:wisp/screens/safety/safety_center_screen.dart';
 import 'package:wisp/screens/chat/chat_detail_screen.dart';
 import 'package:wisp/screens/profile/profile_detail_screen.dart';
 import 'package:wisp/screens/swipe/random_chat_screen.dart';
@@ -59,6 +61,8 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   // Passwort-Reset (Ziel des Recovery-Deep-Links wisp://reset-password)
   static const String resetPassword = '/reset-password';
+  // Entsperrungsantrag für gesperrte E-Mail-Adressen (öffentlich)
+  static const String unbanRequest = '/unban-request';
   static const String home = '/';
   static const String findYourMatch = '/find-your-match';
   static const String interessen = '/interessen';
@@ -82,6 +86,7 @@ class AppRoutes {
   static const String moodPicker = '/mood/picker';
   // Datenschutz & Account (DSGVO)
   static const String privacy = '/privacy';
+  static const String safetyCenter = '/safety-center';
   // Dating Hour (Event-Modus)
   static const String datingHourEvent = '/dating-hour';
   static const String datingHourPreferences = '/dating-hour/preferences';
@@ -92,7 +97,6 @@ class AppRoutes {
   static const String verificationVideo = '/verification/video';
   static const String verificationComplete = '/verification/complete';
   static const String verificationInfo = '/verification/info';
-  static const String invitationCode = '/invitation-code';
   static const String emailVerification = '/email-verification';
   // Zwei-Faktor-Schutz (TOTP/Authenticator-App)
   static const String mfaSetup = '/mfa-setup';
@@ -125,7 +129,7 @@ class AppRoutes {
 }
 
 /// Benachrichtigt den [GoRouter], sobald sich der Auth-Status ODER die
-/// App-Einstellungen (z. B. `introSeen`, `onboardingCompleted`, …) ändern.
+/// App-Einstellungen (z. B. `introSeen`, `onboardingCompleted`, ⬦) ändern.
 ///
 /// Ohne dieses [Listenable] würde der `redirect`-Callback nur bei einer
 /// echten Navigation neu ausgewertet - asynchrone Zustandsänderungen
@@ -227,6 +231,8 @@ GoRouter createRouter(Ref ref) {
           state.matchedLocation == AppRoutes.forgotPassword;
       final goingToResetPassword =
           state.matchedLocation == AppRoutes.resetPassword;
+      final goingToUnbanRequest =
+          state.matchedLocation == AppRoutes.unbanRequest;
       final goingToSettingsPrivacyOnce =
           state.matchedLocation == AppRoutes.settingsPrivacyOnce;
       final goingToOnboarding = state.matchedLocation == AppRoutes.onboarding;
@@ -246,12 +252,26 @@ GoRouter createRouter(Ref ref) {
         if (goingToLoading) {
           return introSeen ? AppRoutes.login : AppRoutes.welcome;
         }
-        // Einführung nur beim allerersten Start zeigen.
-        if (goingToWelcome && introSeen) return AppRoutes.login;
-        // Wenn Intro noch nicht gesehen → von Login zur Einfuehrung schicken.
-        if (goingToLogin && !introSeen) return AppRoutes.welcome;
+        // Einführung nur beim allerersten Start zeigen: Der Welcome-Screen
+        // setzt introSeen bereits beim ANZEIGEN (initState) – deshalb darf
+        // der Router einen Nicht-Eingeloggten auf /welcome NICHT mehr
+        // wegredirecten, sobald introSeen true ist (sonst wirft er den
+        // Nutzer direkt nach dem ersten Frame wieder runter).
+        // KEIN Login->Welcome-Redirect mehr: Dieser warf den Nutzer nach
+        // einer FEHLGESCHLAGENEN Registrierung (introSeen noch false,
+        // keine pendingVerification) auf den Welcome-Screen – deshalb
+        // kam "Willkommen" scheinbar erst NACH der Registrierung. Der
+        // Erststart läuft ausschließlich über den Lade-Screen-Pfad
+        // (loading -> welcome, siehe oben).
+        final pendingRegistration =
+            ref.read(pendingVerificationCredentialsProvider) != null;
+        if (pendingRegistration) {
+          // Mitten im Registrierungs-Flow (E-Mail-Bestätigung ausstehend)
+          // auf dem Login-Screen bleiben.
+          return null;
+        }
         if (goingToLogin || goingToForgotPassword ||
-            goingToResetPassword || goingToWelcome) {
+            goingToResetPassword || goingToUnbanRequest || goingToWelcome) {
           return null;
         }
         return AppRoutes.login;
@@ -270,7 +290,7 @@ GoRouter createRouter(Ref ref) {
       //
       // WICHTIG: Die Schritte dürfen NICHT unabhängig geprüft werden, da
       // sonst Schleifen entstehen (z. B. /settings-privacy-once -> /onboarding
-      // -> /settings-privacy-once -> …). Stattdessen wird jeder Schritt nur
+      // -> /settings-privacy-once -> ⬦). Stattdessen wird jeder Schritt nur
       // geprüft, wenn die vorherigen bereits erledigt sind.
 
       // Sicherheitsnetz gegen "Geister-Login": Zustand "eingeloggt" OHNE
@@ -315,12 +335,11 @@ GoRouter createRouter(Ref ref) {
 
       // Schritt 0.5: Zwei-Faktor-Schutz (TOTP/Authenticator-App).
       //
-      // a) Verifizierte Faktoren vorhanden, Session aber nur AAL1
-      //    (Passwort-Login) -> Code-Abfrage VOR jedem anderen Screen.
-      // b) Keine Faktoren eingerichtet und Hinweis nicht ausgeblendet
-      //    -> optionaler Einrichtungs-Screen (nach der E-Mail-Bestätigung,
-      //       vor der restlichen Einrichtung). „Später" merkt sich das
-      //       lokal (mfaSetupDismissed).
+      // Verifizierte Faktoren vorhanden, Session aber nur AAL1
+      // (Passwort-Login) -> Code-Abfrage VOR jedem anderen Screen.
+      // Die EINRICHTUNG selbst ist bewusst KEIN Router-Zwang mehr: Sie
+      // läuft als überspringbarer Schritt in der Erst-Einrichtung
+      // (SettingsPrivacyOnceScreen) und jederzeit über die Einstellungen.
       final mfa = ref.read(mfaStatusProvider);
       if (mfa.loaded) {
         final location = state.matchedLocation;
@@ -331,20 +350,23 @@ GoRouter createRouter(Ref ref) {
         if (mfa.needsChallenge && !mfaExempt) {
           return AppRoutes.mfaChallenge;
         }
-        if (!mfa.needsChallenge &&
-            mfa.shouldPromptSetup &&
-            !settings.mfaSetupDismissed &&
-            !mfaExempt) {
-          return AppRoutes.mfaSetup;
-        }
       }
 
+      // Während der Einrichtung dürfen Hilfs-Screens (2FA-Einrichtung,
+      // 2FA-Challenge, Bug-Report) erreicht werden, ohne dass der Router
+      // zur ersten Einrichtungsseite zurückschmeißt. Sonst landet man nach
+      // "Jetzt einrichten" (2FA) wieder auf Seite 1 der Einrichtung.
+      final setupExempt = goingToSettingsPrivacyOnce ||
+          state.matchedLocation == AppRoutes.mfaSetup ||
+          state.matchedLocation == AppRoutes.mfaChallenge ||
+          state.matchedLocation == AppRoutes.bugReport;
+
       if (!settings.oneTimeSettingsCompleted) {
-        if (!goingToSettingsPrivacyOnce) return AppRoutes.settingsPrivacyOnce;
+        if (!setupExempt) return AppRoutes.settingsPrivacyOnce;
         return null;
       }
       if (!settings.communityGuidelinesAccepted) {
-        if (!goingToSettingsPrivacyOnce) return AppRoutes.settingsPrivacyOnce;
+        if (!setupExempt) return AppRoutes.settingsPrivacyOnce;
         return null;
       }
       // Onboarding-Schritt uebersprungen (onboardingCompleted jetzt default true).
@@ -357,14 +379,11 @@ GoRouter createRouter(Ref ref) {
       // Verifizierungs-Flow per Feature-Flag gesperrt (Betreiber-Entscheidung):
       // Routen sind nicht erreichbar und leiten auf Home um.
       // Reaktivierung: --dart-define=VERIFICATION_ENABLED=true.
-      // (Der Einladungscode als Zugangskontrolle bei der Registrierung
-      //  bleibt unabhängig davon aktiv.)
       if (!AppConstants.verificationEnabled) {
         final location = state.matchedLocation;
         if (location == AppRoutes.verificationVideo ||
             location == AppRoutes.verificationComplete ||
-            location == AppRoutes.verificationInfo ||
-            location == AppRoutes.invitationCode) {
+            location == AppRoutes.verificationInfo) {
           return AppRoutes.home;
         }
       }
@@ -424,6 +443,12 @@ routes: [
         builder: (context, state) => const ResetPasswordScreen(),
       ),
       GoRoute(
+        path: AppRoutes.unbanRequest,
+        builder: (context, state) => UnbanRequestScreen(
+          initialEmail: state.extra is String ? state.extra as String : null,
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.settingsPrivacyOnce,
         builder: (context, state) => const SettingsPrivacyOnceScreen(),
       ),
@@ -447,10 +472,6 @@ routes: [
       GoRoute(
         path: AppRoutes.verificationInfo,
         builder: (context, state) => const VerificationInfoScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.invitationCode,
-        builder: (context, state) => const InvitationCodeScreen(),
       ),
       GoRoute(
         path: AppRoutes.emailVerification,
@@ -498,6 +519,11 @@ routes: [
       GoRoute(
         path: AppRoutes.privacy,
         builder: (context, state) => const PrivacyScreen(),
+      ),
+      // Safety Center: Hilfe bei Belästigung/Stalking + In-App-Maßnahmen
+      GoRoute(
+        path: AppRoutes.safetyCenter,
+        builder: (context, state) => const SafetyCenterScreen(),
       ),
       // Dating Hour (Event-Modus)
       GoRoute(

@@ -61,7 +61,6 @@ class AuthService implements AppAuthService {
     required String password,
     String? gender,
     required DateTime birthDate,
-    String? inviteCode,
     double? latitude,
     double? longitude,
     String? captchaToken,

@@ -61,9 +61,20 @@ class AppSettings {
   /// Dating Hour Intro (Regeln + Erklärung) bereits gesehen?
   final bool datingHourIntroSeen;
 
+  /// Dating Hour: Beim nächsten Event automatisch wieder dabei sein?
+  /// Wird nach Ende eines Events abgefragt (Dialog im Dating-Hour-Chat).
+  final bool datingHourAutoJoin;
+
   /// MFA-Einrichtungshinweis dauerhaft ausgeblendet?
   /// (Nutzer hat „Später“ auf dem 2FA-Setup-Screen gewählt.)
   final bool mfaSetupDismissed;
+
+  /// Bilder im Chat standardmäßig verpixelt anzeigen (Schutz vor
+  /// unangemessenen Inhalten; Antippen zeigt nach Warnung das Bild).
+  final bool blurChatImages;
+
+  /// Gewähltes Farbschema (Name aus WispTheme, Default 'classic').
+  final String themeName;
 
   const AppSettings({
     this.blindModeEnabled = true,
@@ -84,7 +95,10 @@ class AppSettings {
     this.notifyMessages = true,
     this.notifyDatingHour = true,
     this.datingHourIntroSeen = false,
+    this.datingHourAutoJoin = false,
     this.mfaSetupDismissed = false,
+    this.blurChatImages = true,
+    this.themeName = 'classic',
   });
 
   /// Standard-Einstellungen für einen neuen Nutzer.
@@ -115,7 +129,10 @@ class AppSettings {
       notifyMessages: json['notifyMessages'] as bool? ?? true,
       notifyDatingHour: json['notifyDatingHour'] as bool? ?? true,
       datingHourIntroSeen: json['datingHourIntroSeen'] as bool? ?? false,
+      datingHourAutoJoin: json['datingHourAutoJoin'] as bool? ?? false,
       mfaSetupDismissed: json['mfaSetupDismissed'] as bool? ?? false,
+      blurChatImages: json['blurChatImages'] as bool? ?? true,
+      themeName: json['themeName'] as String? ?? 'classic',
     );
   }
 
@@ -139,7 +156,10 @@ class AppSettings {
         'notifyMessages': notifyMessages,
         'notifyDatingHour': notifyDatingHour,
         'datingHourIntroSeen': datingHourIntroSeen,
+        'datingHourAutoJoin': datingHourAutoJoin,
         'mfaSetupDismissed': mfaSetupDismissed,
+        'blurChatImages': blurChatImages,
+        'themeName': themeName,
       };
 
   /// Immutabele Kopie mit veränderten Werten.
@@ -162,7 +182,10 @@ class AppSettings {
     bool? notifyMessages,
     bool? notifyDatingHour,
     bool? datingHourIntroSeen,
+    bool? datingHourAutoJoin,
     bool? mfaSetupDismissed,
+    bool? blurChatImages,
+    String? themeName,
   }) {
     return AppSettings(
       blindModeEnabled: blindModeEnabled ?? this.blindModeEnabled,
@@ -187,7 +210,10 @@ class AppSettings {
       notifyMessages: notifyMessages ?? this.notifyMessages,
       notifyDatingHour: notifyDatingHour ?? this.notifyDatingHour,
       datingHourIntroSeen: datingHourIntroSeen ?? this.datingHourIntroSeen,
+      datingHourAutoJoin: datingHourAutoJoin ?? this.datingHourAutoJoin,
       mfaSetupDismissed: mfaSetupDismissed ?? this.mfaSetupDismissed,
+      blurChatImages: blurChatImages ?? this.blurChatImages,
+      themeName: themeName ?? this.themeName,
     );
   }
 }

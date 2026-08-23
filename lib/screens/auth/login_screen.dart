@@ -13,6 +13,7 @@ import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/validators.dart';
+import 'package:wisp/widgets/app_version_footer.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/captcha_challenge.dart';
 
@@ -40,7 +41,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _inviteCodeCtrl = TextEditingController();
   Gender _gender = Gender.diverse;
   DateTime? _birthDate;
   // Login-Modus als Default: Beim Erststart führt der Router zuerst über die
@@ -50,13 +50,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _submitAttempted = false;
   bool _passkeyLoading = false;
+  bool _submitting = false;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
-    _inviteCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -88,8 +88,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    final auth = ref.read(authProvider.notifier);
+    // Eigener Ladezustand für den Absende-Button. Bewusst NICHT an
+    // `authProvider.isLoading` gekoppelt: Sonst wären auch der
+    // "Passwort vergessen?"-Button und der Modus-Wechsel während eines
+    // (langsamen) Logins deaktiviert bzw. der ganze Screen wirkte "laggy".
+    setState(() => _submitting = true);
     try {
+      final auth = ref.read(authProvider.notifier);
       if (_isRegister) {
         // Geburtsdatum ist im Registrierungs-Modus Pflicht; bei Login
         // (kein Feld) bewusst null lassen.
@@ -136,9 +141,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordCtrl.text,
           gender: _gender.value,
           birthDate: _birthDate!,
-          inviteCode: _inviteCodeCtrl.text.trim().isEmpty
-              ? null
-              : _inviteCodeCtrl.text.trim(),
           captchaToken: captchaToken,
         );
         // Profil wurde bereits in AuthNotifier.register() via setProfile()
@@ -170,6 +172,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           captchaToken: captchaToken,
         );
       }
+
+      final result = ref.read(authProvider);
+      if (result.hasError) {
+        debugPrint('[LoginScreen] Auth-Provider hat Fehler: ${result.error}');
+        debugPrint('[LoginScreen] Fehler-Typ: ${result.error.runtimeType}');
+        if (mounted) {
+          final message = result.error is AppException
+              ? (result.error as AppException).message
+              : 'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+      // Explizite Navigation nach erfolgreichem Login/Registrierung.
+      // Der Router-Redirect ist ein Fallback, aber explizites Navigieren ist
+      // zuverlässiger (vermeidet Timing-Probleme bei Provider-Initialisierung).
+      // Nach Registrierung: zuerst E-Mail-Verifizierung, dann Einstellungen & Privatsphäre.
+      // Nach Login: Home - Redirect-Logik leitet basierend auf Setup-Fortschritt weiter.
+      debugPrint('[LoginScreen] Auth erfolgreich, navigiere zu: '
+          '${_isRegister ? AppRoutes.emailVerification : AppRoutes.home}');
+      if (mounted) {
+        context.go(
+          _isRegister ? AppRoutes.emailVerification : AppRoutes.home,
+        );
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[LoginScreen] FEHLER bei ${_isRegister ? "Registrierung" : "Login"}: $e');
@@ -177,7 +209,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       if (mounted) {
         String message;
-        if (e is AppException) {
+        if (e is EmailBannedException) {
+          // Plattform-Sperre (Migration 045): Weiterleitung zum
+          // Entsperrungs-Flow statt generischer Fehlermeldung.
+          context.go(AppRoutes.unbanRequest, extra: e.email);
+          return;
+        } else if (e is AppException) {
           message = e.message;
         } else if (e is AuthException) {
           // Supabase-Fehlertexte nicht direkt anzeigen, sondern übersetzen.
@@ -192,11 +229,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             message =
                 'Zu viele Anfragen in kurzer Zeit. Bitte warte einen Moment '
                 'und versuche es erneut.';
+          } else if (lower.contains('weak password')) {
+            // zxcvbn-Komplexitäts-Prüfung (Password Strength Policy im
+            // Dashboard): Länge allein reicht nicht.
+            message = 'Das Passwort ist zu schwach. Bitte wähle ein längeres '
+                'Passwort mit Groß-/Kleinbuchstaben, Zahlen und '
+                'Sonderzeichen.';
+          } else if (lower.contains('password should')) {
+            // Server-Meldung durchreichen (z. B. "Password should be at
+            // least 12 characters") – die Mindestlänge steht im Dashboard.
+            message = e.message;
+          } else if (lower.contains('captcha')) {
+            message = 'Der Sicherheitscheck wurde vom Server abgelehnt. '
+                'Bitte versuche es erneut.';
+          } else if (lower.contains('database error') ||
+              lower.contains('saving new user')) {
+            message = 'Registrierung auf dem Server fehlgeschlagen. '
+                'Bitte versuche es später erneut.';
           } else {
-            message = 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
+            // Generischer Fallback. Im Debug-Modus wird die Original-
+            // Server-Meldung direkt mit angezeigt, damit die Ursache
+            // ohne Konsole sichtbar wird (Produktiv-Builds bleiben
+            // generisch).
+            message = kDebugMode
+                ? 'Anmeldung fehlgeschlagen (Server: ${e.message})'
+                : 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
           }
         } else {
-          message = 'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
+          message = kDebugMode
+              ? 'Etwas ist schiefgelaufen (${e.runtimeType}: $e)'
+              : 'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -206,44 +268,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
       return;
-    }
-
-    final result = ref.read(authProvider);
-    if (result.hasError) {
-      debugPrint('[LoginScreen] Auth-Provider hat Fehler: ${result.error}');
-      debugPrint('[LoginScreen] Fehler-Typ: ${result.error.runtimeType}');
-      if (mounted) {
-        final message = result.error is AppException
-            ? (result.error as AppException).message
-            : 'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-        );
-      }
-      return;
-    }
-    // Explizite Navigation nach erfolgreichem Login/Registrierung.
-    // Der Router-Redirect ist ein Fallback, aber explizites Navigieren ist
-    // zuverlässiger (vermeidet Timing-Probleme bei Provider-Initialisierung).
-    // Nach Registrierung: zuerst E-Mail-Verifizierung, dann Einstellungen & Privatsphäre.
-    // Nach Login: Home - Redirect-Logik leitet basierend auf Setup-Fortschritt weiter.
-    debugPrint('[LoginScreen] Auth erfolgreich, navigiere zu: '
-        '${_isRegister ? AppRoutes.emailVerification : AppRoutes.home}');
-    if (mounted) {
-      context.go(_isRegister ? AppRoutes.emailVerification : AppRoutes.home);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
   /// Meldet den Nutzer per Passkey (WebAuthn) an, ohne E-Mail/Passwort.
   ///
-  /// Läuft nur im Supabase-Modus. Erfolg/Fehler werden über SnackBar
-  /// angezeigt; bei Erfolg übernimmt der Router (Home/Setup-Redirect).
+  /// Läuft nur im Supabase-Modus. Nach erfolgreicher Zeremonie setzt der
+  /// AuthNotifier den Status via `onAuthStateChange` (signedIn) und der
+  /// Router leitet automatisch weiter (Home bzw. Setup-Redirect) – daher
+  /// wird hier NICHT explizit navigiert. Eine sofortige `context.go(home)`
+  /// würde den Redirect vor dem Aktualisieren des Auth-Status auslösen und
+  /// den Nutzer kurz zurück zum Login werfen.
   Future<void> _signInWithPasskey() async {
     setState(() => _passkeyLoading = true);
     try {
       await PasskeyAuth.signIn();
-      // AuthNotifier setzt den Status via onAuthStateChange (signedIn).
-      if (mounted) context.go(AppRoutes.home);
+      // Kein explizites Navigieren: Der Auth-State-Listener setzt den
+      // Status auf "eingeloggt" und der Router übernimmt die Weiterleitung.
     } catch (e) {
       if (mounted) {
         final message = e is AppException
@@ -300,9 +343,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final loading = authState.isLoading;
-
     return Scaffold(
       appBar: _isRegister
           ? null
@@ -381,7 +421,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           onFieldSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
                             labelText: 'Passwort',
-                            helperText: 'Mindestens 8 Zeichen',
+                            helperText: 'Mindestens 8 Zeichen, mit Groß- und '
+                                'Kleinbuchstaben, einer Zahl und einem '
+                                'Sonderzeichen',
                             suffixIcon: IconButton(
                               icon: Icon(_obscurePassword
                                   ? Icons.visibility_off
@@ -393,7 +435,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   setState(() => _obscurePassword = !_obscurePassword),
                             ),
                           ),
-                          validator: Validators.password,
+                          validator: Validators.registrationPassword,
                         ),
                       ),
                        _field(
@@ -425,18 +467,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             if (v != null) setState(() => _gender = v);
                           },
                         ),
-                      ),
-                      _field(
-                        showError: _submitAttempted,
-                        child: TextFormField(
-                          controller: _inviteCodeCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Einladungscode (optional)',
-                            hintText: 'Falls du einen Code hast',
-                          ),
-                        ),
-                      ),
-                   ] else ...[
+                       ),
+                    ] else ...[
                      _field(
                        showError: _submitAttempted,
                        child: TextFormField(
@@ -472,29 +504,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           validator: Validators.password,
                         ),
                       ),
-                     Align(
-                       alignment: Alignment.centerRight,
-                       child: TextButton(
-                         onPressed: loading
-                             ? null
-                             : () => context.go(AppRoutes.forgotPassword),
-                         child: const Text('Passwort vergessen?'),
-                       ),
-                     ),
-                  ],
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: (_submitting || _passkeyLoading)
+                              ? null
+                              : () => context.go(AppRoutes.forgotPassword),
+                          child: const Text('Passwort vergessen?'),
+                        ),
+                      ),
+                   ],
                   const SizedBox(height: 24),
                   PrimaryButton(
-                    label: loading
+                    label: _submitting
                         ? 'Bitte warten …'
                         : (_isRegister ? 'Registrieren' : 'Einloggen'),
-                    onPressed: loading ? null : _submit,
-                    loading: loading,
+                    onPressed: _submitting ? null : _submit,
+                    loading: _submitting,
                   ),
                   if (!_isRegister && SupabaseService.isInitialized) ...[
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed:
-                          (loading || _passkeyLoading) ? null : _signInWithPasskey,
+                          (_submitting || _passkeyLoading) ? null : _signInWithPasskey,
                       icon: _passkeyLoading
                           ? const SizedBox(
                               width: 16,
@@ -509,7 +541,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: loading
+                    onPressed: (_submitting || _passkeyLoading)
                         ? null
                         : () => setState(() {
                               _isRegister = !_isRegister;
@@ -521,6 +553,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           : 'Neu hier? Konto erstellen',
                     ),
                   ),
+                   const SizedBox(height: 8),
+                   const AppVersionFooter(),
                    const SizedBox(height: 8),
                 ],
               ),

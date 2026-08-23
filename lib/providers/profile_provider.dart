@@ -3,13 +3,21 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/services/local_storage.dart';
+import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// Verwaltet das eigene Nutzerprofil und persistiert es lokal.
+///
+/// Sicherheit: Das Profil enthält PII (Geburtsdatum, GPS-Koordinaten,
+/// Bio, Persönlichkeitsergebnis) und wird ausschließlich im
+/// verschlüsselten Keystore/Keychain ([SecureProfileStore]) abgelegt.
+/// Der frühere Klartext-Eintrag in SharedPreferences wird einmalig
+/// migriert und gelöscht.
 class ProfileNotifier extends StateNotifier<UserProfile> {
-  ProfileNotifier(this._storage)
+  ProfileNotifier(this._storage, this._secure)
       : super(
           UserProfile(
             id: AppConstants.currentUserId,
@@ -22,9 +30,22 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
   }
 
   final LocalStorage _storage;
+  final SecureProfileStore _secure;
 
   Future<void> _load() async {
-    final raw = await _storage.getString(AppConstants.prefsProfileKey);
+    var raw = await _secure.read();
+
+    // Migration: Alten Klartext-Eintrag aus SharedPreferences übernehmen
+    // und entfernen (einmalig nach dem Update).
+    if (raw == null) {
+      final legacy = await _storage.getString(AppConstants.prefsProfileKey);
+      if (legacy != null) {
+        await _secure.write(legacy);
+        await _storage.remove(AppConstants.prefsProfileKey);
+        raw = legacy;
+      }
+    }
+
     if (raw != null) {
       try {
         state = UserProfile.fromJson(
@@ -33,6 +54,7 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
       } catch (e) {
         debugPrint('[ProfileNotifier] Korrupte Profil-Daten erkannt: $e');
         // Korrupte Daten verwerfen – Nutzer muss Profil neu einrichten.
+        await _secure.delete();
         await _storage.remove(AppConstants.prefsProfileKey);
         state = UserProfile(id: AppConstants.currentUserId, name: '', bio: '');
       }
@@ -40,10 +62,7 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
   }
 
   Future<void> _persist() async {
-    await _storage.saveString(
-      AppConstants.prefsProfileKey,
-      jsonEncode(state.toJson()),
-    );
+    await _secure.write(jsonEncode(state.toJson()));
   }
 
   /// überschreibt das Profil (z. B. nach Registrierung).
@@ -69,6 +88,9 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
     double? locationLng,
     String? introText,
     String? introAudioPath,
+    HabitudeLevel? smoking,
+    HabitudeLevel? alcohol,
+    HabitudeLevel? drugs,
     bool clearIntroAudio = false,
   }) async {
     state = state.copyWith(
@@ -87,6 +109,9 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
       locationLng: locationLng,
       introText: introText,
       introAudioPath: introAudioPath,
+      smoking: smoking,
+      alcohol: alcohol,
+      drugs: drugs,
       clearIntroAudio: clearIntroAudio,
     );
     await _persist();
@@ -121,6 +146,8 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
   /// (z. B. nach Account-Löschung – keine Alt-Daten im neuen Account).
   Future<void> resetToDefaults() async {
     state = UserProfile(id: AppConstants.currentUserId, name: '', bio: '');
+    await _secure.delete();
+    // Legacy-Aufräumen (ältere App-Versionen).
     await _storage.remove(AppConstants.prefsProfileKey);
   }
 }
@@ -129,6 +156,7 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
 final profileProvider =
     StateNotifierProvider<ProfileNotifier, UserProfile>((ref) {
   final storage = ref.watch(localStorageProvider);
-  return ProfileNotifier(storage);
+  final secure = ref.watch(secureProfileStoreProvider);
+  return ProfileNotifier(storage, secure);
 });
 

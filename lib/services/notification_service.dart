@@ -1,5 +1,7 @@
 ﻿import 'dart:io';
 
+import 'package:flutter/material.dart'
+    show Color;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -146,6 +148,10 @@ class NotificationService {
         android: AndroidNotificationDetails(
           channelId,
           channelId,
+          // Wisp-Silhouette statt weissem Punkt (siehe
+          // tool/generate_notification_icon.dart).
+          icon: 'notification_icon',
+          color: const Color(0xFFFF6B9D),
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -188,6 +194,8 @@ class NotificationService {
               : channelId == 'matches'
                   ? 'Neue Matches'
                   : 'Event Erinnerungen',
+      icon: 'notification_icon',
+      color: const Color(0xFFFF6B9D),
       importance: Importance.high,
       priority: Priority.high,
     );

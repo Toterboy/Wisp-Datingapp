@@ -10,3 +10,21 @@ class AppException implements Exception {
   @override
   String toString() => 'AppException: $message';
 }
+
+/// Die E-Mail-Adresse ist auf der Plattform gesperrt (public.banned_emails,
+/// Migration 045): Registrierung und Login sind nicht möglich. Der Nutzer
+/// kann stattdessen einen Entsperrungsantrag senden.
+class EmailBannedException extends AppException {
+  EmailBannedException({
+    required this.email,
+    this.reason,
+  }) : super(
+         reason != null && reason.isNotEmpty
+             ? 'Dieser Account wurde gesperrt: $reason'
+             : 'Dieser Account wurde gesperrt. Du kannst einen '
+                   'Entsperrungsantrag senden.',
+       );
+
+  final String email;
+  final String? reason;
+}

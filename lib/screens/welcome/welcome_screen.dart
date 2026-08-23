@@ -29,12 +29,26 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   late Future<void> _logoReady;
 
   @override
+  void initState() {
+    super.initState();
+    // Einführung gilt ab dem Moment als gesehen, in dem sie ANGEZEIGT wird –
+    // nicht erst beim Verlassen. So erscheint sie garantiert nur beim
+    // allerersten App-Start: Auch wenn der Nutzer die App mitten auf der
+    // Seite beendet oder im Anschluss der Router-Redirect greift (z. B.
+    // nach dem CAPTCHA bei der Registrierung), wird der Welcome-Screen
+    // nie wieder angezeigt.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(settingsProvider.notifier).markIntroSeen();
+    });
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final imageProvider = const AssetImage('assets/images/wisp_icon_base.png');
-    // precacheImage laedt das Bild in den System-Cache, bevor die
-    // Seite gerendert wird. Der FutureBuilder wartet auf den Abschluss,
-    // sodass Logo und Text GLEICHZEITIG erscheinen.
+    // Wichtig: exakt DIESELBE Datei precachen, die AppLogo auch anzeigt
+    // (assets/images/wisp_icon_round.png) – sonst erscheinen Logo und Text
+    // nicht gleichzeitig.
+    final imageProvider = const AssetImage('assets/images/wisp_icon_round.png');
     _logoReady = precacheImage(imageProvider, context);
   }
 
@@ -62,8 +76,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   ];
 
   Future<void> _leave() async {
-    // Einführung als gesehen markieren, damit sie nicht erneut erscheint.
-    await ref.read(settingsProvider.notifier).markIntroSeen();
+    // introSeen wird bereits beim Anzeigen gesetzt (initState) – hier nur
+    // weiter zur Anmeldung navigieren.
     if (mounted) context.go(AppRoutes.login);
   }
 

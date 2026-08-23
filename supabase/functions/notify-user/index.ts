@@ -81,6 +81,44 @@ const clientTextsByKind: Record<string, { title: string; body: string }> = {
   messages: { title: "Wisp", body: "Du hast eine neue Nachricht erhalten." },
 };
 
+/**
+ * Audit E1: Clients dürfen nur Nutzer benachrichtigen, mit denen eine
+ * reale Beziehung besteht (Match zwischen beiden ODER eigener Like an
+ * das Ziel). Interne Trigger-Aufrufe sind davon ausgenommen.
+ */
+async function hasRelationshipBetween(
+  callerId: string,
+  targetUserId: string,
+): Promise<boolean> {
+  try {
+    const { data } = await admin
+      .from("matches")
+      .select("id")
+      .or(
+        `and(user_one_id.eq.${callerId},user_two_id.eq.${targetUserId}),` +
+          `and(user_one_id.eq.${targetUserId},user_two_id.eq.${callerId})`,
+      )
+      .limit(1)
+      .maybeSingle();
+    if (data) return true;
+
+    // Noch kein Match: ein eigener (auch unbeantworteter) Like genügt,
+    // damit Like-Benachrichtigungen zustellen können.
+    const { data: like } = await admin
+      .from("likes")
+      .select("id")
+      .eq("user_id", callerId)
+      .eq("liked_user_id", targetUserId)
+      .limit(1)
+      .maybeSingle();
+    return !!like;
+  } catch (e) {
+    console.error("relationship check failed:", e);
+    // Fail-closed: ohne Beziehungsnachweis wird nicht gepusht.
+    return false;
+  }
+}
+
 /** Erzeugt ein kurzlebiges FCM-Access-Token aus dem Service-Account (JWT-Flow). */
 async function getFcmAccessToken(serviceAccountJson: string): Promise<string> {
   const sa = JSON.parse(serviceAccountJson);
@@ -189,6 +227,17 @@ serve(async (req) => {
     });
   }
 
+  // Strikte UUID-Validierung (wie match-media): target_user_id fließt in
+  // PostgREST-Filter (.or()-Interpolation) - ohne Prüfung wäre die
+  // Beziehungsprüfung theoretisch umlenkbar.
+  const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(targetUserId)) {
+    return new Response(JSON.stringify({ error: "Invalid target_user_id" }), {
+      status: 400, headers: { "Content-Type": "application/json" },
+    });
+  }
+
   // Nur internen Aufrufen (DB-Trigger) ist es erlaubt, Titel/Text frei zu
   // wählen. Clients bekommen feste, serverseitig generierte Texte - das
   // verhindert Push-Phishing mit beliebigem Inhalt im App-Look.
@@ -210,16 +259,22 @@ serve(async (req) => {
         status: 200, headers: { "Content-Type": "application/json" },
       });
     }
+    // Audit E1: Push nur an Nutzer, mit denen der Aufrufer eine reale
+    // Beziehung hat (Match oder eigener Like). Verhindert Belästigung
+    // über beliebige target_user_id-Werte.
+    if (!(await hasRelationshipBetween(callerId, targetUserId))) {
+      return new Response(JSON.stringify({ ok: false, reason: "no_relationship" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    }
     title = fixed.title;
     text = fixed.body;
   }
 
-  const data: Record<string, string> = {};
-
   // Einzel-Schalter + Master serverseitig prüfen (Service-Role, RLS-frei).
   const { data: profile } = await admin
     .from("profiles")
-    .select("notifications_enabled, notify_matches, notify_likes, notify_messages, notify_dating_hour, fcm_token")
+    .select("notifications_enabled, notify_matches, notify_likes, notify_messages, notify_dating_hour, fcm_token, up_endpoint")
     .eq("user_id", targetUserId)
     .maybeSingle();
 
@@ -244,6 +299,34 @@ serve(async (req) => {
     return new Response(JSON.stringify({ ok: false, reason: "kind_disabled" }), {
       status: 200, headers: { "Content-Type": "application/json" },
     });
+  }
+
+  // ---- UnifiedPush (Google-frei, F-Droid-Variante) ----
+  // Wenn ein Endpunkt hinterlegt ist, geht der Versand DORTHIN (z. B.
+  // eigener ntfy-Server) und FCM wird nicht mehr kontaktiert.
+  const upEndpoint = (profile.up_endpoint as string | null)?.trim();
+  if (upEndpoint) {
+    try {
+      const upResp = await fetch(upEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, message: text }),
+      });
+      if (!upResp.ok) {
+        console.error("UnifiedPush-Fehler:", upResp.status, await upResp.text());
+        return new Response(JSON.stringify({ ok: false, reason: "up_error" }), {
+          status: 200, headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true, transport: "unifiedpush" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      console.error("UnifiedPush-Exception:", e);
+      return new Response(JSON.stringify({ ok: false, reason: "up_error" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   const fcmToken = profile.fcm_token;
@@ -278,9 +361,6 @@ serve(async (req) => {
           message: {
             token: fcmToken,
             notification: { title, body: text },
-            data: Object.fromEntries(
-              Object.entries(data).map(([k, v]) => [k, String(v)]),
-            ),
           },
         }),
       },

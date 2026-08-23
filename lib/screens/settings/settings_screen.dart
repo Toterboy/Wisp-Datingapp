@@ -2,6 +2,8 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -12,13 +14,17 @@ import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/auth_exception.dart';
+import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/mfa_service.dart';
 import 'package:wisp/services/passkey_auth.dart';
+import 'package:wisp/services/prekey_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/services/unified_push_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/selectable_tile.dart';
+import 'package:wisp/widgets/theme_picker.dart';
 
 /// Spiegelt die Benachrichtigungs-Schalter in die profiles-Tabelle, damit
 /// die Push-Versendung (Edge Function notify-user) serverseitig gegatet
@@ -183,6 +189,19 @@ class SettingsScreen extends ConsumerWidget {
                         }
                       },
                     ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.shield_outlined),
+                      title: const Text('Zwei-Faktor-Schutz (2FA)'),
+                      subtitle: Text(
+                        ref.watch(mfaStatusProvider).hasVerifiedFactors
+                            ? 'Aktiv – Login nur mit Authenticator-Code'
+                            : 'Login zusätzlich mit Authenticator-App sichern',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () => context.push(AppRoutes.mfaSetup),
+                    ),
                   ],
                 ],
               ),
@@ -216,8 +235,8 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Neue Matches'),
-                    subtitle: const Text('Wenn ein Match entsteht'),
+                    title: const Text('Neue Funken'),
+                    subtitle: const Text('Wenn ein Funke entsteht'),
                     value: settings.notifyMatches,
                     onChanged: settings.notificationsEnabled
                         ? (v) {
@@ -262,6 +281,8 @@ class SettingsScreen extends ConsumerWidget {
                           }
                         : null,
                   ),
+                  const Divider(),
+                  const _UnifiedPushTile(),
                 ],
               ),
             ),
@@ -279,23 +300,110 @@ class SettingsScreen extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
-                  SelectableTile<bool?>(
-                    value: null,
-                    groupValue: settings.useDarkMode,
+                  // String-Keys statt bool? (siehe Einrichtung):
+                  // Radio mit null-Value verschluckt Taps.
+                  SelectableTile<String>(
+                    value: 'system',
+                    groupValue: settings.useDarkMode == null
+                        ? 'system'
+                        : (settings.useDarkMode! ? 'dark' : 'light'),
                     title: 'System',
-                    onChanged: (v) => notifier.setDarkMode(v),
+                    onChanged: (_) => notifier.setDarkMode(null),
                   ),
-                  SelectableTile<bool?>(
-                    value: false,
-                    groupValue: settings.useDarkMode,
+                  SelectableTile<String>(
+                    value: 'light',
+                    groupValue: settings.useDarkMode == null
+                        ? 'system'
+                        : (settings.useDarkMode! ? 'dark' : 'light'),
                     title: 'Hell',
-                    onChanged: (v) => notifier.setDarkMode(v),
+                    onChanged: (_) => notifier.setDarkMode(false),
                   ),
-                  SelectableTile<bool?>(
-                    value: true,
-                    groupValue: settings.useDarkMode,
+                  SelectableTile<String>(
+                    value: 'dark',
+                    groupValue: settings.useDarkMode == null
+                        ? 'system'
+                        : (settings.useDarkMode! ? 'dark' : 'light'),
                     title: 'Dunkel',
-                    onChanged: (v) => notifier.setDarkMode(v),
+                    onChanged: (_) => notifier.setDarkMode(true),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Farbwelt',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  ThemePicker(
+                    selectedName: settings.themeName,
+                    onChanged: (t) =>
+                        ref.read(settingsProvider.notifier).setThemeName(t.name),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _SectionTitle('Sicherheit im Chat'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile.adaptive(
+                    title: const Text('Bilder verpixelt anzeigen'),
+                    subtitle: const Text(
+                      'Schutz vor unangemessenen Inhalten: Bilder deiner '
+                      'Gegenstelle werden erst nach Bestätigung gezeigt '
+                      '(lang drücken zum Melden).',
+                    ),
+                    value: settings.blurChatImages,
+                    onChanged: (v) =>
+                        ref.read(settingsProvider.notifier).setBlurChatImages(v),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _SectionTitle('E2E-Identität'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Verschlüsseltes Key-Backup',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sichert die private Identität deiner '
+                    'Ende-zu-Ende-Verschlüsselung (passwortverschlüsselt, '
+                    'AES-256-GCM). Nur damit kannst du nach Gerätewechsel '
+                    'wieder verschlüsselt chatten. Verlust von Backup UND '
+                    'Passwort ist unwiederbringlich.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.download_outlined),
+                    title: const Text('Backup erstellen'),
+                    subtitle:
+                        const Text('Erzeugt einen verschlüsselten Code'),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: SupabaseService.isInitialized
+                        ? () => _createIdentityBackup(context, ref)
+                        : null,
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.restore),
+                    title: const Text('Backup wiederherstellen'),
+                    subtitle: const Text(
+                        'Überschreibt die aktuelle E2E-Identität'),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: SupabaseService.isInitialized
+                        ? () => _restoreIdentityBackup(context, ref)
+                        : null,
                   ),
                 ],
               ),
@@ -309,6 +417,15 @@ class SettingsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  ListTile(
+                    leading: const Icon(Icons.health_and_safety_outlined),
+                    title: const Text('Safety Center'),
+                    subtitle: const Text(
+                        'Hilfe bei Belästigung oder Stalking, Blockieren, Melden'),
+                    trailing: const Icon(Icons.chevron_right),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => context.push(AppRoutes.safetyCenter),
+                  ),
                   ListTile(
                     leading: const Icon(Icons.privacy_tip),
                     title: const Text('Datenschutz & Account'),
@@ -463,3 +580,271 @@ Future<String?> _promptTotpCode(BuildContext context) {
 }
 
 
+
+// ===========================================================================
+// E2E-Identität: verschlüsseltes Key-Backup (Migration Roadmap 0.6)
+// ===========================================================================
+
+/// Erstellt ein passwortverschlüsseltes Backup der Signal-Identität und
+/// zeigt es zum Kopieren an. Der Nutzer bewahrt den Code selbst auf
+/// (Passwortmanager/Papier) - kein Cloud-Zwang.
+Future<void> _createIdentityBackup(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final pwCtrl = TextEditingController();
+  final pw2Ctrl = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Backup-Passwort wählen'),
+      content: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: pwCtrl,
+              obscureText: true,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Passwort (min. 8 Zeichen)',
+              ),
+              validator: (v) =>
+                  v != null && v.length >= 8 ? null : 'Zu kurz (min. 8)',
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: pw2Ctrl,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(labelText: 'Passwort wiederholen'),
+              validator: (v) => v == pwCtrl.text ? null : 'Passwörter stimmen nicht überein',
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Abbrechen'),
+        ),
+        FilledButton(
+          onPressed: () =>
+              Navigator.of(ctx).pop(formKey.currentState!.validate()),
+          child: const Text('Backup erstellen'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final blob = await ref
+      .read(encryptionServiceProvider)
+      .createEncryptedBackup(pwCtrl.text);
+  if (!context.mounted) return;
+  if (blob == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Backup konnte nicht erstellt werden.')),
+    );
+    return;
+  }
+
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Dein Backup-Code'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SelectableText(blob,
+                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+              const SizedBox(height: 12),
+              Text(
+                'Bewahre Code UND Passwort sicher auf (z. B. Passwort-'
+                'Manager). Ohne beides ist eine Wiederherstellung unmöglich.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: blob));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Backup-Code kopiert.')),
+            );
+          },
+          icon: const Icon(Icons.copy),
+          label: const Text('Kopieren'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Fertig'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Stellt die E2E-Identität aus einem Backup-Code wieder her und
+/// veröffentlicht anschließend frische PreKeys auf dem Server, damit
+/// Partner wieder verschlüsselte Sessions aufbauen können.
+Future<void> _restoreIdentityBackup(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final proceed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Identität wiederherstellen?'),
+      content: const Text(
+        'Die aktuelle E2E-Identität auf diesem Gerät wird ÜBERSCHRIEBEN '
+        '(bestehende verschlüsselte Sitzungen gehen verloren). Verwende nur '
+        'ein Backup deines eigenen Kontos.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Abbrechen'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Weiter'),
+        ),
+      ],
+    ),
+  );
+  if (proceed != true || !context.mounted) return;
+
+  final blobCtrl = TextEditingController();
+  final pwCtrl = TextEditingController();
+  final restored = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Backup eingeben'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: blobCtrl,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: 'Backup-Code einfügen',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: pwCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Backup-Passwort'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Abbrechen'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Wiederherstellen'),
+        ),
+      ],
+    ),
+  );
+  if (restored != true || !context.mounted) return;
+
+  try {
+    await ref
+        .read(encryptionServiceProvider)
+        .restoreFromBackup(blobCtrl.text.trim(), pwCtrl.text);
+    // Frische PreKeys veröffentlichen, damit Partner wieder Sessions
+    // aufbauen können (das Backup enthält keine One-Time-PreKeys).
+    await ref.read(preKeyServiceProvider).publishOwnPreKeysFromStore();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('E2E-Identität wiederhergestellt.')),
+    );
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'Wiederherstellung fehlgeschlagen. Prüfe Code und Passwort.'),
+      ),
+    );
+  }
+}
+
+/// Schalter fuer Google-freien Push via UnifiedPush (F-Droid-Variante).
+///
+/// Benoetigt eine Distributor-App (z. B. ntfy). Der Endpunkt wird
+/// serverseitig im Profil gespeichert; eingehende Pushes zeigt der
+/// [UnifiedPushService] lokal an.
+class _UnifiedPushTile extends ConsumerStatefulWidget {
+  const _UnifiedPushTile();
+
+  @override
+  ConsumerState<_UnifiedPushTile> createState() => _UnifiedPushTileState();
+}
+
+class _UnifiedPushTileState extends ConsumerState<_UnifiedPushTile> {
+  bool? _enabled;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    UnifiedPushService.isEnabled().then((v) {
+      if (mounted) setState(() => _enabled = v);
+    });
+  }
+
+  Future<void> _toggle(bool want) async {
+    setState(() => _busy = true);
+    try {
+      if (want) {
+        await UnifiedPushService.enable();
+      } else {
+        await UnifiedPushService.disable();
+      }
+      final active = await UnifiedPushService.isEnabled();
+      if (mounted) setState(() => _enabled = active);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = _enabled ?? false;
+    return SwitchListTile.adaptive(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Push ohne Google (UnifiedPush)'),
+      subtitle: Text(
+        enabled
+            ? 'Aktiv - Endpunkt ist hinterlegt.'
+            : 'Ben\u00f6tigt eine Distributor-App wie ntfy '
+                '(F-Droid). FCM bleibt in der Play-Variante aktiv.',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      value: enabled,
+      onChanged: _busy ? null : (v) => _toggle(v),
+    );
+  }
+}

@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/supabase_database_service.dart';
+import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/widgets/buttons.dart';
+import 'package:wisp/widgets/habitude_selector.dart';
 
 /// Onboarding mit Blind-Mode-Erklärung, Datenschutz-Hinweisen und
 /// ergänzbaren Profilschritten.
@@ -235,6 +239,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   final Set<String> _interests = {};
 
+  HabitudeLevel? _smoking;
+  HabitudeLevel? _alcohol;
+  HabitudeLevel? _drugs;
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -261,9 +269,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           name: profile.name,
           bio: _bioCtrl.text.trim(),
           interests: _interests.toList(),
+          smoking: _smoking,
+          alcohol: _alcohol,
+          drugs: _drugs,
         );
+    await _persistHabitudesToServer();
     await ref.read(settingsProvider.notifier).completeOnboarding();
     if (mounted) context.go(AppRoutes.home);
+  }
+
+  /// Schreibt die Konsum-Präferenzen serverseitig in die profiles-Tabelle,
+  /// damit der Find-your-Match-Algorithmus darüber filtern kann.
+  Future<void> _persistHabitudesToServer() async {
+    if (!SupabaseService.isInitialized) return;
+    try {
+      await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+        'smoking': _smoking?.toServer(),
+        'alcohol': _alcohol?.toServer(),
+        'drugs': _drugs?.toServer(),
+      });
+    } catch (e) {
+      debugPrint('[Onboarding] Habitude-Server-Sync fehlgeschlagen: $e');
+    }
   }
 
   void _next() {
@@ -310,7 +337,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
-                  itemCount: 7,
+                  itemCount: 8,
                   itemBuilder: (context, index) {
                     switch (index) {
                       case 0:
@@ -328,14 +355,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           title: 'Deine Privatsphäre zählt',
                           body: 'Du entscheidest, wer dein Profil sehen darf. Deine '
                               'Fotos bleiben so lange verborgen, bis ihr euch '
-                              'beide gematcht habt. Keine unnötigen Berechtigungen.',
+                              'euch gegenseitig ausgewählt habt. Keine unnötigen Berechtigungen.',
                         );
                       case 2:
                         return const _Page(
                           icon: Icons.favorite,
                           title: 'Echte Verbindungen',
                           body: 'Erst wenn ihr euch beide liket, werdet ihr '
-                              'gematcht und die Fotos werden freigeschaltet. Fair '
+                              'auf beiden Seiten Ja gesagt und die Fotos freigeschaltet. Fair '
                               'und weniger oberflächlich.',
                         );
                       case 3:
@@ -385,6 +412,43 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           ),
                         );
                       case 6:
+                        return _Step(
+                          title: 'Dein Umgang mit ...',
+                          onSkip: _next,
+                          onContinue: _next,
+                          onBack: _prev,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Wie stehst du zu folgenden Dingen? Diese Angaben '
+                                'beeinflussen, wen du bei "Find your Match" siehst – '
+                                'es werden nur Personen gezeigt, die maximal so '
+                                'viel konsumieren wie du.',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              HabitudeSelector(
+                                topic: HabitudeTopic.smoking,
+                                value: _smoking,
+                                onChanged: (v) => setState(() => _smoking = v),
+                              ),
+                              const SizedBox(height: 16),
+                              HabitudeSelector(
+                                topic: HabitudeTopic.alcohol,
+                                value: _alcohol,
+                                onChanged: (v) => setState(() => _alcohol = v),
+                              ),
+                              const SizedBox(height: 16),
+                              HabitudeSelector(
+                                topic: HabitudeTopic.drugs,
+                                value: _drugs,
+                                onChanged: (v) => setState(() => _drugs = v),
+                              ),
+                            ],
+                          ),
+                        );
+                      case 7:
                         return const _Page(
                           icon: Icons.celebration,
                           title: 'Fertig!',

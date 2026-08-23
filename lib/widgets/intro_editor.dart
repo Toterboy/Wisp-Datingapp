@@ -6,24 +6,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
 
 import 'package:wisp/services/supabase_storage_service.dart';
+import 'package:wisp/widgets/audio_review_sheet.dart';
 
 /// Editor für die eigene Vorstellung ("Find your Match"): Text + Audio.
 ///
 /// Selbstständig für Aufnahme/Upload/Entfernen der Audio-Datei zuständig.
 /// Meldet jede Änderung über [onChanged] an den Parent, der die Werte
-/// speichert. Text und Audio sind Pflichtangaben (Validierung über
-/// [validate]).
+/// speichert.
+///
+/// Audio-Flow: Nach dem Stoppen bleibt die Aufnahme lokal erhalten und
+/// wird über ein Review-Sheet erst ANGEHÖRT ([showAudioReviewSheet]) –
+/// erst nach Bestätigung erfolgt der Upload. Mindestlänge 10 Sekunden
+/// ([minAudioSeconds]), Maximum 5 Minuten / 300 Sekunden (Auto-Stopp).
+///
+/// Ist [required] false (z. B. in der Erst-Einrichtung), sind Text und
+/// Audio freiwillige Angaben und der Pflicht-Hinweis entfällt.
 class IntroEditor extends ConsumerStatefulWidget {
   const IntroEditor({
     required this.initialText,
     required this.initialAudioPath,
     required this.onChanged,
     super.key,
+    this.required = true,
   });
 
   final String initialText;
   final String? initialAudioPath;
   final void Function(String text, String? audioPath) onChanged;
+  final bool required;
 
   @override
   ConsumerState<IntroEditor> createState() => _IntroEditorState();
@@ -31,6 +41,12 @@ class IntroEditor extends ConsumerStatefulWidget {
   /// True, wenn beide Pflichtangaben vorhanden sind.
   static bool isValid({required String text, String? audioPath}) =>
       text.trim().isNotEmpty && audioPath != null;
+
+  /// Mindestlänge der Audio-Vorstellung in Sekunden.
+  static const int minAudioSeconds = 10;
+
+  /// Maximale Länge der Audio-Vorstellung in Sekunden (Auto-Stopp = 5 Min).
+  static const int maxAudioSeconds = 300;
 }
 
 class _IntroEditorState extends ConsumerState<IntroEditor> {
@@ -60,6 +76,10 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
 
   Future<void> _toggleRecording() async {
     if (_recording) {
+      // WICHTIG: Die Sekunden VOR dem Reset sichern – vorher stand der
+      // Reset vor der Prüfung, sodass JEDE Aufnahme (auch 40 s) als
+      // "unter 1 Sekunde" verworfen wurde.
+      final seconds = _recordSeconds;
       _recordTimer?.cancel();
       setState(() {
         _recording = false;
@@ -73,19 +93,27 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
           return;
         }
         final file = File(recordedPath);
-        if (_recordSeconds < 1) {
-          await file.delete();
-          if (mounted) {
-            setState(() => _uploading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Aufnahme zu kurz (< 1 s), verworfen.'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
+        if (!mounted) {
+          if (await file.exists()) await file.delete();
           return;
         }
+
+        // Anhören vor dem Verwenden: Review-Sheet zeigt Player, Länge
+        // und (bei Unterschreitung) die Mindestlänge. Nur bei expliziter
+        // Bestätigung wird hochgeladen.
+        final use = await showAudioReviewSheet(
+          context: context,
+          path: recordedPath,
+          durationSeconds: seconds,
+          minimumSeconds: IntroEditor.minAudioSeconds,
+          confirmLabel: 'Verwenden & hochladen',
+        );
+        if (use != true) {
+          if (await file.exists()) await file.delete();
+          if (mounted) setState(() => _uploading = false);
+          return;
+        }
+
         final bytes = await file.readAsBytes();
         await file.delete();
 
@@ -145,7 +173,7 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
       });
       _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() => _recordSeconds++);
-        if (_recordSeconds >= 60) {
+        if (_recordSeconds >= IntroEditor.maxAudioSeconds) {
           _toggleRecording();
         }
       });
@@ -183,8 +211,12 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
         ),
         const SizedBox(height: 4),
         Text(
-          'So lernst du andere kennen, bevor ein Foto zu sehen ist. '
-          'Text UND Audio sind Pflicht.',
+          widget.required
+              ? 'So lernst du andere kennen, bevor ein Foto zu sehen ist. '
+                  'Text UND Audio sind Pflicht.'
+              : 'So lernst du andere kennen, bevor ein Foto zu sehen ist. '
+                  'Du kannst diesen Schritt auch überspringen und alles '
+                  'später ergänzen.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -195,8 +227,13 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
           maxLines: 4,
           maxLength: 500,
           keyboardType: TextInputType.text,
-          decoration: const InputDecoration(
-            labelText: 'Vorstellung (Text) *',
+          // Weit oben über der Tastatur halten, damit man beim Tippen
+          // alle vier Zeilen lesen kann (Standard wäre nur 20 px).
+          scrollPadding: const EdgeInsets.only(bottom: 180),
+          decoration: InputDecoration(
+            labelText: widget.required
+                ? 'Vorstellung (Text) *'
+                : 'Vorstellung (Text)',
             hintText: 'z. B. wer du bist und wonach du suchst',
           ),
           onChanged: (_) => widget.onChanged(_textCtrl.text, _audioPath),
@@ -209,7 +246,7 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Audio-Vorstellung *',
+                  widget.required ? 'Audio-Vorstellung *' : 'Audio-Vorstellung',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
@@ -217,6 +254,15 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
                   _audioPath != null
                       ? 'Aufgenommen. Du kannst sie neu aufnehmen oder entfernen.'
                       : 'Noch keine Audio-Vorstellung hinterlegt.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${IntroEditor.minAudioSeconds}–${IntroEditor.maxAudioSeconds} '
+                  'Sekunden. Du kannst jede Aufnahme vor dem Speichern anhören.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color:
                             Theme.of(context).colorScheme.onSurfaceVariant,

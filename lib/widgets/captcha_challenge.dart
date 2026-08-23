@@ -6,7 +6,7 @@ import 'package:wisp/utils/constants.dart';
 
 /// CAPTCHA-Challenge für Registrierung & Login (Bot-Schutz).
 ///
-/// Lädt die statische Turnstile-Seite `captcha.html` (gehostet auf
+/// Lädt die statische Turnstile-Seite `index.html` (gehostet auf
 /// `https://auth.wispdating.de/`, Ordner `passkey-assets/`) in einem WebView
 /// und liefert das Token an die aufrufende Stelle. Das Token wird an
 /// `supabase.auth.signUp(...)` bzw. `signInWithPassword(...)` als
@@ -14,11 +14,12 @@ import 'package:wisp/utils/constants.dart';
 /// im Dashboard konfigurierte Secret.
 ///
 /// Konfiguration (Operator):
-///   1. `passkey-assets/captcha.html` deployen; dort den Platzhalter
+///   1. `passkey-assets/index.html` deployen; dort den Platzhalter
 ///      `<TURNSTILE_SITE_KEY>` durch den öffentlichen Sitekey ersetzen.
 ///   2. Cloudflare-Dashboard: Widget-Hostname `auth.wispdating.de`
 ///      registrieren – die Seite wird exakt unter
-///      `https://auth.wispdating.de/captcha.html` ausgeliefert.
+///      `https://auth.wispdating.de/` ausgeliefert (Netlify liefert
+///      `index.html` automatisch als Startseite aus).
 ///   3. Supabase Dashboard → Authentication → CAPTCHA: Turnstile aktivieren
 ///      + Secret eintragen (Secret liegt NUR dort, nie im Client).
 ///   4. Beim App-Build:
@@ -67,11 +68,10 @@ class _CaptchaChallengeDialogState extends State<_CaptchaChallengeDialog> {
   /// Wichtig: Turnstile validiert den Hostnamen der aufrufenden Seite gegen
   /// die Widget-Konfiguration. `loadHtmlString` hätte die Origin
   /// `about:blank` und würde abgelehnt – deshalb wird die Seite exakt unter
-  /// `https://auth.wispdating.de/captcha.html` ausgeliefert (Netlify,
-  /// Ordner `passkey-assets/`). Im Cloudflare-Dashboard muss der Hostname
-  /// `auth.wispdating.de` registriert sein.
-  static const String _captchaPageUrl =
-      'https://auth.wispdating.de/captcha.html';
+  /// `https://auth.wispdating.de/` ausgeliefert (Netlify, Ordner
+  /// `passkey-assets/`, `index.html` als Startseite). Im Cloudflare-
+  /// Dashboard muss der Hostname `auth.wispdating.de` registriert sein.
+  static const String _captchaPageUrl = 'https://auth.wispdating.de/';
 
   /// Fehlertext, falls Turnstile einen Fehler meldet (z. B. abgelaufen).
   String? _error;
@@ -108,10 +108,13 @@ class _CaptchaChallengeDialogState extends State<_CaptchaChallengeDialog> {
         NavigationDelegate(
           onNavigationRequest: (request) {
             // Nur CAPTCHA-/Anbieter-bezogene Navigation erlauben
-            // (Startseite, Turnstile-Assets).
-            final url = request.url;
-            if (url.startsWith('https://auth.wispdating.de') ||
-                url.startsWith('https://challenges.cloudflare.com')) {
+            // (Startseite, Turnstile-Assets). Host-exakter Vergleich statt
+            // startsWith - sonst matchen auch Suffix-Domains wie
+            // auth.wispdating.de.evil.com.
+            final host = Uri.tryParse(request.url)?.host.toLowerCase();
+            if (host == 'auth.wispdating.de' ||
+                host == 'challenges.cloudflare.com' ||
+                (host?.endsWith('.challenges.cloudflare.com') ?? false)) {
               return NavigationDecision.navigate;
             }
             return NavigationDecision.prevent;

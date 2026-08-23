@@ -249,7 +249,7 @@ class _RandomChatScreenState extends ConsumerState<RandomChatScreen> {
     ref.read(chatProvider.notifier).addMatch(partner, ref: ref);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Du und ${partner.name} sind jetzt ein Match! ✨')),
+        SnackBar(content: Text('Zwischen dir und ${partner.name} ist ein Funke entstanden! ✨')),
       );
     }
   }

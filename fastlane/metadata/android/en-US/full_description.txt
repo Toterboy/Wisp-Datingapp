@@ -1,0 +1,27 @@
+WispDating flips the classic dating formula: person first, picture later.
+
+You only see photos once two people have genuinely gotten to know each other – through written and spoken intros plus a little quiz about each other. No perfectly staged profile pics in the spotlight; the human behind them takes center stage.
+
+HIGHLIGHTS
+
+• Find your Match: candidates without photos, with written & spoken intros instead
+• Quiz unlock: pictures appear only after both pass the quiz (enforced server-side)
+• Random Chat: talk anonymously with a random person
+• QR code: connect in person – scan, show, or type a code
+• Dating Hour: weekly event with 5-minute chats; match only if both say yes
+
+PRIVACY ISN'T AN ADD-ON, IT'S THE ARCHITECTURE
+
+• End-to-end encryption for all messages, pictures and calls (Signal Protocol)
+• Direct device-to-device connections via WebRTC – servers never see content
+• Your location is never shared: others only see "approx. X km away"
+• No ad or tracking SDKs, EU infrastructure, fully open source
+
+SAFETY FOR EVERYONE
+
+• Age protection: minors are invisible to adults
+• Incoming chat pictures are blurred by default, revealed only after confirmation
+• Report and block features with personal review by the support team
+• Optional: two-factor authentication and passkeys
+
+WispDating is free software (AGPLv3). The complete source code is public.

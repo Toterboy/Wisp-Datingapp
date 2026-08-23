@@ -5,9 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:wisp/utils/avatar_image.dart';
 
 import 'package:wisp/models/gender.dart';
+import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
@@ -22,6 +23,7 @@ import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/validators.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/gender_preference_selector.dart';
+import 'package:wisp/widgets/habitude_selector.dart';
 import 'package:wisp/widgets/intro_editor.dart';
 
 /// Unterstützte Wohnsitzländer (Auswahl für die Profilangabe).
@@ -50,25 +52,7 @@ const kSupportedCountries = <String>[
   'Anderes Land',
 ];
 
-/// Deutsche Bundesländer (Vollnamen, für die Auswahl im Profil).
-const kGermanStates = <String>[
-  'Baden-Württemberg',
-  'Bayern',
-  'Berlin',
-  'Brandenburg',
-  'Bremen',
-  'Hamburg',
-  'Hessen',
-  'Mecklenburg-Vorpommern',
-  'Niedersachsen',
-  'Nordrhein-Westfalen',
-  'Rheinland-Pfalz',
-  'Saarland',
-  'Sachsen',
-  'Sachsen-Anhalt',
-  'Schleswig-Holstein',
-  'Thüringen',
-];
+// kGermanStates ist zentral in lib/utils/constants.dart definiert.
 
 /// Profil bearbeiten: Name, Geburtsdatum, Geschlecht, Präferenzen, Bio,
 /// Beziehungsart, Standort, Entfernungsfilter, Interessen und die
@@ -87,6 +71,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   final _cityCtrl = TextEditingController();
   final _stateCtrl = TextEditingController();
 
+  /// Stadt beim Oeffnen des Screens (fuer Change-Detection beim Speichern).
+  String? _loadedCity;
+
   late Gender _gender;
   late RelationshipType _relationshipType;
   DateTime? _birthDate;
@@ -100,6 +87,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String _introTextValue = '';
   String? _introAudioPath;
 
+  // Konsum-Präferenzen (Rauchen, Alkohol, Drogen) – beeinflussen den
+  // Find-your-Match-Filter.
+  HabitudeLevel? _smoking;
+  HabitudeLevel? _alcohol;
+  HabitudeLevel? _drugs;
+
   @override
   void initState() {
     super.initState();
@@ -111,10 +104,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _stateCtrl.text = p.state ?? '';
     _introTextValue = p.introText;
     _introAudioPath = p.introAudioPath;
+    _smoking = p.smoking;
+    _alcohol = p.alcohol;
+    _drugs = p.drugs;
     _countryValue = p.country.isEmpty ? 'Deutschland' : p.country;
     _gender = Gender.fromValue(p.gender) ?? Gender.diverse;
     _relationshipType = prefs.relationshipType ?? RelationshipType.open;
     _birthDate = p.birthDate;
+    // Gemerkter Ausgangswert: GPS-Gegenpruefung beim Speichern nur bei
+    // geaenderter Stadt ausfuehren (Performance).
+    _loadedCity = p.city;
 
     // Initial signed URL für aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
@@ -188,17 +187,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   Future<void> _pickProfileImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 80,
-    );
-    if (picked == null) return;
-
     try {
-      final bytes = await picked.readAsBytes();
+      final bytes = await pickAndCropAvatar();
+      if (bytes == null) return;
+
       final storageService = ref.read(supabaseStorageServiceProvider);
       final path = await storageService.uploadAvatar(bytes);
 
@@ -238,12 +230,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         return;
       }
 
-      // Sicherheitscheck: Prüfe auf verdächtigen Standort
+      // Plausibilitaets-Check gegen die BISHERIGEN Standorte dieses
+      // Geraets (lokal) - keine Cross-Account-Erkennung.
       if (await locationService.isLocationSuspicious(position)) {
         setState(() {
           _isDetectingLocation = false;
-          _locationError = 'Achtung: An diesem Standort wurde bereits ein '
-              'anderer Account verifiziert.';
+          _locationError = 'Hinweis: Dieser Standort weicht deutlich von '
+              'deinen bisherigen Standorten auf diesem Ger\u00e4t ab.';
         });
         return;
       }
@@ -257,6 +250,19 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             locationLat: position.latitude,
             locationLng: position.longitude,
           );
+
+      // Koordinaten serverseitig persistieren (Basis fuer die
+      // Distanzberechnung zu anderen Nutzern).
+      if (SupabaseService.isInitialized) {
+        try {
+          await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+            'location_lat': position.latitude,
+            'location_lng': position.longitude,
+          });
+        } catch (e) {
+          debugPrint('[ProfileEdit] Standort-Sync fehlgeschlagen: $e');
+        }
+      }
 
       // Serverseitigen Standort-Check via Edge Function auslösen.
       final auth = SupabaseService.currentUser;
@@ -344,7 +350,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final location = _cityCtrl.text.trim().isEmpty
         ? null
         : _cityCtrl.text.trim();
-    if (location != null) {
+    // GPS-Gegenpruefung NUR wenn der Ort geaendert wurde - der Geocoding-
+    // Netzwerk-Call hat bei jedem Speichern sonst mehrere Sekunden gedauert.
+    final cityChanged =
+        location != null && location != (_loadedCity?.trim() ?? '');
+    if (cityChanged) {
       await _validateLocationAgainstGps(location);
     }
 
@@ -359,23 +369,39 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           introText: _introTextValue.trim(),
           introAudioPath: _introAudioPath,
           clearIntroAudio: _introAudioPath == null,
+          smoking: _smoking,
+          alcohol: _alcohol,
+          drugs: _drugs,
         );
     await ref.read(userPreferencesProvider.notifier).setRelationshipType(
           _relationshipType,
         );
 
-    // Vorstellung serverseitig persistieren, damit andere Nutzer sie in
-    // "Find your Match" und unter "Erhaltene Likes" sehen/hören können.
-    try {
-      if (SupabaseService.isInitialized) {
-        await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
-          'intro_text': _introTextValue.trim(),
-          'intro_audio_path': _introAudioPath,
-          'country': _countryValue,
-        });
-      }
-    } catch (e) {
-      debugPrint('[ProfileEdit] Intro-Server-Sync fehlgeschlagen: $e');
+    // Server-Sync NICHT blockierend (unawaited): Lokal ist alles gespeichert,
+    // der Nutzer sieht sofort "Profil gespeichert". Fehler landen im Log -
+    // ein erneutes Speichern synchronisiert erneut.
+    if (SupabaseService.isInitialized) {
+      unawaited(() async {
+        try {
+          await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+            'bio': _bioCtrl.text.trim(),
+            'name': _nameCtrl.text.trim(),
+            'state': _stateCtrl.text.trim().isEmpty
+                ? null
+                : _stateCtrl.text.trim(),
+            'interests':
+                ref.read(profileProvider).interests,
+            'intro_text': _introTextValue.trim(),
+            'intro_audio_path': _introAudioPath,
+            'country': _countryValue,
+            'smoking': _smoking?.toServer(),
+            'alcohol': _alcohol?.toServer(),
+            'drugs': _drugs?.toServer(),
+          });
+        } catch (e) {
+          debugPrint('[ProfileEdit] Server-Sync fehlgeschlagen: $e');
+        }
+      }());
     }
 
     if (!mounted) return;
@@ -583,46 +609,40 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _field(
-                      child: TextFormField(
-                        controller: _cityCtrl,
-                        keyboardType: TextInputType.text,
-                        decoration: const InputDecoration(
-                          labelText: 'Ort / Stadt',
-                          hintText: 'z. B. Berlin',
-                        ),
-                        onChanged: (v) {
-                          if (v.trim().isEmpty) return;
-                          _validateLocationAgainstGps(v.trim());
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    onPressed: _isDetectingLocation ? null : _detectLocation,
-                    icon: _isDetectingLocation
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+              // GPS-Button als suffixIcon: immer perfekt am Eingabefeld
+              // ausgerichtet, auch bei grosser Systemschrift (a11y).
+              _field(
+                child: TextFormField(
+                  controller: _cityCtrl,
+                  keyboardType: TextInputType.text,
+                  decoration: InputDecoration(
+                    labelText: 'Ort / Stadt',
+                    hintText: 'z. B. Berlin',
+                    suffixIcon: _isDetectingLocation
+                        ? const Padding(
+                            padding: EdgeInsets.all(14),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            ),
                           )
-                        : const Icon(Icons.my_location),
-                    tooltip: 'Standort erkennen',
+                        : IconButton(
+                            tooltip: 'Standort erkennen (GPS)',
+                            onPressed: _detectLocation,
+                            icon: const Icon(Icons.my_location),
+                          ),
                   ),
-                ],
+                  onChanged: (v) {
+                    if (v.trim().isEmpty) return;
+                    _validateLocationAgainstGps(v.trim());
+                  },
+                ),
               ),
               if (_locationError != null) ...[
                 const SizedBox(height: 8),
-                Text(
-                  _locationError!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                ),
+                _LocationNotice(text: _locationError!),
               ],
               // Land (statt nur Deutschland) + Bundesland nur bei DE.
               _field(
@@ -787,6 +807,46 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 },
               ),
               const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gewohnheiten',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Wie stehst du zu ...? Diese Angaben beeinflussen, '
+                        'wen du bei "Find your Match" siehst – es werden nur '
+                        'Personen gezeigt, die maximal so viel konsumieren wie du.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      HabitudeSelector(
+                        topic: HabitudeTopic.smoking,
+                        value: _smoking,
+                        onChanged: (v) => setState(() => _smoking = v),
+                      ),
+                      const SizedBox(height: 16),
+                      HabitudeSelector(
+                        topic: HabitudeTopic.alcohol,
+                        value: _alcohol,
+                        onChanged: (v) => setState(() => _alcohol = v),
+                      ),
+                      const SizedBox(height: 16),
+                      HabitudeSelector(
+                        topic: HabitudeTopic.drugs,
+                        value: _drugs,
+                        onChanged: (v) => setState(() => _drugs = v),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               Text('Interessen',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
@@ -855,6 +915,42 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Dezent gestylter Hinweis-/Fehlerkasten fuer Standort-Meldungen.
+class _LocationNotice extends StatelessWidget {
+  const _LocationNotice({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: scheme.onErrorContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                    height: 1.35,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -304,7 +304,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Wie gut kennst du dein Match?',
+          'Wie gut kennst du dein Gegenüber?',
           style: Theme.of(context).textTheme.headlineSmall,
           textAlign: TextAlign.center,
         ),
@@ -411,7 +411,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Antwortet dein Match auch richtig, ist das Quiz bestanden.',
+            'Antwortet dein Gegenüber auch richtig, ist das Quiz bestanden.',
             style: Theme.of(context).textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),
@@ -425,7 +425,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           const Icon(Icons.info_outline, size: 48, color: Colors.orange),
           const SizedBox(height: 8),
           Text(
-            'Die Runde ist vorbei. Dein Match hat sie nicht bestanden, '
+            'Die Runde ist vorbei. Dein Gegenüber hat sie nicht bestanden, '
             'also startet ihr nach der Pause gemeinsam neu.',
             style: Theme.of(context).textTheme.bodyLarge,
             textAlign: TextAlign.center,

@@ -1,5 +1,30 @@
 import 'package:flutter/material.dart';
 
+/// Verfügbare Farbschemata ("Erscheinungsbilder").
+///
+/// Classic ist das ursprüngliche WispDating-Rosa; die anderen sind
+/// gleichwertige Alternativen (Light + Dark aus demselben Seed).
+enum WispTheme {
+  classic('Classic WispDating', Color(0xFFE9457B)),
+  ocean('Ozean', Color(0xFF1E88E5)),
+  forest('Wald', Color(0xFF2E7D32)),
+  sunset('Sonnenuntergang', Color(0xFFF57C00)),
+  lila('Lavendel', Color(0xFF8E6BD0)),
+  mono('Schiefer', Color(0xFF546E7A));
+
+  const WispTheme(this.label, this.primaryColor);
+
+  final String label;
+  final Color primaryColor;
+
+  /// Aufhellung für Dark-Mode-Akzente.
+  Color get lightPrimary => Color.lerp(primaryColor, Colors.white, 0.25)!;
+
+  static WispTheme fromName(String? name) => WispTheme.values
+      .where((t) => t.name == name)
+      .firstOrNull ?? WispTheme.classic;
+}
+
 /// Zentrale Design-Farben der App (warm, einladend, modern).
 class AppColors {
   AppColors._();
@@ -35,12 +60,12 @@ class AppColors {
 class AppTheme {
   AppTheme._();
 
-  /// Light Theme (Material 3).
-  static ThemeData get light => ThemeData(
+  /// Light Theme (Material 3) für das gewählte Farbschema.
+  static ThemeData light({WispTheme theme = WispTheme.classic}) => ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
+          seedColor: theme.primaryColor,
           brightness: Brightness.light,
           surface: AppColors.surfaceLight,
         ),
@@ -56,9 +81,9 @@ class AppTheme {
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.black87,
         ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
           elevation: 8,
-          selectedItemColor: AppColors.primary,
+          selectedItemColor: theme.primaryColor,
         ),
         // Snackbars als schwebende Bubbles am unteren Rand – konsistent
         // für Light- und Dark-Mode.
@@ -74,12 +99,12 @@ class AppTheme {
         ],
       );
 
-  /// Dark Theme (Material 3).
-  static ThemeData get dark => ThemeData(
+  /// Dark Theme (Material 3) für das gewählte Farbschema.
+  static ThemeData dark({WispTheme theme = WispTheme.classic}) => ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
+          seedColor: theme.primaryColor,
           brightness: Brightness.dark,
           surface: AppColors.surfaceDark,
         ),
@@ -95,9 +120,9 @@ class AppTheme {
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
         ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
           elevation: 8,
-          selectedItemColor: AppColors.primaryLight,
+          selectedItemColor: theme.lightPrimary,
         ),
         // Snackbars als schwebende Bubbles am unteren Rand – konsistent
         // für Light- und Dark-Mode.

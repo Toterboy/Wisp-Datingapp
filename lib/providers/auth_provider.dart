@@ -10,8 +10,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
-import 'package:wisp/services/api_auth_service.dart';
-import 'package:wisp/services/api_client.dart';
 import 'package:wisp/services/app_auth_service.dart';
 import 'package:wisp/services/auth_service.dart';
 import 'package:wisp/services/encryption_service.dart';
@@ -86,7 +84,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
 
   Future<void> _restore() async {
     try {
-      final loggedIn = await _auth.restoreSession();
+      // Globale Sicherheits-Wache: Falls restoreSession() (z. B. im
+      // API-Backend-Modus bei nicht erreichbarem Server) HÄNGT und nie
+      // zurückkehrt, würde der Router ewig auf dem Lade-Screen bleiben.
+      // Nach dem Timeout wird sicher als "nicht eingeloggt" fortgefahren.
+      final loggedIn = await _auth
+          .restoreSession()
+          .timeout(const Duration(seconds: 10), onTimeout: () => false);
       state = AsyncValue.data(loggedIn);
       if (loggedIn) {
         // Profil (Geburtsdatum/Alter!) und Setup-Flags vom Server nachladen.
@@ -99,7 +103,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // fortfahren -> Nutzer landet auf Welcome/Login.
       debugPrint('[AuthNotifier] restoreSession fehlgeschlagen: $e');
       debugPrint('[AuthNotifier] StackTrace: $st');
-      state = AsyncValue.error(e, st);
+      state = const AsyncValue.data(false);
     }
   }
 
@@ -119,6 +123,22 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // FCM-Token-Registrierung NIE den kritischen Sync-Pfad blockieren
       // lassen (getToken kann auf Geräten ohne Google-Dienste hängen).
       unawaited(_syncFcmToken());
+
+      // MFA-Status UNABHÄNGIG vom Profil-Fetch laden (eigener try-Block):
+      // Schlägt der Profil-Fetch per Timeout fehl, darf die App trotzdem
+      // wissen, ob 2FA aktiv ist - sonst zeigt sie nach einem Update fälsch-
+      // lich "nicht eingerichtet".
+      try {
+        _ref.read(mfaStatusProvider.notifier).state =
+            await MfaService(SupabaseService.client).loadStatus().timeout(
+                  const Duration(seconds: 5),
+                  onTimeout: () => const MfaStatus.initial(),
+                );
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[AuthNotifier] MFA-Status konnte nicht geladen werden: $e');
+        }
+      }
 
       // Profil laden. Ein Timeout/Netzfehler wirft und behält die Session
       // (kein fälschlicher Logout) – nur ein SAUBERES "keine Zeile" bei
@@ -157,19 +177,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
                   flags['personality_test_completed'] == true,
             );
       }
-
-      // MFA-Status laden (vor dem Router-Freigeben im finally): Der
-      // Redirect entscheidet damit synchron über Challenge-/Setup-Screen.
-      // Fehler dürfen den Sync nicht blockieren (Status bleibt initial,
-      // Router zeigt dann keine MFA-Screens).
-      try {
-        _ref.read(mfaStatusProvider.notifier).state =
-            await MfaService(SupabaseService.client).loadStatus();
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[AuthNotifier] MFA-Status konnte nicht geladen werden: $e');
-        }
-      }
     } catch (e) {
       debugPrint('[AuthNotifier] Server-Sync fehlgeschlagen: $e');
     } finally {
@@ -184,6 +191,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
   /// dieses Gerät senden kann. Best effort – mit Timeout, damit
   /// getToken() (kann ohne Google-Dienste hängen) nie blockiert.
   Future<void> _syncFcmToken() async {
+    // F-Droid-Build: kein Firebase, Push via UnifiedPush (falls aktiv).
+    if (AppConstants.fdroidBuild) return;
     try {
       final token = await FirebaseMessaging.instance
           .getToken()
@@ -202,13 +211,12 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     required String password,
     String? gender,
     required DateTime birthDate,
-    String? inviteCode,
     String? captchaToken,
   }) async {
     if (kDebugMode) {
       // PII (E-Mail, Name) nur im Debug-Modus loggen (Audit H4).
       debugPrint('[AuthNotifier] register() aufgerufen: name=$name, '
-          'email=$email, gender=$gender, inviteCode=$inviteCode');
+          'email=$email, gender=$gender');
     }
     state = const AsyncValue.loading();
     try {
@@ -234,7 +242,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
         password: password,
         gender: gender,
         birthDate: birthDate,
-        inviteCode: inviteCode,
         latitude: lat,
         longitude: lng,
         captchaToken: captchaToken,
@@ -317,8 +324,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
   Future<void> silentLogin({
     required String email,
     required String password,
+    String? captchaToken,
   }) async {
-    await _auth.login(email: email, password: password);
+    await _auth.login(
+      email: email,
+      password: password,
+      captchaToken: captchaToken,
+    );
     _ref.read(pendingVerificationEmailProvider.notifier).state = null;
     _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
     state = const AsyncValue.data(true);
@@ -342,12 +354,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
 /// Prüft, ob der Demo-Modus (lokaler Mock) aktiv ist.
 ///
 /// Entscheidung delegiert an die reine, testbare Funktion
-/// [resolveDemoMode] (lib/utils/demo_mode.dart).
+/// [resolveDemoMode] (lib/utils/demo_mode.dart). Ohne Legacy-ApiConfig
+/// gibt es keine Backend-URL mehr -> leerer String aktiviert die
+/// URL-Heuristik nicht; ohne Supabase und ohne Flag bleibt der Modus
+/// aus (fail-closed).
 bool _isDemoMode() => resolveDemoMode(
       isReleaseMode: kReleaseMode,
       isSupabaseInitialized: SupabaseService.isInitialized,
       demoModeFlag: AppConstants.demoMode,
-      baseUrl: ApiConfig.baseUrl,
+      baseUrl: '',
     );
 
 final authProvider =
@@ -383,8 +398,14 @@ final authProvider =
       secureStore.writeDemoCredentials,
     );
   } else {
-    final api = ref.watch(apiClientProvider);
-    auth = ApiAuthService(api, tokens, encryption);
+    // Weder Supabase noch Demo-Modus: Es gibt bewusst KEIN Legacy-Backend
+    // mehr (der fruehere ApiClient mit Platzhalter-URL ist entfernt).
+    // Fail-closed mit klarer Meldung statt garantiert fehlschlagender
+    // Netzwerk-Calls.
+    throw StateError(
+      'Kein Auth-Backend verf\u00fcgbar: Supabase nicht initialisiert '
+      'und Demo-Modus deaktiviert. Pr\u00fcfe .env / DEMO_MODE Build-Flag.',
+    );
   }
 
   return AuthNotifier(auth, ref.watch(profileProvider.notifier), ref);

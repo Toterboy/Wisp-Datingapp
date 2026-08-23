@@ -93,7 +93,7 @@ class _FindYourMatchScreenState extends ConsumerState<FindYourMatchScreen> {
         content: Text(
           ok
               ? 'Du hast ${profile.name} geliked! 💚 '
-                  'Bei gegenseitigem Interesse entsteht ein Match.'
+                  'Bei gegenseitigem Interesse entsteht ein Funke.'
               : 'Like konnte nicht gespeichert werden.',
         ),
         behavior: SnackBarBehavior.floating,
@@ -233,6 +233,21 @@ class _FindYourMatchScreenState extends ConsumerState<FindYourMatchScreen> {
                                           current.city,
                                           style: const TextStyle(
                                               color: Colors.grey),
+                                        ),
+                                      // Distanz in 5-km-Schritten (ohne
+                                      // exakten Standort, serverseitig
+                                      // berechnet).
+                                      if (current.distanceKm > 0)
+                                        Text(
+                                          current.distanceLabel,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
+                                              ),
                                         ),
                                     ],
                                   ),

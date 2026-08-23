@@ -3,10 +3,9 @@ import 'package:wisp/models/user_profile.dart';
 /// Gemeinsame Schnittstelle für alle Auth-Backends.
 ///
 /// Wird von [AuthNotifier] verwendet, um unabhängig vom konkret ausgewählten
-/// Backend (Demo-Modus, Supabase, eigene API) zu bleiben. Implementiert von:
+/// Backend (Demo-Modus, Supabase) zu bleiben. Implementiert von:
 /// - [AuthService]        (lokaler Demo-Modus)
 /// - [SupabaseAuthService] (Supabase Auth + RLS-geschützte Datenbank)
-/// - [ApiAuthService]     (eigenes Signaling-Backend + SQLite)
 ///
 /// Ermöglicht Multi-Backend-Support über einen einzigen typisierten
 /// [AppAuthService]-Verweis, statt des bisherigen `dynamic _auth`.
@@ -27,7 +26,6 @@ abstract class AppAuthService {
     required String password,
     String? gender,
     required DateTime birthDate,
-    String? inviteCode,
     double? latitude,
     double? longitude,
     String? captchaToken,

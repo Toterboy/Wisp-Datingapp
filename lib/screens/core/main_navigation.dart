@@ -85,25 +85,54 @@ class MainNavigation extends ConsumerWidget {
       }
     });
 
+    final hideNav = _hideBottomNavRoutes.contains(location);
+    // Desktop/Web: ab 1000 px logischer Breite NavigationRail statt
+    // Bottom-Bar (Touch-Targets bleiben, Maus-Nutzung wird natürlicher).
+    final useRail = MediaQuery.sizeOf(context).width >= 1000;
+
+    final navBar = NavigationBar(
+      selectedIndex: index,
+      onDestinationSelected: (i) {
+        ref.read(currentNavIndexProvider.notifier).state = i;
+        context.go(_tabs[i].route);
+      },
+      destinations: _tabs
+          .map(
+            (t) => NavigationDestination(
+              icon: Icon(t.icon),
+              label: t.label,
+            ),
+          )
+          .toList(),
+    );
+
     return Scaffold(
-      body: child,
-      bottomNavigationBar: _hideBottomNavRoutes.contains(location)
-          ? null
-          : NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) {
-          ref.read(currentNavIndexProvider.notifier).state = i;
-          context.go(_tabs[i].route);
-        },
-        destinations: _tabs
-            .map(
-              (t) => NavigationDestination(
-                icon: Icon(t.icon),
-                label: t.label,
-              ),
+      body: useRail && !hideNav
+          ? Row(
+              children: [
+                NavigationRail(
+                  selectedIndex: index,
+                  onDestinationSelected: (i) {
+                    ref.read(currentNavIndexProvider.notifier).state = i;
+                    context.go(_tabs[i].route);
+                  },
+                  labelType: NavigationRailLabelType.all,
+                  destinations: _tabs
+                      .map(
+                        (t) => NavigationRailDestination(
+                          icon: Icon(t.icon),
+                          label: Text(t.label),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const VerticalDivider(width: 1, thickness: 1),
+                Expanded(child: child),
+              ],
             )
-            .toList(),
-      ),
+          : child,
+      bottomNavigationBar:
+          (hideNav || useRail) ? null : navBar,
     );
   }
 }

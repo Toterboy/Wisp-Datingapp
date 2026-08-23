@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/models/find_match_models.dart';
+import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/find_your_match_service.dart';
@@ -49,7 +50,7 @@ class _InteressenScreenState extends ConsumerState<InteressenScreen>
           tabs: const [
             Tab(text: 'Eigene Likes'),
             Tab(text: 'Erhaltene Likes'),
-            Tab(text: 'Matches'),
+            Tab(text: 'Funken'),
           ],
         ),
       ),
@@ -156,7 +157,11 @@ class _OwnLikesTabState extends ConsumerState<_OwnLikesTab> {
                       child: const Icon(Icons.person, color: Colors.white),
                     ),
                     title: Text(profile.name),
-                    subtitle: Text('${profile.age ?? '?'} Jahre'),
+                    subtitle: Text([
+                      '${profile.age ?? '?'} Jahre',
+                      // Serverseitig berechnete Distanz (5-km-Schritte).
+                      if (profile.distanceKm > 0) profile.distanceLabel,
+                    ].join(' · ')),
                     trailing: IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
                       tooltip: 'Like zurückziehen',
@@ -281,7 +286,10 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
                       child: const Icon(Icons.visibility_off,
                           color: Colors.white),
                     ),
-                    title: Text('${profile.name}, ${profile.age ?? '?'}'),
+                    title: Text([
+                      '${profile.name}, ${profile.age ?? '?'}',
+                      if (profile.distanceKm > 0) profile.distanceLabel,
+                    ].join(' · ')),
                     subtitle: Text(
                       profile.introText.isNotEmpty
                           ? profile.introText
@@ -380,9 +388,9 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
     if (_serverMatches.isEmpty && qrContacts.isEmpty) {
       return const EmptyState(
         icon: Icons.chat_bubble_outline,
-        title: 'Noch keine Matches',
+        title: 'Noch keine Funken',
         message:
-            'Bestätige erhaltene Likes, um Matches zu bekommen. Danach wartet '
+            'Bestätige erhaltene Likes, um Funken zu bekommen. Danach wartet '
             'das Kennenlern-Quiz auf euch.',
       );
     }
@@ -417,7 +425,7 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
           if (_serverMatches.isNotEmpty) ...[
             const _SectionHeader(
               icon: Icons.favorite,
-              title: 'Matches',
+              title: 'Funken',
               subtitle: 'Bestätigte gegenseitige Likes',
             ),
             ..._serverMatches.map((m) => _MatchTile(
@@ -492,7 +500,10 @@ class _MatchTile extends StatelessWidget {
               ? const Icon(Icons.person)
               : const Icon(Icons.visibility_off),
         ),
-        title: Text('${p.name}, ${p.age ?? '?'}'),
+        title: Text([
+          '${p.name}, ${p.age ?? '?'}',
+          if (p.distanceKm > 0) p.distanceLabel,
+        ].join(' · ')),
         subtitle: Text(
           match.quizPassed
               ? 'Foto freigeschaltet'

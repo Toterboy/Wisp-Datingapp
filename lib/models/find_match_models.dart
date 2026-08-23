@@ -13,11 +13,14 @@ class ReceivedLike {
   final DateTime? createdAt;
 
   factory ReceivedLike.fromJson(Map<String, dynamic> json) {
+    final profile = UserProfile.fromPublicView(
+      Map<String, dynamic>.from(json['profile'] as Map? ?? {}),
+    );
+    final distanceKm = (json['distanceKm'] as num?)?.toDouble();
     return ReceivedLike(
       likeId: json['likeId'] as int,
-      profile: UserProfile.fromPublicView(
-        Map<String, dynamic>.from(json['profile'] as Map? ?? {}),
-      ),
+      // Distanz kommt als Geschwister-Feld der RPC-Antwort (5-km-Schritte).
+      profile: distanceKm == null ? profile : profile.copyWith(distanceKm: distanceKm),
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.tryParse(json['createdAt'] as String),
@@ -51,11 +54,14 @@ class MatchWithState {
   bool get quizGated => createdVia == 'find_match' && !quizPassed;
 
   factory MatchWithState.fromJson(Map<String, dynamic> json) {
+    final profile = UserProfile.fromPublicView(
+      Map<String, dynamic>.from(json['profile'] as Map? ?? {}),
+    );
+    final distanceKm = (json['distanceKm'] as num?)?.toDouble();
     return MatchWithState(
       matchId: json['matchId'] as int,
-      partner: UserProfile.fromPublicView(
-        Map<String, dynamic>.from(json['profile'] as Map? ?? {}),
-      ),
+      // Distanz kommt als Geschwister-Feld der RPC-Antwort (5-km-Schritte).
+      partner: distanceKm == null ? profile : profile.copyWith(distanceKm: distanceKm),
       unlockLevel: (json['unlockLevel'] as num?)?.toInt() ?? 0,
       failedAttempts: (json['failedAttempts'] as num?)?.toInt() ?? 0,
       createdVia: json['createdVia'] as String? ?? 'swipe',

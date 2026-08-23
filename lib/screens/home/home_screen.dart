@@ -171,7 +171,7 @@ Widget _buildMessagesSection(
               child: _EmptyStateCard(
                 icon: Icons.chat_bubble_outline,
                 title: 'Keine neuen Nachrichten',
-                subtitle: 'Wenn du Matches hast, erscheinen hier neue Nachrichten.',
+                subtitle: 'Wenn du Funken hast, erscheinen hier neue Nachrichten.',
               ),
             )
           else
@@ -378,7 +378,7 @@ Widget _buildMatchesSection(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SectionHeader(
-            title: 'Neue Matches',
+            title: 'Neue Funken',
             count: newMatches,
             onTap: newMatches > 0
                 ? () => context.go(AppRoutes.interessen)
@@ -390,8 +390,8 @@ Widget _buildMatchesSection(
               width: double.infinity,
               child: _EmptyStateCard(
                 icon: Icons.people_outline,
-                title: 'Keine neuen Matches',
-                subtitle: 'Likes führen zu Matches, wenn beide sich mögen.',
+                title: 'Keine neuen Funken',
+                subtitle: 'Likes führen zu Funken, wenn beide sich mögen.',
               ),
             )
           else
@@ -416,14 +416,14 @@ Widget _buildMatchesSection(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '$newMatches ${newMatches == 1 ? 'neues Match' : 'neue Matches'}',
+                                '$newMatches ${newMatches == 1 ? 'neuer Funke' : 'neue Funken'}',
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Tippe, um alle Matches zu sehen',
+                                'Tippe, um alle Funken zu sehen',
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),

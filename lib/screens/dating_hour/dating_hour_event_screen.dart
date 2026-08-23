@@ -33,6 +33,13 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
   Timer? _countdownTimer;
   String? _reminderScheduledFor;
 
+  // Guard: Rejoin-Abfrage nach Event-Ende nur einmal pro Screen-Lebensdauer.
+  bool _rejoinAsked = false;
+
+  // Guard: Auto-Beitritt nur einmal pro Screen-Besuch versuchen (kein Loop
+  // mit dem Provider-Refresh nach joinEvent).
+  bool _autoJoinAttempted = false;
+
   @override
   void initState() {
     super.initState();
@@ -115,8 +122,7 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
         title: const Text('Am Event teilnehmen?'),
         content: const Text(
           'Du wirst nur dann mit jemandem verbunden, wenn du jetzt '
-          'bestätigst. Du kannst bis zum Ende des Events jederzeit '
-          'aussteigen.',
+          'bestätigst. Du kannst jederzeit aussteigen.',
         ),
         actions: [
           TextButton(
@@ -182,6 +188,76 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
     }
   }
 
+  /// Ende des Events + letzte Entscheidung getroffen: Einmalig fragen, ob
+  /// der Nutzer beim nächsten Mal automatisch wieder dabei sein will.
+  Future<void> _askRejoin() async {
+    final rejoin = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bis zum nächsten Mal!'),
+        content: const Text(
+          'Das Event ist für heute vorbei. Möchtest du beim nächsten '
+          'Dating Hour automatisch wieder dabei sein?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Nein, danke'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Ja, gerne'),
+          ),
+        ],
+      ),
+    );
+    if (rejoin == null || !mounted) return;
+    await ref.read(settingsProvider.notifier).setDatingHourAutoJoin(rejoin);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(rejoin
+              ? 'Du bist beim nächsten Dating Hour automatisch dabei.'
+              : 'Alles klar – du wirst beim nächsten Mal gefragt.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Automatischer Wiederbeigritt (datingHourAutoJoin): Nutzt dieselben
+  /// Default-Präferenzen wie der manuelle Beitritt.
+  Future<void> _autoJoin() async {
+    final service = ref.read(datingHourServiceProvider);
+    final settings = ref.read(settingsProvider);
+    final userPrefs = ref.read(userPreferencesProvider);
+    final preferences = DatingHourPreferences(
+      ageMin: settings.ageRangeMin.clamp(18, 99),
+      ageMax: settings.ageRangeMax.clamp(18, 99),
+      genderPreference: genderPrefFromList(userPrefs.genderPreferences),
+      preferredTrait: 'Humor',
+      maxDistanceKm: settings.maxDistanceKm.toDouble(),
+    );
+    try {
+      await service.joinEvent(AppConstants.currentUserId, preferences);
+      ref.invalidate(currentDatingHourEventProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Willkommen zurück! Du bist automatisch wieder '
+                'dabei (änderbar in den Präferenzen).'),
+          ),
+        );
+      }
+    } on DatingHourException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Auto-Beitritt fehlgeschlagen: ${e.message}')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventAsync = ref.watch(currentDatingHourEventProvider);
@@ -210,6 +286,28 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
     // (nur bei Teilnahme; feuert auch bei geschlossener App).
     if (!isRunning && !isEnded && minutesUntilStart > 0) {
       _scheduleStartReminder(event, isParticipating);
+    }
+
+    // Event beendet + Nutzer war dabei: einmalig fragen, ob er beim
+    // nächsten Mal automatisch wieder dabei sein will.
+    if (isEnded && isParticipating && !_rejoinAsked) {
+      _rejoinAsked = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _askRejoin();
+      });
+    }
+
+    // Auto-Beitritt: Hat der Nutzer beim letzten Event-Ende "Ja, gerne"
+    // gewählt, nimmt er automatisch wieder teil (ohne erneute Bestätigung).
+    if (ref.read(settingsProvider).datingHourAutoJoin &&
+        isRunning &&
+        !isParticipating &&
+        canJoin &&
+        !_autoJoinAttempted) {
+      _autoJoinAttempted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _autoJoin();
+      });
     }
 
     return Scaffold(
@@ -722,7 +820,7 @@ class _EventInfoCard extends StatelessWidget {
             ),
             const _InfoRow(
               icon: Icons.refresh,
-              title: 'Kein Match? Neue Chance!',
+              title: 'Kein Funke? Neue Chance!',
               subtitle: 'Bei "Ablehnen" sucht der Algorithmus sofort jemand Neues.',
             ),
           ],
@@ -797,7 +895,7 @@ class _RulesCard extends StatelessWidget {
     const _RuleItem('1', 'Samstags 20:00 bis 21:00 Uhr (Beitritt bereits vorher möglich).'),
     const _RuleItem('2', 'Direkt in 1:1 Chat verbunden, ohne vorherige Profilansicht.'),
     const _RuleItem('3', '5 Minuten Chat, dann Entscheidung: "Annehmen" oder "Ablehnen".'),
-    const _RuleItem('4', 'Nur bei BEIDSEITIGEM "Annehmen" entsteht ein Match.'),
+    const _RuleItem('4', 'Nur bei BEIDSEITIGEM "Annehmen" entsteht ein Funke.'),
     const _RuleItem('5', 'Bei "Ablehnen" (oder Timeout): Automatische neue Zuordnung.'),
     const _RuleItem('6', 'Während eines Chats: NUR dieser Chat erlaubt.'),
     const _RuleItem('7', 'Um 21:00 Uhr Ende, laufende Chats werden zu Ende geführt.'),

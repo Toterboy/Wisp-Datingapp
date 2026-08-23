@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src https://challenges.cloudflare.com; img-src 'self' data:">
+  <title>Sicherheitscheck – Wisp</title>
+  <!-- Kein async: zusammen mit DOMContentLoaded-Race führe das sonst zu
+       "typeof turnstile === 'undefined'" (ERROR:SCRIPT_NOT_LOADED), weil
+       DOMContentLoaded feuern kann, bevor das Script ausgeführt wurde.
+       Nur defer garantiert Ausführung VOR DOMContentLoaded. -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #121212;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <!-- Öffentlicher Sitekey (kein Secret!). -->
+  <div id="captcha-box" class="cf-turnstile"
+       data-sitekey="0x4AAAAAAEULSj7cNo-O2bmp"></div>
+
+  <!-- Nur sichtbar bei Browser-/Debug-Tests ohne WebView-Channel. -->
+  <div id="debug-output" style="display:none; margin-top:16px; color:#4ade80; font-family:monospace;"></div>
+
+  <script>
+    // Zustellung an die App: webview_flutter (Captcha.postMessage) ODER
+    // flutter_inappwebview (callHandler). Ohne Channel (Browser-Test) wird
+    // das Ergebnis im DOM angezeigt statt einer ReferenceError zu werfen.
+    function sendToApp(message) {
+      try {
+        if (window.Captcha && typeof window.Captcha.postMessage === 'function') {
+          window.Captcha.postMessage(message);
+          return;
+        }
+      } catch (e) { /* weiter mit nächster Variante */ }
+      try {
+        if (window.flutter_inappwebview &&
+            typeof window.flutter_inappwebview.callHandler === 'function') {
+          window.flutter_inappwebview.callHandler('Captcha', message);
+          return;
+        }
+      } catch (e) { /* weiter mit Fallback */ }
+      var out = document.getElementById('debug-output');
+      if (out) {
+        out.style.display = 'block';
+        out.textContent = message;
+      }
+    }
+
+    function onSuccess(token) {
+      sendToApp(token);
+    }
+    function onError() {
+      sendToApp('ERROR:CAPTCHA_ERROR');
+    }
+    function onExpired() {
+      sendToApp('ERROR:CAPTCHA_EXPIRED');
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
+      var el = document.getElementById('captcha-box');
+      if (!el) {
+        sendToApp('ERROR:SCRIPT_NOT_LOADED');
+        return;
+      }
+      // Sicherheitsnetz: api.js kann bei langsamer Verbindung trotz defer
+      // noch nicht ausgeführt sein – bis zu 5 s (20 x 250 ms) warten,
+      // erst dann Fehler melden.
+      var attempts = 0;
+      function tryRender() {
+        if (typeof turnstile !== 'undefined') {
+          turnstile.render(el, {
+            sitekey: el.getAttribute('data-sitekey'),
+            callback: onSuccess,
+            'error-callback': onError,
+            'expired-callback': onExpired
+          });
+        } else if (attempts < 20) {
+          attempts++;
+          setTimeout(tryRender, 250);
+        } else {
+          sendToApp('ERROR:SCRIPT_NOT_LOADED');
+        }
+      }
+      tryRender();
+    });
+  </script>
+</body>
+</html>

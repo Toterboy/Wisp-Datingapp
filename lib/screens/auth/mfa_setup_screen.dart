@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
@@ -29,7 +32,7 @@ class MfaSetupScreen extends ConsumerStatefulWidget {
   ConsumerState<MfaSetupScreen> createState() => _MfaSetupScreenState();
 }
 
-enum _SetupPhase { intro, scan, done }
+enum _SetupPhase { intro, scan, confirm, done }
 
 class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
   _SetupPhase _phase = _SetupPhase.intro;
@@ -40,10 +43,15 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
   String? _qrUri;
   String? _secret;
 
+  // Audit: TOTP-Secret nach 30 s automatisch aus der Zwischenablage
+  // entfernen (falls es nicht durch etwas anderes ersetzt wurde).
+  Timer? _clipboardClearTimer;
+
   final _codeCtrl = TextEditingController();
 
   @override
   void dispose() {
+    _clipboardClearTimer?.cancel();
     // Unvollständige Einrichtung serverseitig verwerfen.
     final factorId = _factorId;
     if (factorId != null && _phase != _SetupPhase.done) {
@@ -85,12 +93,25 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
       if (kDebugMode) debugPrint('[MfaSetup] enroll fehlgeschlagen: $e');
       if (mounted) {
         setState(() {
-          _error = 'Einrichtung konnte nicht gestartet werden. '
-              'Bitte versuche es später erneut.';
+          // Im Debug-Modus die Original-Fehlermeldung mit anzeigen,
+          // sonst ist die Ursache nur im Log sichtbar.
+          _error = kDebugMode
+              ? 'Einrichtung konnte nicht gestartet werden '
+                  '(${e is AuthException ? e.message : e}). '
+                  'Bitte versuche es später erneut.'
+              : 'Einrichtung konnte nicht gestartet werden. '
+                  'Bitte versuche es später erneut.';
           _loading = false;
         });
       }
     }
+  }
+
+  /// Nach dem Scannen/Eingeben des Schlüssels zum Bestätigungsschritt
+  /// (TOTP-Code aus der Authenticator-App) wechseln.
+  void _toConfirm() {
+    if (_qrUri == null || _factorId == null) return;
+    setState(() => _phase = _SetupPhase.confirm);
   }
 
   Future<void> _verifyCode() async {
@@ -136,16 +157,34 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
     if (mounted) _continueFlow();
   }
 
+  /// Weiter: Wurde der Screen aufgestapelt geöffnet (Einrichtung,
+  /// Einstellungen), zurück dorthin – sonst zur Startseite.
   void _continueFlow() {
-    context.go(AppRoutes.home);
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.home);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Wird der Screen aufgestapelt geöffnet (Einstellungen, Einrichtung),
+    // einen Zurück-Pfeil zeigen; nur im alten Router-Flow (ohne Stack)
+    // bleibt er ohne Leading.
+    final canLeave = Navigator.of(context).canPop();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _continueFlow();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Konto absichern'),
         automaticallyImplyLeading: false,
+        leading: canLeave
+            ? BackButton(onPressed: () => context.pop())
+            : null,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -153,9 +192,11 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
           child: switch (_phase) {
             _SetupPhase.intro => _buildIntro(),
             _SetupPhase.scan => _buildScan(),
+            _SetupPhase.confirm => _buildConfirm(),
             _SetupPhase.done => _buildDone(),
           },
         ),
+      ),
       ),
     );
   }
@@ -216,49 +257,67 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
   }
 
   Widget _buildScan() {
+    // Responsiver QR: Auf schmalen Screens (oder großer Schrift) darf das
+    // fixed 220px-Bild den Platz nicht wegdrücken.
+    final qrSize = (MediaQuery.of(context).size.width - 120)
+        .clamp(140.0, 220.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // ---------- Abschnitt 1: QR-Code ----------
         Text(
           '1. QR-Code scannen',
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
         const Text(
-          'Öffne deine Authenticator-App und füge den Eintrag per '
-          'QR-Scan hinzu.',
+          'Öffne deine Authenticator-App (z. B. Google Authenticator, '
+          'Aegis oder 2FAS) und füge den Eintrag per QR-Scan hinzu.',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         if (_qrUri != null)
           Center(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: QrImageView(
-                data: _qrUri!,
-                size: 220,
-                backgroundColor: Colors.white,
+            child: Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: QrImageView(
+                  data: _qrUri!,
+                  size: qrSize,
+                  backgroundColor: Colors.white,
+                ),
               ),
             ),
           ),
         if (_secret != null) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           const Text(
-            'Kein Scan möglich? Trage diesen Schlüssel manuell ein:',
+            'Kein Scan möglich? Trage diesen Schlüssel manuell ein '
+            '(antippen zum Kopieren):',
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           InkWell(
             onTap: () {
               Clipboard.setData(ClipboardData(text: _secret!));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Schlüssel kopiert.')),
+                const SnackBar(
+                  content: Text(
+                    'Schl\u00fcssel kopiert. Wird in 30 s automatisch gel\u00f6scht.',
+                  ),
+                ),
               );
+              _clipboardClearTimer?.cancel();
+              _clipboardClearTimer = Timer(const Duration(seconds: 30), () async {
+                final data = await Clipboard.getData('text/plain');
+                if (data?.text == _secret) {
+                  await Clipboard.setData(const ClipboardData(text: ''));
+                }
+              });
             },
             child: Container(
+              width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Theme.of(context)
@@ -278,24 +337,67 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
             ),
           ),
         ],
-        const SizedBox(height: 24),
+
+        const SizedBox(height: 32),
+        FilledButton.icon(
+          onPressed: _toConfirm,
+          icon: const Icon(Icons.arrow_forward),
+          label: const Text('Weiter – Code eingeben'),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Danach gibst du den 6-stelligen Code aus deiner '
+          'Authenticator-App einmal ein, um die Einrichtung zu bestätigen.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+          textAlign: TextAlign.center,
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _error!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Bestätigungsschritt: Den aktuellen 6-stelligen Code aus der
+  /// Authenticator-App einmal eingeben und damit die Einrichtung abschließen.
+  Widget _buildConfirm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         Text(
           '2. Code eingeben',
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
+        const Text(
+          'Gib den aktuellen 6-stelligen Code aus deiner '
+          'Authenticator-App ein, um die Einrichtung zu bestätigen:',
+        ),
+        const SizedBox(height: 16),
         TextField(
           controller: _codeCtrl,
           keyboardType: TextInputType.number,
           maxLength: 6,
           textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 28,
+            letterSpacing: 12,
+            fontWeight: FontWeight.bold,
+          ),
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: const InputDecoration(
             hintText: '000000',
             counterText: '',
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 32),
         FilledButton(
           onPressed: _loading ? null : _verifyCode,
           child: _loading
@@ -305,6 +407,13 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Text('Bestätigen'),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: _loading
+              ? null
+              : () => setState(() => _phase = _SetupPhase.scan),
+          child: const Text('Zurück zum QR-Code'),
         ),
         if (_error != null) ...[
           const SizedBox(height: 12),

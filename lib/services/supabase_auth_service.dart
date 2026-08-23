@@ -9,8 +9,7 @@ import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Echte Authentifizierung über Supabase Auth (ersetzt den Mock [AuthService]
-/// und optional den [ApiAuthService]).
+/// Echte Authentifizierung über Supabase Auth (ersetzt den Mock [AuthService]).
 ///
 /// Speichert Tokens zusätzlich im [SecureTokenStore] (Kompatibilität zum
 /// bestehenden System), primär nutzt Supabase Auth aber seine eigene
@@ -98,9 +97,6 @@ class SupabaseAuthService implements AppAuthService {
 
   /// Registriert einen neuen Nutzer in Supabase Auth + Datenbank und loggt ihn ein.
   ///
-  /// Wenn [inviteCode] angegeben ist, wird vor der Registrierung geprüft,
-  /// ob der Code gültig und noch nicht verwendet wurde.
-  ///
   /// [captchaToken]: CAPTCHA-Token (hCaptcha/Turnstile) für den Bot-Schutz.
   /// Supabase validiert es serverseitig, wenn im Dashboard CAPTCHA aktiviert
   /// ist; ohne Dashboard-Aktivierung wird das Token ignoriert.
@@ -111,45 +107,38 @@ class SupabaseAuthService implements AppAuthService {
     required String password,
     String? gender,
     required DateTime birthDate,
-    String? inviteCode,
     double? latitude,
     double? longitude,
     String? captchaToken,
   }) async {
     await _encryption.initialized;
 
+    // 0) Plattform-Sperre (Migration 045): Gesperrte E-Mail-Adressen
+    //    dürfen sich nicht (neu) registrieren. Der serverseitige
+    //    handle_new_user-Trigger erzwingt das zusätzlich (RAISE 'email_banned').
+    //    Hier geht es um die UX: Der Nutzer bekommt sofort den
+    //    Entsperrungs-Flow angeboten statt eines generischen Fehlers.
+    final banStatus = await _database.checkEmailBanStatus(email);
+    if (banStatus.banned) {
+      throw EmailBannedException(email: email.trim(), reason: banStatus.reason);
+    }
+
     final birth = '${birthDate.year.toString().padLeft(4, '0')}-'
         '${birthDate.month.toString().padLeft(2, '0')}-'
         '${birthDate.day.toString().padLeft(2, '0')}';
 
     if (kDebugMode) {
-      debugPrint('[SupabaseAuthService] registriere: gender=$gender, inviteCode=$inviteCode');
+      debugPrint('[SupabaseAuthService] registriere: gender=$gender');
     }
 
-    // 1) Invite-Code prüfen, falls angegeben.
-    //    Seit Migration 040 läuft die Validierung über die RPC
-    //    validate_invite_code (SECURITY DEFINER, boolean-Rückgabe) –
-    //    die Tabelle invite_codes ist per RLS nicht mehr lesbar (K4).
-    String? usedInviteCode;
-    if (inviteCode != null && inviteCode.isNotEmpty) {
-      usedInviteCode = inviteCode.trim().toUpperCase();
-      final isValid = await _database.validateInviteCode(usedInviteCode);
-      if (isValid != true) {
-        throw AppException('Dieser Invite-Code ist ungültig oder wurde bereits verwendet.');
-      }
-    }
-
-    // 2) Auth-User anlegen.
+    // 1) Auth-User anlegen.
     // raw_user_meta_data enthält ALLE bei der Registrierung erfassten
-    // Nutzerdaten – der serverseitige handle_new_user-Trigger
-    // (Migration 009) liest diese Felder aus und legt das Profil mit
-    // SECURITY DEFINER an. Dadurch ist kein clientseitiger INSERT nötig.
-    // Der Invite-Code wird ebenfalls in den Metadaten übergeben und vom
-    // Trigger serverseitig eingelöst (Migration 040 – atomar, ohne dass
-    // der Client ihn selbst markieren kann).
+    // Nutzerdaten – der serverseitige handle_new_user-Trigger liest diese
+    // Felder aus und legt das Profil mit SECURITY DEFINER an. Dadurch ist
+    // kein clientseitiger INSERT nötig.
     //
     // WICHTIG: Das Passwort darf NIEMALS in raw_user_meta_data landen!
-    // Nur unkritische Profilfelder: name, gender, birth_date, invite_code.
+    // Nur unkritische Profilfelder: name, gender, birth_date.
     if (kDebugMode) {
       debugPrint('[SupabaseAuthService] signUp() wird aufgerufen: email=$email');
       debugPrint('[SupabaseAuthService] Supabase-URL: ${_supabase.rest.url}');
@@ -166,7 +155,6 @@ class SupabaseAuthService implements AppAuthService {
           'name': name,
           'gender': gender ?? 'unknown',
           'birth_date': birth,
-          'invite_code': ?usedInviteCode,
         },
       );
       if (kDebugMode) {
@@ -177,6 +165,12 @@ class SupabaseAuthService implements AppAuthService {
     } on AuthException catch (e) {
       if (kDebugMode) {
         debugPrint('[SupabaseAuthService] AuthException: ${e.message} (Code: ${e.statusCode})');
+      }
+      // Serverseitige Sperre (handle_new_user-Trigger, Migration 045):
+      // auch dann den Entsperrungs-Flow anbieten, wenn der Vorab-Check
+      // nicht griff (z. B. altes App-Build).
+      if (e.message.toLowerCase().contains('email_banned')) {
+        throw EmailBannedException(email: email.trim());
       }
       rethrow;
     } catch (e, st) {
@@ -247,6 +241,14 @@ class SupabaseAuthService implements AppAuthService {
   }) async {
     if (kDebugMode) {
       debugPrint('[SupabaseAuthService] login aufgerufen');
+    }
+
+    // Plattform-Sperre (Migration 045): Auch der Login mit einer
+    // gesperrten E-Mail-Adresse wird blockiert - der Nutzer soll nur
+    // den Entsperrungs-Flow sehen.
+    final banStatus = await _database.checkEmailBanStatus(email);
+    if (banStatus.banned) {
+      throw EmailBannedException(email: email.trim(), reason: banStatus.reason);
     }
 
     final authResponse = await _supabase.auth.signInWithPassword(

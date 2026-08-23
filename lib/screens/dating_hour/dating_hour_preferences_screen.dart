@@ -56,9 +56,18 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dating Hour: Präferenzen'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => context.pop(),
+        leading: BackButton(
+          onPressed: () {
+            // Robuster Zurück-Weg: Der Screen kann auch ohne
+            // Navigator-Stack geöffnet worden sein (context.go) – dann
+            // führt pop() ins Leere (der alte X-Button "funktionierte
+            // nicht"). In dem Fall direkt zum Event-Screen.
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.datingHourEvent);
+            }
+          },
         ),
       ),
       body: SingleChildScrollView(
@@ -167,6 +176,25 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
                     }).toList(),
                   ),
                 ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Automatische Teilnahme (Abfrage nach Ende eines Events)
+            const _SectionTitle('Teilnahme'),
+            const SizedBox(height: 12),
+            Card(
+              child: SwitchListTile(
+                title: const Text('Automatisch wieder dabei sein'),
+                subtitle: const Text(
+                  'Wenn aktiviert, nimmst du am nächsten Dating Hour '
+                  'automatisch teil, sobald es läuft.',
+                ),
+                value: ref.watch(settingsProvider).datingHourAutoJoin,
+                onChanged: (v) => ref
+                    .read(settingsProvider.notifier)
+                    .setDatingHourAutoJoin(v),
               ),
             ),
 

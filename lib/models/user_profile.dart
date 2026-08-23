@@ -4,7 +4,7 @@
 // (Mock-)Bild-Pfaden/URLs gespeichert. Der Blind Mode sorgt dafür, dass
 // diese Fotos erst nach einem Match für andere sichtbar sind.
 
-import 'package:flutter/foundation.dart';
+import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/utils/age_calculator.dart';
 
 class UserProfile {
@@ -81,6 +81,15 @@ class UserProfile {
   /// Zugriff nur über die match-media-Edge-Function (signierte URL).
   final String? introAudioPath;
 
+  /// Umgang mit Rauchen (beeinflusst den Find-your-Match-Algorithmus).
+  final HabitudeLevel? smoking;
+
+  /// Umgang mit Alkohol (beeinflusst den Find-your-Match-Algorithmus).
+  final HabitudeLevel? alcohol;
+
+  /// Umgang mit anderen Drogen (beeinflusst den Find-your-Match-Algorithmus).
+  final HabitudeLevel? drugs;
+
   const UserProfile({
     required this.id,
     required this.name,
@@ -106,6 +115,9 @@ class UserProfile {
     this.mood,
     this.introText = '',
     this.introAudioPath,
+    this.smoking,
+    this.alcohol,
+    this.drugs,
   });
 
   /// Berechnet das Alter dynamisch basierend auf dem aktuellen Datum.
@@ -113,7 +125,8 @@ class UserProfile {
   /// Liefert null, wenn kein birthDate gesetzt ist.
   int? get age {
     final calculatedAge = calculateAge(birthDate);
-    debugPrint('[USER_PROFILE] id=$id, birthDate=$birthDate, calculatedAge=$calculatedAge');
+    // Audit H-Log: Geburtsdatum ist PII und wird NICHT geloggt
+    // (auch nicht im Debug - der Getter läuft im Hot Path).
     return calculatedAge;
   }
 
@@ -144,6 +157,11 @@ class UserProfile {
       mood: json['mood'] as String?,
       introText: json['intro_text'] as String? ?? '',
       introAudioPath: json['intro_audio_path'] as String?,
+      smoking: HabitudeLevel.fromServer(json['smoking'] as String?),
+      alcohol: HabitudeLevel.fromServer(json['alcohol'] as String?),
+      drugs: HabitudeLevel.fromServer(json['drugs'] as String?),
+      // Abgerundete Distanz in km (5-km-Schritte, serverseitig berechnet).
+      distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -185,6 +203,9 @@ class UserProfile {
       mood: json['mood'] as String?,
       introText: json['introText'] as String? ?? '',
       introAudioPath: json['introAudioPath'] as String?,
+      smoking: HabitudeLevel.fromServer(json['smoking'] as String?),
+      alcohol: HabitudeLevel.fromServer(json['alcohol'] as String?),
+      drugs: HabitudeLevel.fromServer(json['drugs'] as String?),
     );
   }
 
@@ -214,6 +235,9 @@ class UserProfile {
         'mood': mood,
         'introText': introText,
         'introAudioPath': introAudioPath,
+        'smoking': smoking?.toServer(),
+        'alcohol': alcohol?.toServer(),
+        'drugs': drugs?.toServer(),
       };
 
   /// Erstellt eine Kopie mit veränderten Feldern (immutabel).
@@ -242,6 +266,9 @@ class UserProfile {
     String? mood,
     String? introText,
     String? introAudioPath,
+    HabitudeLevel? smoking,
+    HabitudeLevel? alcohol,
+    HabitudeLevel? drugs,
     bool clearIntroAudio = false,
   }) {
     return UserProfile(
@@ -272,6 +299,9 @@ class UserProfile {
       introAudioPath: clearIntroAudio
           ? null
           : (introAudioPath ?? this.introAudioPath),
+      smoking: smoking ?? this.smoking,
+      alcohol: alcohol ?? this.alcohol,
+      drugs: drugs ?? this.drugs,
     );
   }
 
@@ -305,4 +335,14 @@ class UserProfile {
         isLocationSuspicious,
         mood,
       );
+}
+
+/// Einheitliches Distanz-Label (5-km-Schritte, serverseitig berechnet).
+extension UserProfileDistanceLabel on UserProfile {
+  String get distanceLabel {
+    if (distanceKm <= 0) return '';
+    final km = distanceKm.round();
+    // Rundung auf 5-km-Schritte: Werte unter 2.5 km runden auf 0.
+    return km == 0 ? 'unter 5 km entfernt' : 'ca. $km km entfernt';
+  }
 }
