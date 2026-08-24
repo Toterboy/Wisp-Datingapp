@@ -9,6 +9,7 @@ import 'package:wisp/models/message.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/widgets/funke_overlay.dart';
 import 'package:wisp/services/dating_hour_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/p2p_chat_service.dart';
@@ -246,9 +247,14 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
     ref.read(chatProvider.notifier).addMatch(partnerProfile, ref: ref);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ein Funke ist übersprungen! Chat wird geöffnet...')),
-      );
+      await FunkeOverlay.show(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Ein Funke ist übersprungen! Chat wird geöffnet...')),
+        );
+      }
       await Future.delayed(const Duration(milliseconds: 1500));
       if (mounted) {
         context.go(AppRoutes.interessen);

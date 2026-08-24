@@ -4,9 +4,16 @@ import 'package:wisp/theme/app_theme.dart';
 
 /// Zeigt Interessen als abgerundete "Chips" an.
 class InterestChips extends StatelessWidget {
-  const InterestChips({required this.interests, super.key});
+  const InterestChips({
+    required this.interests,
+    this.highlighted = false,
+    super.key,
+  });
 
   final List<String> interests;
+
+  /// true = gemeinsame Interessen (hervorgehoben, mit Herz).
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -17,10 +24,21 @@ class InterestChips extends StatelessWidget {
           .map(
             (i) => Chip(
               label: Text(i),
-              backgroundColor:
-                  Theme.of(context).colorScheme.primaryContainer,
+              avatar: highlighted
+                  ? Icon(
+                      Icons.favorite,
+                      size: 14,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    )
+                  : null,
+              backgroundColor: highlighted
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.primaryContainer,
               labelStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                color: highlighted
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onPrimaryContainer,
+                fontWeight: highlighted ? FontWeight.w600 : null,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),

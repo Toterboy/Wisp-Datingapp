@@ -16,7 +16,11 @@ können sich Schnittstellen und Verhalten jederzeit ändern.
   mitgelöscht. Jetzt bleibt alles erhalten; nach erneutem Login ist
   sofort alles wieder da
 - **CI-Pipeline grün**: Flutter auf 3.44.6 gepinnt (webview_flutter braucht
-  Dart ≥ 3.10), `.env` wird im Workflow erzeugt, Actions auf v5
+  Dart ≥ 3.10), `.env` wird im Workflow erzeugt, Actions auf v5,
+  Signing-Prüfung wirft nur noch bei echten Release-Builds
+- KGP-Warnung für `unifiedpush_android` behoben (lokaler Fork)
+- Encoding-Nachbereinigung: doppelt kodierte Umlaute in diversen Dateien
+  repariert
 
 ### Hinzugefügt
 
@@ -28,11 +32,19 @@ können sich Schnittstellen und Verhalten jederzeit ändern.
   Verknüpfung und Gerät und zeigt die genaue Ursache bei Passkey-Problemen
 - **Dating Hour**: Gewohnheiten (Rauchen/Alkohol/Drogen) als weiche
   Matching-Präferenz wählbar; Anzeige als Chips im Event-Chat
+- **„Funke"-Animation** beim Entstehen eines Funkens (Herz + Partikel)
+- **Funke-Streak**: Flamme + Tageszähler seit dem Funke – in den Funken
+  und im Chat-Header, ganz ohne Schreibpflicht
+- **Gemeinsame Interessen** im fremden Profil hervorgehoben
+- **Sichtbarer E2E-Status** im Chat-Header (Chip: grün = P2P verbunden)
 - Einrichtung: Gewohnheiten jetzt Schritt 5; Profil- und Vorstellungs-
   Angaben sind Pflicht (Bio, mindestens ein Interesse, Text + Audio)
 - Passkey und 2FA werden am Ende der Einrichtung **dringend empfohlen**
   (mit Direkt-Sprung zum Einrichten)
-- App-Logo mit **Dark-Variante** (keine weißen Flächen mehr), Splash kleiner
+- **Neues WispDating-Logo**: rundes Logo überall (App, Splash day/night,
+  Launcher-Icons, Adaptive-Icon, Fastlane) – generiert aus der neuen
+  Basis-Grafik, Schriftzug vollständig lesbar
+- App-Logo mit Dark-Variante (keine weißen Flächen mehr), Splash kleiner
 - Desktop/Web: NavigationRail auf breiten Screens
 
 ### Geändert
@@ -41,6 +53,7 @@ können sich Schnittstellen und Verhalten jederzeit ändern.
 - Captcha-Dialog an die Cloudflare-Fenstergröße angepasst
 - Theme-Picker mit einheitlichen Kachelgrößen
 - Bild-Zuschnitt folgt dem aktiven Farbschema
+- App-Titel überall „WispDating"
 
 ## [0.6.0] – 2026-08-24
 

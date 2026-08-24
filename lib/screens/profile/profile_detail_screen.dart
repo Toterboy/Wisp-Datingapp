@@ -255,20 +255,56 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
             ),
             const SizedBox(height: 12),
             if (profile.interests.isNotEmpty) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Interessen',
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 12),
-                      InterestChips(interests: profile.interests),
-                    ],
+              Builder(builder: (context) {
+                // Gemeinsame Interessen mit dem eigenen Profil hervorheben.
+                final me = ref.watch(profileProvider);
+                final common =
+                    profile.interests.where(me.interests.contains).toList();
+                final others =
+                    profile.interests.where((i) => !me.interests.contains(i)).toList();
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Interessen',
+                            style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 12),
+                        if (common.isNotEmpty) ...[
+                          Row(
+                            children: [
+                              Icon(Icons.favorite,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 6),
+                              Text('Gemeinsam mit dir',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      )),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          InterestChips(interests: common, highlighted: true),
+                          const SizedBox(height: 12),
+                        ],
+                        if (others.isNotEmpty) ...[
+                          if (common.isNotEmpty)
+                            Text('Weitere',
+                                style: Theme.of(context).textTheme.labelLarge),
+                          const SizedBox(height: 8),
+                          InterestChips(interests: others),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              }),
             ],
           ],
         ),

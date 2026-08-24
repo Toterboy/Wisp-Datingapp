@@ -30,6 +30,7 @@ import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/widgets/audio_review_sheet.dart';
 import 'package:wisp/widgets/meet_intent_card.dart';
+import 'package:wisp/widgets/funke_streak.dart';
 import 'package:wisp/widgets/profile_widgets.dart';
 
 /// 1:1-Chat-Detailansicht mit Nachrichtenverlauf und Eingabefeld.
@@ -999,24 +1000,52 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(partner.name),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(partner.name),
+                      const SizedBox(width: 10),
+                      FunkeStreak(compact: true, createdAt: _match!.matchedAt),
+                    ]),
                     // Bewusst KEIN Online-Status / „schreibt…“ /
                     // Lesebestätigung - siehe ADR-0007 (Präsenz-frei).
                   ],
                 ),
               ),
-              // E2E + P2P-Status-Indikator
+              // E2E + P2P-Status-Badge (sichtbarer Verschlüsselungs-Status)
               const SizedBox(width: 8),
               Tooltip(
                 message: _p2pConnected
                     ? 'Ende zu Ende verschlüsselt (Signal Protocol via P2P)'
-                    : 'E2E Verbindung wird aufgebaut…',
-                child: Icon(
-                  _p2pConnected ? Icons.lock : Icons.lock_open,
-                  size: 16,
-                  color: _p2pConnected
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.orange,
+                    : 'E2E-Verbindung wird aufgebaut.',
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _p2pConnected
+                        ? Colors.green.withValues(alpha: 0.15)
+                        : Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _p2pConnected ? Icons.lock : Icons.lock_open,
+                        size: 13,
+                        color: _p2pConnected ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'E2E',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _p2pConnected
+                              ? Colors.green
+                              : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

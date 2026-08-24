@@ -1,4 +1,4 @@
-import 'package:wisp/models/user_profile.dart';
+﻿import 'package:wisp/models/user_profile.dart';
 
 /// Ein erhaltener Like inklusive Profil (Vorstellung) des Likers.
 class ReceivedLike {
@@ -36,6 +36,7 @@ class MatchWithState {
     required this.unlockLevel,
     required this.failedAttempts,
     this.createdVia = 'swipe',
+    this.createdAt,
     this.passedAt,
     this.lastAttemptAt,
   });
@@ -45,6 +46,7 @@ class MatchWithState {
   final int unlockLevel;
   final int failedAttempts;
   final String createdVia;
+  final DateTime? createdAt;
   final DateTime? passedAt;
   final DateTime? lastAttemptAt;
 
@@ -65,6 +67,9 @@ class MatchWithState {
       unlockLevel: (json['unlockLevel'] as num?)?.toInt() ?? 0,
       failedAttempts: (json['failedAttempts'] as num?)?.toInt() ?? 0,
       createdVia: json['createdVia'] as String? ?? 'swipe',
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.tryParse(json['createdAt'] as String),
       passedAt: json['passedAt'] == null
           ? null
           : DateTime.tryParse(json['passedAt'] as String),

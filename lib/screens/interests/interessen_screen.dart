@@ -9,6 +9,8 @@ import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/find_your_match_service.dart';
 import 'package:wisp/utils/formatters.dart';
+import 'package:wisp/widgets/funke_overlay.dart';
+import 'package:wisp/widgets/funke_streak.dart';
 import 'package:wisp/widgets/intro_audio_player.dart';
 import 'package:wisp/widgets/states.dart';
 
@@ -224,11 +226,15 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
       await service.respondToLike(like.likeId, accept: accept);
       if (!mounted) return;
       setState(() => _likes.removeWhere((l) => l.likeId == like.likeId));
+      if (accept) {
+        await FunkeOverlay.show(context);
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             accept
-                ? 'Es ist ein Match mit ${like.profile.name}! 🎉 '
+                ? 'Ein Funke mit ${like.profile.name} ist entstanden! '
                     'Das Kennenlern-Quiz wartet auf euch.'
                 : 'Like von ${like.profile.name} abgelehnt.',
           ),
@@ -500,10 +506,18 @@ class _MatchTile extends StatelessWidget {
               ? const Icon(Icons.person)
               : const Icon(Icons.visibility_off),
         ),
-        title: Text([
-          '${p.name}, ${p.age ?? '?'}',
-          if (p.distanceKm > 0) p.distanceLabel,
-        ].join(' · ')),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text([
+                '${p.name}, ${p.age ?? '?'}',
+                if (p.distanceKm > 0) p.distanceLabel,
+              ].join(' · ')),
+            ),
+            if (match.createdAt != null)
+              FunkeStreak(compact: true, createdAt: match.createdAt!),
+          ],
+        ),
         subtitle: Text(
           match.quizPassed
               ? 'Foto freigeschaltet'

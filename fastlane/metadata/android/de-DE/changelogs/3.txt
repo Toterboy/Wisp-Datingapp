@@ -1,11 +1,20 @@
-﻿Bugfix-Release auf 0.6.0:
+﻿Bugfix- und Feature-Release auf 0.6.0:
 
-• Behoben: Automatischer Logout beim App-Neustart (Daten bleiben erhalten)
-• Neu: "Angemeldet bleiben"-Schalter im Login
-• Neu: Sprache Deutsch/Englisch umschaltbar (Login + Einstellungen)
-• Neu: Passkey-Diagnose zeigt die genaue Ursache bei Problemen
-• Neu: Dating Hour mit Gewohnheiten (Präferenz + Anzeige im Chat)
-• Einrichtung: Gewohnheiten jetzt Schritt 5, Grundangaben sind Pflicht
-• Passkey & 2FA werden dringend empfohlen (mit Direkt-Sprung)
-• App-Logo mit Dark-Variante, Splash kleiner, Captcha kompakter
-• CI-Pipeline wieder grün
+BEHOBEN
+• Automatischer Logout beim App-Neustart (Daten bleiben erhalten)
+• CI-Pipeline wieder gruen
+• KGP-Warnung fuer UnifiedPush behoben
+• Doppelkodierte Umlaute repariert
+
+NEU
+• "Angemeldet bleiben"-Schalter im Login
+• Sprache Deutsch/Englisch umschaltbar (Login + Einstellungen)
+• Passkey-Diagnose: zeigt die genaue Ursache bei Problemen
+• Dating Hour mit Gewohnheiten (Praeferenz + Anzeige im Chat)
+• "Funke"-Animation beim Entstehen eines Funkens
+• Funke-Streak: Tage-Zaehler seit dem Funke (ohne Schreibpflicht)
+• Gemeinsame Interessen im Profil hervorgehoben
+• Sichtbarer E2E-Status im Chat-Header
+• Neues rundes WispDating-Logo ueberall (inkl. Dark-Variante)
+• Einrichtung: Gewohnheiten Schritt 5, Grundangaben Pflicht,
+  Passkey/2FA dringend empfohlen

@@ -170,10 +170,10 @@ dependency_overrides:
 flutter_launcher_icons:
   # Legacy-Android-Icon (mipmap-*): volles Basis-PNG (weisser Hintergrund +
   # Badge) â€“ entspricht exakt der hochgeladenen PNG.
-  image_path: "assets/images/wispdating_icon_base.png"
+  image_path: "assets/images/wispdating_logo_round.png"
   # iOS-Icon: voll opake 1024er-Variante (Apple maskt selbst, Transparenz
   # ist auf iOS nicht erlaubt).
-  image_path_ios: "assets/images/wispdating_icon_base.png"
+  image_path_ios: "assets/images/wispdating_logo_round.png"
   android: true
   ios: true
   remove_alpha_ios: true
@@ -200,9 +200,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/wispdating_icon_base.png
-    - assets/images/wisp_icon_round.png
-    - assets/images/wisp_icon_round_dark.png
+    - assets/images/wispdating_logo_round.png
+    - assets/images/wispdating_benachrichtigungsicon.png
     - .env
 
   # Hinweis: In einer echten App wÃ¼rden hier weitere Assets (Bilder, Fonts) registriert.

@@ -14,6 +14,7 @@ import 'package:wisp/services/random_chat_service.dart';
 import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/widgets/funke_overlay.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// Zufallschat: echtes Matching über die Supabase-Warteschlange
@@ -244,12 +245,18 @@ class _RandomChatScreenState extends ConsumerState<RandomChatScreen> {
   }
 
   /// Liken: speichert den Zufallspartner als dauerhaftes Match (lokal).
-  void _likePartner() {    final partner = _partner;
+  Future<void> _likePartner() async {
+    final partner = _partner;
     if (partner == null) return;
     ref.read(chatProvider.notifier).addMatch(partner, ref: ref);
     if (mounted) {
+      await FunkeOverlay.show(context);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Zwischen dir und ${partner.name} ist ein Funke entstanden! ✨')),
+        SnackBar(
+          content: Text(
+              'Zwischen dir und ${partner.name} ist ein Funke entstanden!'),
+        ),
       );
     }
   }

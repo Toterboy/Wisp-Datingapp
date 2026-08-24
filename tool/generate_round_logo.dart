@@ -1,18 +1,17 @@
 ﻿import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:image/image.dart' as img;
 
 /// Erzeugt alle Logos aus dem neuen WispDating-Basis-Icon
 /// (`assets/images/wispdating_icon_base.png`):
 ///
-///  1. `wisp_icon_round.png`          â€“ rundes App-Logo (Light + Dark nutzbar)
-///     Das quadratische Artwork wird leicht eingezoomt, sodass die Ecken
-///     des Rounded-Square sicher auÃŸerhalb des Kreises liegen (kein
-///     "Ecken-Blitzen" am Rand), mit weicher Kante.
-///  2. `wisp_icon_round_dark.png`     â€“ identisch, Hintergrund um ~12 %
-///     abgedunkelt (weiÃŸe Design-Elemente bleiben weiÃŸ).
-///  3. `wisp_icon_foreground.png`     â€“ Adaptive-Icon-Foreground
-///     (Inhalt auf ~66 % Safe-Zone, transparenter Rand).
+///  1. `wisp_icon_round.png`      – rundes App-Logo. Der Zoombasiert auf
+///     dem größten um den Mittelpunkt liegenden opaken Kreis des Artworks:
+///     keine transparenten Ecken, aber minimal möglicher Zuschnitt, damit
+///     der Schriftzug vollständig lesbar bleibt.
+///  2. `wisp_icon_round_dark.png` – Hintergrund ~12 % abgedunkelt.
+///  3. `wisp_icon_foreground.png` – Adaptive-Icon-Foreground (Safe-Zone).
 ///  4. `splash_raw.png` in allen Android-Dichteordnern (day + night).
 ///
 /// Aufruf: dart run tool/generate_round_logo.dart
@@ -21,7 +20,7 @@ void main(List<String> args) {
   final src = img.decodePng(File(sourcePath).readAsBytesSync());
   if (src == null) throw Exception('$sourcePath konnte nicht gelesen werden');
 
-  // Bounding-Box der opaken Pixel (das PNG hat einen transparenten Rand).
+  // Bounding-Box der opaken Pixel (PNG hat einen transparenten Rand).
   var minX = src.width, minY = src.height, maxX = 0, maxY = 0;
   for (final p in src) {
     if (p.a.toInt() > 20) {
@@ -33,45 +32,100 @@ void main(List<String> args) {
   }
   final bw = maxX - minX + 1;
   final bh = maxY - minY + 1;
-  final bboxSide = bw > bh ? bw : bh;
+  final bboxSide = math.max(bw, bh);
 
-  // Auf Quadrat (laengere Seite) transparent padden, zentriert.
+  // Auf Quadrat bringen: transparente Ränder/Ecken werden mit den
+  // NAECHSTEN opaken Randpixeln gefuellt (Kanten-Extension). Der Farb-
+  // verlauf laeuft damit nahtlos weiter -> kein transparentes Eckblitzen,
+  // und der Schriftzug bleibt vollstaendig im Kreis sichtbar (Zoom 1.0).
   final square = img.Image(width: bboxSide, height: bboxSide);
   final padX = (bboxSide - bw) ~/ 2;
   final padY = (bboxSide - bh) ~/ 2;
-  for (final p in img.copyCrop(
-    src,
-    x: minX,
-    y: minY,
-    width: bw,
-    height: bh,
-  )) {
-    square.setPixel(p.x + padX, p.y + padY, p);
+  for (final p in square) {
+    final sx = (minX + (p.x - padX).clamp(0, bw - 1)).clamp(0, src.width - 1);
+    final sy = (minY + (p.y - padY).clamp(0, bh - 1)).clamp(0, src.height - 1);
+    final s = src.getPixel(sx, sy);
+    p.setRgba(s.r, s.g, s.b, s.a);
   }
 
-  // ---- 1+2) Rundes Logo (Light + Dark) ---------------------------------
+  // Zweiter Durchlauf: verbliebene transparente Pixel (die abgerundeten
+  // Ecken) aus der naechsten opaken Pixel derselben Zeile fuellen. Der
+  // horizontale Farbverlauf bleibt so erhalten und es gibt keine
+  // transparenten Ecken mehr -> Zoom 1.0, Schriftzug vollstaendig.
+  for (var y = 0; y < bboxSide; y++) {
+    for (var x = 0; x < bboxSide; x++) {
+      if (square.getPixel(x, y).a.toInt() >= 200) continue;
+      img.Pixel? fill;
+      for (var d = 1; d < bboxSide && fill == null; d++) {
+        final xl = x - d;
+        if (xl >= 0 && square.getPixel(xl, y).a.toInt() >= 200) {
+          fill = square.getPixel(xl, y);
+          break;
+        }
+        final xr = x + d;
+        if (xr < bboxSide && square.getPixel(xr, y).a.toInt() >= 200) {
+          fill = square.getPixel(xr, y);
+        }
+      }
+      if (fill != null) {
+        square.getPixel(x, y).setRgba(
+              fill.r.toInt(),
+              fill.g.toInt(),
+              fill.b.toInt(),
+              255,
+            );
+      }
+    }
+  }
+
+  // ---- 1+2) Rundes Logo -------------------------------------------------
   const outSize = 1024;
-  // Zoom: Ecken des Rounded-Square sollen auÃŸerhalb des Kreises liegen.
-  // Faktor 1.18 -> Eckabstand sicher auÃŸerhalb, Motiv bleibt vollstÃ¤ndig.
-  final zoom = 1.18;
+  final outRadius = outSize / 2.0 - 0.5;
+
+  // Größter zentrierter Kreis, der NUR opake Pixel enthält (respektiert
+  // die abgerundeten Ecken). Daraus folgt der minimale Zoom: keine
+  // transparenten Ecken, aber minimaler Zuschnitt -> Schriftzug bleibt
+  // vollständig lesbar.
+  // (Diagnose-Wert, falls doch Lücken blieben:)
+  var minInscribed = bboxSide / 2.0;
+  const steps = 1440;
+  for (var a = 0; a < steps; a++) {
+    final theta = 2 * math.pi * a / steps;
+    final dx = math.cos(theta);
+    final dy = math.sin(theta);
+    var d = 0.0;
+    while (d < bboxSide / 2.0) {
+      final x = (bboxSide / 2.0 + dx * d).round();
+      final y = (bboxSide / 2.0 + dy * d).round();
+      if (x < 0 || y < 0 || x >= bboxSide || y >= bboxSide) break;
+      if (square.getPixel(x, y).a.toInt() < 200) break;
+      d++;
+    }
+    if (d < minInscribed) minInscribed = d;
+  }
+  // Zoom 1.0: Der quadratische Kachel ist kantenverlaengert (opak), der
+  // Ausgabe-Kreis samplet am Rand einfach die fortgesetzten Kantenfarben.
+  // Damit ist der Schriftzug vollstaendig sichtbar und es gibt keinerlei
+  // transparente Ecken.
+  const zoom = 1.0;
+
+  final scaledSide = (outSize * zoom).round();
   final scaled = img.copyResize(
     square,
-    width: (outSize * zoom).round(),
-    height: (outSize * zoom).round(),
+    width: scaledSide,
+    height: scaledSide,
     interpolation: img.Interpolation.cubic,
   );
-  final inset = (scaled.width - outSize) ~/ 2;
+  final inset = (scaledSide - outSize) ~/ 2;
   final round = img.Image(width: outSize, height: outSize);
-  final radius = outSize / 2.0 - 0.5;
 
   for (final p in round) {
     final dx = p.x + 0.5 - outSize / 2;
     final dy = p.y + 0.5 - outSize / 2;
-    final distSq = dx * dx + dy * dy;
-    if (distSq <= radius * radius) {
+    if (dx * dx + dy * dy <= outRadius * outRadius) {
       final s = scaled.getPixel(
-        (p.x + inset).clamp(0, scaled.width - 1),
-        (p.y + inset).clamp(0, scaled.height - 1),
+        (p.x + inset).clamp(0, scaledSide - 1),
+        (p.y + inset).clamp(0, scaledSide - 1),
       );
       p.setRgba(s.r, s.g, s.b, s.a);
     }
@@ -82,17 +136,16 @@ void main(List<String> args) {
     if (p.a == 0) continue;
     final dx = p.x + 0.5 - outSize / 2;
     final dy = p.y + 0.5 - outSize / 2;
-    final edge = radius - _dist(dx, dy);
+    final edge = outRadius - math.sqrt(dx * dx + dy * dy);
     if (edge < 1.5) {
       p.a = (p.a * (edge.clamp(0.0, 1.5) / 1.5)).round().clamp(0, 255);
     }
   }
 
-  File('assets/images/wisp_icon_round.png')
-      .writeAsBytesSync(img.encodePng(round));
+  File('assets/images/wisp_icon_round.png').writeAsBytesSync(img.encodePng(round));
 
-  // Dark: Hintergrund-Motive ~12 % abgedunkelt; nahe-weiÃŸe Design-Elemente
-  // (Schriftzug/Herz) bleiben weiÃŸ.
+  // Dark: Hintergrund-Motive ~12 % abgedunkelt; nahe-weiße Design-Elemente
+  // (Schriftzug/Herz) bleiben weiß.
   final dark = img.Image.from(round);
   for (final p in dark) {
     if (p.a == 0) continue;
@@ -135,7 +188,6 @@ void main(List<String> args) {
   );
   final splashBytes = img.encodePng(splashDay);
 
-  // Night: gleiche Dark-Variante wie oben (Hintergrund leicht dunkler).
   final splashNightSrc = img.Image.from(round);
   for (final p in splashNightSrc) {
     if (p.a == 0) continue;
@@ -183,21 +235,6 @@ void main(List<String> args) {
   }
 
   stdout.writeln('Logos erzeugt: round ${round.width}px, '
-      'foreground ${fgSize}px, '
+      'foreground ${fgSize}px, zoom=${zoom.toStringAsFixed(3)}, '
       '${dayDirs.length + nightDirs.length} Splash-Dateien');
-}
-
-double _dist(double dx, double dy) {
-  final v = dx * dx + dy * dy;
-  return v <= 0 ? 0 : _sqrt(v);
-}
-
-double _sqrt(double v) {
-  // Newton-Verfahren (vermeidet dart:math Import-Duplikat).
-  if (v == 0) return 0;
-  var x = v;
-  for (var i = 0; i < 24; i++) {
-    x = 0.5 * (x + v / x);
-  }
-  return x;
 }
