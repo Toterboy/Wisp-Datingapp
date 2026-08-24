@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Hintergrund des adaptiven Launchers (Flutter-Icon-Konfiguration). -->
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#390D3C</color>
     <!-- Akzentfarbe fuer Benachrichtigungen (Wisp-Brand-Pink). -->
     <color name="notification_accent">#FF6B9D</color>
 </resources>

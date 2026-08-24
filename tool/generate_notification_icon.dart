@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:image/image.dart' as img;
 
@@ -13,7 +13,7 @@ import 'package:image/image.dart' as img;
 void main(List<String> args) {
   final sourcePath = args.isNotEmpty
       ? args[0]
-      : 'assets/images/wisp_icon_base.png';
+      : 'assets/images/wispdating_icon_base.png';
   final bytes = File(sourcePath).readAsBytesSync();
   final src = img.decodePng(bytes);
   if (src == null) {

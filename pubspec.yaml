@@ -170,10 +170,10 @@ dependency_overrides:
 flutter_launcher_icons:
   # Legacy-Android-Icon (mipmap-*): volles Basis-PNG (weisser Hintergrund +
   # Badge) â€“ entspricht exakt der hochgeladenen PNG.
-  image_path: "assets/images/wisp_icon_base.png"
+  image_path: "assets/images/wispdating_icon_base.png"
   # iOS-Icon: voll opake 1024er-Variante (Apple maskt selbst, Transparenz
   # ist auf iOS nicht erlaubt).
-  image_path_ios: "assets/images/wisp_icon_ios.png"
+  image_path_ios: "assets/images/wispdating_icon_base.png"
   android: true
   ios: true
   remove_alpha_ios: true
@@ -181,7 +181,7 @@ flutter_launcher_icons:
   # transparentes Foreground, in dem das Badge zentriert auf 66 % der
   # Safe-Zone eingebacken ist (generiert via tool/generate_icons.ps1).
   # KEINE hex-Varianten! Die enthalten schwarze RÃ¤nder/Dreiecke.
-  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_background: "#390D3C"
   adaptive_icon_foreground: "assets/images/wisp_icon_foreground.png"
   # Safe-Zone steckt bereits im Foreground -> kein zusaetzlicher Inset,
   # sonst wuerde das Badge erneut verkleinert (16 % Default).
@@ -200,7 +200,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/wisp_icon_base.png
+    - assets/images/wispdating_icon_base.png
     - assets/images/wisp_icon_round.png
     - assets/images/wisp_icon_round_dark.png
     - .env
