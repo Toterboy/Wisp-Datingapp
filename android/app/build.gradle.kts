@@ -76,25 +76,36 @@ android {
 
     buildTypes {
         release {
-            // Release mit dem echten Keystore signieren. Ohne key.properties
-            // wird der Build abgebrochen (kein stiller Debug-Fallback);
-            // Ausnahme nur mit explizitem Opt-out für lokale Tests.
+            // Release mit dem echten Keystore signieren. Ohne key.properties:
+            //  - Ein echter Release-Build bricht hart FEHL (kein stiller
+            //    Debug-Fallback - debug-signierte Releases waeren ein
+            //    Sicherheitsrisiko).
+            //  - Reine Debug-Builds (z. B. CI assembleFdroidDebug) konfigurieren
+            //    den release-buildType mit, duerfen dadurch aber nicht knallen:
+            //    Der Fehler wird nur geworfen, wenn tatsaechlich ein
+            //    Release-Task angefragt wurde (Task-Name enthaelt "Release").
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 val allowDebugSigning =
                     System.getenv("WISP_ALLOW_DEBUG_SIGNING") == "true" ||
                         (project.findProperty("wisp.allowDebugSigning") as? String) == "true"
-                if (allowDebugSigning) {
-                    logger.warn("WARNUNG: Release wird mit dem DEBUG-Keystore signiert (nur für lokale Tests).")
-                    signingConfig = signingConfigs.getByName("debug")
-                } else {
-                    throw GradleException(
-                        "Release-Build ohne android/key.properties nicht erlaubt. " +
-                            "Lege android/key.properties an (siehe README/.env.example) oder " +
-                            "signiere lokal bewusst mit -PWisp.allowDebugSigning=true."
-                    )
+                val releaseRequested = gradle.startParameter.taskNames.any {
+                    it.contains("Release", ignoreCase = true)
                 }
+                if (releaseRequested) {
+                    if (allowDebugSigning) {
+                        logger.warn("WARNUNG: Release wird mit dem DEBUG-Keystore signiert (nur für lokale Tests).")
+                        signingConfig = signingConfigs.getByName("debug")
+                    } else {
+                        throw GradleException(
+                            "Release-Build ohne android/key.properties nicht erlaubt. " +
+                                "Lege android/key.properties an (siehe README/.env.example) oder " +
+                                "signiere lokal bewusst mit -PWisp.allowDebugSigning=true."
+                        )
+                    }
+                }
+                // Sonst (Debug-Build): bewusst KEINE Signierung setzen.
             }
         }
     }
