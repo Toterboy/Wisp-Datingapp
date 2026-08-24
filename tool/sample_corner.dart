@@ -1,4 +1,5 @@
-﻿import 'dart:io';
+﻿// ignore_for_file: avoid_print
+import 'dart:io';
 import 'package:image/image.dart' as img;
 
 /// Findet die Bounding-Box der opaken Pixel und samplet deren Randfarbe.

@@ -1,17 +1,17 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:image/image.dart' as img;
 
 /// Erzeugt alle Logos aus dem neuen WispDating-Basis-Icon
 /// (`assets/images/wispdating_icon_base.png`):
 ///
-///  1. `wisp_icon_round.png`          – rundes App-Logo (Light + Dark nutzbar)
+///  1. `wisp_icon_round.png`          â€“ rundes App-Logo (Light + Dark nutzbar)
 ///     Das quadratische Artwork wird leicht eingezoomt, sodass die Ecken
-///     des Rounded-Square sicher außerhalb des Kreises liegen (kein
+///     des Rounded-Square sicher auÃŸerhalb des Kreises liegen (kein
 ///     "Ecken-Blitzen" am Rand), mit weicher Kante.
-///  2. `wisp_icon_round_dark.png`     – identisch, Hintergrund um ~12 %
-///     abgedunkelt (weiße Design-Elemente bleiben weiß).
-///  3. `wisp_icon_foreground.png`     – Adaptive-Icon-Foreground
+///  2. `wisp_icon_round_dark.png`     â€“ identisch, Hintergrund um ~12 %
+///     abgedunkelt (weiÃŸe Design-Elemente bleiben weiÃŸ).
+///  3. `wisp_icon_foreground.png`     â€“ Adaptive-Icon-Foreground
 ///     (Inhalt auf ~66 % Safe-Zone, transparenter Rand).
 ///  4. `splash_raw.png` in allen Android-Dichteordnern (day + night).
 ///
@@ -51,8 +51,8 @@ void main(List<String> args) {
 
   // ---- 1+2) Rundes Logo (Light + Dark) ---------------------------------
   const outSize = 1024;
-  // Zoom: Ecken des Rounded-Square sollen außerhalb des Kreises liegen.
-  // Faktor 1.18 -> Eckabstand sicher außerhalb, Motiv bleibt vollständig.
+  // Zoom: Ecken des Rounded-Square sollen auÃŸerhalb des Kreises liegen.
+  // Faktor 1.18 -> Eckabstand sicher auÃŸerhalb, Motiv bleibt vollstÃ¤ndig.
   final zoom = 1.18;
   final scaled = img.copyResize(
     square,
@@ -91,8 +91,8 @@ void main(List<String> args) {
   File('assets/images/wisp_icon_round.png')
       .writeAsBytesSync(img.encodePng(round));
 
-  // Dark: Hintergrund-Motive ~12 % abgedunkelt; nahe-weiße Design-Elemente
-  // (Schriftzug/Herz) bleiben weiß.
+  // Dark: Hintergrund-Motive ~12 % abgedunkelt; nahe-weiÃŸe Design-Elemente
+  // (Schriftzug/Herz) bleiben weiÃŸ.
   final dark = img.Image.from(round);
   for (final p in dark) {
     if (p.a == 0) continue;
@@ -121,8 +121,7 @@ void main(List<String> args) {
   final fg = img.Image(width: fgSize, height: fgSize);
   final fgOff = (fgSize - fgContent) ~/ 2;
   for (final p in fgScaled) {
-    final target = fg.getPixel(p.x + fgOff, p.y + fgOff);
-    target..setRgba(p.r, p.g, p.b, p.a);
+    fg.setPixel(p.x + fgOff, p.y + fgOff, p);
   }
   File('assets/images/wisp_icon_foreground.png')
       .writeAsBytesSync(img.encodePng(fg));
