@@ -23,7 +23,7 @@ class LoadingScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const AppLogo(size: 112),
+            const AppLogo(size: 92),
             const SizedBox(height: 32),
             // Lade-Indikator (drehender Kreis, Windows-11-Stil).
             SizedBox(

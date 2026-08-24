@@ -21,8 +21,8 @@ class ThemePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+      spacing: 10,
+      runSpacing: 10,
       children: [
         for (final theme in WispTheme.values)
           _ThemeSwatch(
@@ -48,6 +48,8 @@ class _ThemeSwatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Feste Kachelgroesse: identische Abstaende/hoehen fuer alle Eintraege,
+    // unabhaengig von der Label-Laenge.
     return Semantics(
       label: 'Farbschema ${theme.label}',
       selected: selected,
@@ -55,10 +57,11 @@ class _ThemeSwatch extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(28),
-        child: Padding(
-          padding: const EdgeInsets.all(6),
+        child: SizedBox(
+          width: 78,
+          height: 86,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 width: 44,
@@ -80,7 +83,9 @@ class _ThemeSwatch extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                theme.label,
+                theme.shortLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight:
                           selected ? FontWeight.bold : FontWeight.w400,

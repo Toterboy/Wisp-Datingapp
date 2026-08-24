@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import 'package:wisp/models/dating_hour_models.dart';
 import 'package:wisp/models/gender.dart';
+import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/dating_hour_service.dart';
+import 'package:wisp/widgets/habitude_selector.dart';
 
 /// Screen für Dating-Hour-Präferenzen (vor dem Event-Beitritt).
 class DatingHourPreferencesScreen extends ConsumerStatefulWidget {
@@ -23,6 +25,9 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
   late String _genderPreference;
   String _selectedTrait = 'Humor';
   int _maxDistanceKm = 50;
+  HabitudeLevel? _smoking;
+  HabitudeLevel? _alcohol;
+  HabitudeLevel? _drugs;
 
   static const List<String> _suggestedTraits = [
     'Humor', 'Ehrlichkeit', 'Abenteuerlust', 'Intelligenz',
@@ -240,6 +245,38 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
 
             const SizedBox(height: 32),
 
+            // Gewohnheiten als weiche Matching-Präferenz
+            Text('Gewohnheiten (optional)',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Personen mit passenden Gewohnheiten werden dir beim Matching '
+              'zuerst vorgeschlagen – ausgeschlossen wird niemand.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            HabitudeSelector(
+              topic: HabitudeTopic.smoking,
+              value: _smoking,
+              onChanged: (v) => setState(() => _smoking = v),
+            ),
+            const SizedBox(height: 16),
+            HabitudeSelector(
+              topic: HabitudeTopic.alcohol,
+              value: _alcohol,
+              onChanged: (v) => setState(() => _alcohol = v),
+            ),
+            const SizedBox(height: 16),
+            HabitudeSelector(
+              topic: HabitudeTopic.drugs,
+              value: _drugs,
+              onChanged: (v) => setState(() => _drugs = v),
+            ),
+
+            const SizedBox(height: 32),
+
             // Speichern (ohne Beitritt)
             SizedBox(
               width: double.infinity,
@@ -278,6 +315,9 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
       genderPreference: _genderPreference,
       preferredTrait: _selectedTrait.isNotEmpty ? _selectedTrait : _suggestedTraits.first,
       maxDistanceKm: _maxDistanceKm.toDouble(), // aus den Einrichtungs-Einstellungen
+      smoking: _smoking?.toServer(),
+      alcohol: _alcohol?.toServer(),
+      drugs: _drugs?.toServer(),
     );
 
     // NUR Präferenzen speichern - KEIN automatischer Beitritt mehr.

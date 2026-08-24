@@ -120,12 +120,20 @@ class DatingHourPreferences {
   final String preferredTrait; // Freitext, z. B. "Humor"
   final double maxDistanceKm;
 
+  /// Gewohnheiten als SOFT-Präferenz (Serverwerte oder null = egal).
+  final String? smoking;
+  final String? alcohol;
+  final String? drugs;
+
   const DatingHourPreferences({
     required this.ageMin,
     required this.ageMax,
     required this.genderPreference,
     required this.preferredTrait,
     required this.maxDistanceKm,
+    this.smoking,
+    this.alcohol,
+    this.drugs,
   });
 
   DatingHourPreferences copyWith({
@@ -134,6 +142,9 @@ class DatingHourPreferences {
     String? genderPreference,
     String? preferredTrait,
     double? maxDistanceKm,
+    String? smoking,
+    String? alcohol,
+    String? drugs,
   }) {
     return DatingHourPreferences(
       ageMin: ageMin ?? this.ageMin,
@@ -141,6 +152,9 @@ class DatingHourPreferences {
       genderPreference: genderPreference ?? this.genderPreference,
       preferredTrait: preferredTrait ?? this.preferredTrait,
       maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
+      smoking: smoking ?? this.smoking,
+      alcohol: alcohol ?? this.alcohol,
+      drugs: drugs ?? this.drugs,
     );
   }
 
@@ -153,6 +167,9 @@ class DatingHourPreferences {
             ? preferredTrait.trim().substring(0, 50)
             : preferredTrait.trim(),
         'maxDistanceKm': maxDistanceKm,
+        if (smoking != null) 'smoking': smoking,
+        if (alcohol != null) 'alcohol': alcohol,
+        if (drugs != null) 'drugs': drugs,
       };
 
   factory DatingHourPreferences.fromJson(Map<String, dynamic> json) {
@@ -162,6 +179,9 @@ class DatingHourPreferences {
       genderPreference: json['genderPreference'] as String,
       preferredTrait: json['preferredTrait'] as String,
       maxDistanceKm: (json['maxDistanceKm'] as num).toDouble(),
+      smoking: json['smoking'] as String?,
+      alcohol: json['alcohol'] as String?,
+      drugs: json['drugs'] as String?,
     );
   }
 }

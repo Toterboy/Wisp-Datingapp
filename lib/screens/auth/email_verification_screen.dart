@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,7 +65,7 @@ class _EmailVerificationScreenState
     WidgetsBinding.instance.addObserver(this);
     // E-Mail aus der Registrierung (pendingVerificationEmailProvider) bzw.
     // dem Auth-State erfassen. Nach signUp mit aktivierter Bestätigung gibt
-    // es KEINE Session (currentUser == null) â€“ deshalb primär der Provider.
+    // es KEINE Session (currentUser == null) – deshalb primär der Provider.
     _capturedEmail = ref.read(pendingVerificationEmailProvider) ??
         SupabaseService.client.auth.currentUser?.email;
     // Sobald die E-Mail bestätigt ist, automatisch zur Hauptapp weiterleiten.
@@ -93,7 +93,7 @@ class _EmailVerificationScreenState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Die Bestätigung passiert meist im Browser: Beim Zurückkehren in die
-    // App sofort prüfen. Im Hintergrund nicht pollen â€“ schont das
+    // App sofort prüfen. Im Hintergrund nicht pollen – schont das
     // Auth-Rate-Limit-Budget und den Akku.
 if (state == AppLifecycleState.resumed) {
       _autoLoginDelaySeconds = _autoLoginInitialDelaySeconds;

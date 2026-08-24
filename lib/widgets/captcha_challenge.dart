@@ -131,8 +131,11 @@ class _CaptchaChallengeDialogState extends State<_CaptchaChallengeDialog> {
       child: AlertDialog(
         title: const Text('Sicherheitscheck'),
         content: SizedBox(
-          width: 320,
-          height: 380,
+          // Cloudflare-Turnstile (managed) ist ~300x65; die interaktive
+          // Challenge braucht etwas mehr Platz. Kompakt starten, WebView
+          // skaliert den Inhalt auf die Breite.
+          width: 300,
+          height: 200,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

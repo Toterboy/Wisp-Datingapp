@@ -17,6 +17,16 @@ enum WispTheme {
   final String label;
   final Color primaryColor;
 
+  /// Kompakter Anzeigename für den Picker (feste Kachelbreite).
+  String get shortLabel => switch (this) {
+        WispTheme.classic => 'Classic',
+        WispTheme.ocean => 'Ozean',
+        WispTheme.forest => 'Wald',
+        WispTheme.sunset => 'Sonnenuntergang',
+        WispTheme.lila => 'Lavendel',
+        WispTheme.mono => 'Schiefer',
+      };
+
   /// Aufhellung für Dark-Mode-Akzente.
   Color get lightPrimary => Color.lerp(primaryColor, Colors.white, 0.25)!;
 

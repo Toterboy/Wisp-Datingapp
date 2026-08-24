@@ -197,6 +197,7 @@ flutter:
   assets:
     - assets/images/wisp_icon_base.png
     - assets/images/wisp_icon_round.png
+    - assets/images/wisp_icon_round_dark.png
     - .env
 
   # Hinweis: In einer echten App würden hier weitere Assets (Bilder, Fonts) registriert.

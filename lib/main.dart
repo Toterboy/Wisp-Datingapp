@@ -20,6 +20,7 @@ import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/models/signal_key_models.dart';
 import 'package:wisp/models/photo_moderation_models.dart';
 import 'package:wisp/models/report_models.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// Einstiegspunkt der App.
@@ -97,12 +98,15 @@ Future<void> main() async {
   final prefs = await prefsFuture;
   final storage = SharedPreferencesStorage(prefs);
 
+  final savedLocaleCode = prefs.getString('app_locale') ?? 'de';
+
   runApp(
     ProviderScope(
       overrides: [
         localStorageProvider.overrideWithValue(storage),
+        localeProvider.overrideWith((ref) => Locale(savedLocaleCode)),
       ],
-      child: const App(),
+      child: const L10nScope(child: App()),
     ),
   );
 

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,10 +26,10 @@ import 'package:wisp/widgets/gender_preference_selector.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
 import 'package:wisp/widgets/intro_editor.dart';
 
-/// UnterstÃ¼tzte WohnsitzlÃ¤nder (Auswahl fÃ¼r die Profilangabe).
+/// Unterstützte Wohnsitzländer (Auswahl für die Profilangabe).
 const kSupportedCountries = <String>[
   'Deutschland',
-  'Ã–sterreich',
+  'Österreich',
   'Schweiz',
   'Luxemburg',
   'Belgien',
@@ -40,11 +40,11 @@ const kSupportedCountries = <String>[
   'Portugal',
   'Polen',
   'Tschechien',
-  'DÃ¤nemark',
+  'Dänemark',
   'Schweden',
   'Norwegen',
   'Finnland',
-  'Vereinigtes KÃ¶nigreich',
+  'Vereinigtes Königreich',
   'Irland',
   'USA',
   'Kanada',
@@ -54,9 +54,9 @@ const kSupportedCountries = <String>[
 
 // kGermanStates ist zentral in lib/utils/constants.dart definiert.
 
-/// Profil bearbeiten: Name, Geburtsdatum, Geschlecht, PrÃ¤ferenzen, Bio,
+/// Profil bearbeiten: Name, Geburtsdatum, Geschlecht, Präferenzen, Bio,
 /// Beziehungsart, Standort, Entfernungsfilter, Interessen und die
-/// Vorstellung fÃ¼r "Find your Match" (Text + Audio).
+/// Vorstellung für "Find your Match" (Text + Audio).
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
 
@@ -90,7 +90,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String _introTextValue = '';
   String? _introAudioPath;
 
-  // Konsum-PrÃ¤ferenzen (Rauchen, Alkohol, Drogen) â€“ beeinflussen den
+  // Konsum-Präferenzen (Rauchen, Alkohol, Drogen) – beeinflussen den
   // Find-your-Match-Filter.
   HabitudeLevel? _smoking;
   HabitudeLevel? _alcohol;
@@ -118,14 +118,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     // geaenderter Stadt ausfuehren (Performance).
     _loadedCity = p.city;
 
-    // Initial signed URL fÃ¼r aktuelles Profilbild laden.
+    // Initial signed URL für aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
       _signedAvatarUrlFuture = ref
           .read(supabaseStorageServiceProvider)
           .getSignedAvatarUrl(p.photos.first);
     }
 
-    // Falls das Profil spÃ¤ter nachgeladen wird, die Felder nachziehen.
+    // Falls das Profil später nachgeladen wird, die Felder nachziehen.
     _profileSub = ref.listenManual<UserProfile>(profileProvider, (prev, next) {
       if (!mounted) return;
       if (_nameCtrl.text != next.name) {
@@ -181,7 +181,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               DateTime.now().day),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
-      helpText: 'WÃ¤hle dein Geburtsdatum',
+      helpText: 'Wähle dein Geburtsdatum',
     );
     if (picked != null) {
       setState(() => _birthDate = picked);
@@ -267,7 +267,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         }
       }
 
-      // Serverseitigen Standort-Check via Edge Function auslÃ¶sen.
+      // Serverseitigen Standort-Check via Edge Function auslösen.
       final auth = SupabaseService.currentUser;
       if (auth != null) {
         unawaited(
@@ -287,7 +287,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Standort erkannt und Ã¼bernommen.'),
+            content: Text('Standort erkannt und übernommen.'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -348,7 +348,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       final age = Validators.ageFromBirthDate(_birthDate);
       if (age == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bitte wÃ¤hle dein Geburtsdatum')),
+          const SnackBar(content: Text('Bitte wähle dein Geburtsdatum')),
         );
         return;
       }
@@ -541,7 +541,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     ),
                     child: Text(
                       _birthDate == null
-                          ? 'Bitte auswÃ¤hlen'
+                          ? 'Bitte auswählen'
                           : '${_birthDate!.day}.${_birthDate!.month}.'
                               '${_birthDate!.year}',
                     ),
@@ -604,7 +604,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     ),
                     DropdownMenuItem(
                       value: RelationshipType.open,
-                      child: Text('Offen fÃ¼r alles'),
+                      child: Text('Offen für alles'),
                     ),
                   ],
                   onChanged: (v) {
@@ -665,7 +665,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     if (v != null) {
                       setState(() => _countryValue = v);
                       if (v != 'Deutschland') {
-                        // Bundesland nur fÃ¼r Deutschland sinnvoll.
+                        // Bundesland nur für Deutschland sinnvoll.
                         _stateCtrl.clear();
                       }
                     }
@@ -679,7 +679,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         ? null
                         : _stateCtrl.text,
                     decoration: const InputDecoration(labelText: 'Bundesland'),
-                    hint: const Text('Bitte wÃ¤hlen'),
+                    hint: const Text('Bitte wählen'),
                     items: kGermanStates
                         .map((s) =>
                             DropdownMenuItem(value: s, child: Text(s)))
@@ -691,12 +691,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 )
               else
                 const Text(
-                  'Bundesland entfÃ¤llt auÃŸerhalb Deutschlands.',
+                  'Bundesland entfällt außerhalb Deutschlands.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               const SizedBox(height: 16),
               const Text(
-                'Filter & PrÃ¤ferenzen',
+                'Filter & Präferenzen',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 12),
@@ -705,7 +705,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   initialValue:
                       ref.read(userPreferencesProvider).distanceFilterMode,
                   decoration: const InputDecoration(
-                    labelText: 'Suchradius definieren Ã¼ber',
+                    labelText: 'Suchradius definieren über',
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -739,7 +739,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       initialValue: prefs.preferredState,
                       decoration: const InputDecoration(labelText: 'Bundesland'),
                       items: const [
-                        DropdownMenuItem(value: 'BW', child: Text('Baden-WÃ¼rttemberg')),
+                        DropdownMenuItem(value: 'BW', child: Text('Baden-Württemberg')),
                         DropdownMenuItem(value: 'BY', child: Text('Bayern')),
                         DropdownMenuItem(value: 'BE', child: Text('Berlin')),
                         DropdownMenuItem(value: 'BB', child: Text('Brandenburg')),
@@ -754,7 +754,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         DropdownMenuItem(value: 'SN', child: Text('Sachsen')),
                         DropdownMenuItem(value: 'ST', child: Text('Sachsen-Anhalt')),
                         DropdownMenuItem(value: 'SH', child: Text('Schleswig-Holstein')),
-                        DropdownMenuItem(value: 'TH', child: Text('ThÃ¼ringen')),
+                        DropdownMenuItem(value: 'TH', child: Text('Thüringen')),
                       ],
                       onChanged: (v) {
                         if (v != null) {
@@ -767,7 +767,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   }
                   if (prefs.distanceFilterMode == DistanceFilterMode.germany) {
                     return const Text(
-                      'Keine geografische EinschrÃ¤nkung, Suche in ganz Deutschland.',
+                      'Keine geografische Einschränkung, Suche in ganz Deutschland.',
                       style: TextStyle(color: Colors.grey),
                     );
                   }
@@ -829,7 +829,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         'Wie stehst du zu ...? Diese Angaben beeinflussen, '
-                        'wen du bei "Find your Match" siehst â€“ es werden nur '
+                        'wen du bei "Find your Match" siehst – es werden nur '
                         'Personen gezeigt, die maximal so viel konsumieren wie du.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
@@ -877,12 +877,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               if (profile.personalityResult != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'PersÃ¶nlichkeitstest: ${profile.personalityResult}',
+                  'Persönlichkeitstest: ${profile.personalityResult}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
               const SizedBox(height: 16),
-              // PersÃ¶nlichkeitstest (statt in den Einstellungen).
+              // Persönlichkeitstest (statt in den Einstellungen).
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -890,7 +890,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'PersÃ¶nlichkeitstest',
+                        'Persönlichkeitstest',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
@@ -911,7 +911,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                 .watch(settingsProvider)
                                 .personalityTestCompleted
                             ? 'Test wiederholen'
-                            : 'PersÃ¶nlichkeitstest starten',
+                            : 'Persönlichkeitstest starten',
                         onPressed: () =>
                             context.push(AppRoutes.personalityTest),
                       ),

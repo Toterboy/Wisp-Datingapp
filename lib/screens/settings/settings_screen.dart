@@ -25,6 +25,8 @@ import 'package:wisp/services/unified_push_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/selectable_tile.dart';
+import 'package:wisp/l10n/app_strings.dart';
+import 'package:wisp/widgets/language_switch.dart';
 import 'package:wisp/widgets/theme_picker.dart';
 
 /// Spiegelt die Benachrichtigungs-Schalter in die profiles-Tabelle, damit
@@ -209,7 +211,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const _SectionTitle('Benachrichtigungen'),
+          _SectionTitle(L10n.t(context, 'settings.notifications')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -289,7 +291,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const _SectionTitle('Darstellung'),
+          _SectionTitle(L10n.t(context, 'settings.appearance')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -336,12 +338,14 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: (t) =>
                         ref.read(settingsProvider.notifier).setThemeName(t.name),
                   ),
+                  const SizedBox(height: 16),
+                  const LanguageSwitch(),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
-          const _SectionTitle('Sicherheit im Chat'),
+          _SectionTitle(L10n.t(context, 'settings.chatSafety')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -365,7 +369,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const _SectionTitle('E2E-Identität'),
+          _SectionTitle(L10n.t(context, 'settings.e2e')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -420,7 +424,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const _SectionTitle('Datenschutz & Account'),
+          _SectionTitle(L10n.t(context, 'settings.privacyAccount')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),

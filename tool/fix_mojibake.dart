@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'dart:io';
 
@@ -84,9 +84,23 @@ const files = [
   'lib/services/unified_push_service.dart',
 ];
 
+/// Zusaetzlich: rekursiv alle Dart-Dateien in lib/ und tool/ pruefen.
+List<String> collectAll() {
+  final list = <String>[...files];
+  for (final dir in ['lib', 'tool']) {
+    Directory(dir).listSync(recursive: true).forEach((entity) {
+      if (entity is File && entity.path.endsWith('.dart')) {
+        final normalized = entity.path.replaceAll('\\', '/');
+        if (!list.contains(normalized)) list.add(normalized);
+      }
+    });
+  }
+  return list;
+}
+
 void main() {
   var fixed = 0;
-  for (final path in files) {
+  for (final path in collectAll()) {
     final f = File(path);
     if (!f.existsSync()) continue;
     final original = f.readAsStringSync();

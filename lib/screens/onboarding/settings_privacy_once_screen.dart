@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -32,8 +32,8 @@ import 'package:wisp/widgets/intro_editor.dart';
 import 'package:wisp/widgets/selectable_tile.dart';
 import 'package:wisp/widgets/theme_picker.dart';
 
-/// Einmaliger Einstellungen- & PrivatsphÃ¤re-Screen direkt nach der Anmeldung.
-/// Danach sind diese Einstellungen jederzeit in den normalen Einstellungen Ã¤nderbar.
+/// Einmaliger Einstellungen- & Privatsphäre-Screen direkt nach der Anmeldung.
+/// Danach sind diese Einstellungen jederzeit in den normalen Einstellungen änderbar.
 class SettingsPrivacyOnceScreen extends ConsumerStatefulWidget {
   const SettingsPrivacyOnceScreen({super.key});
 
@@ -54,9 +54,9 @@ class _SettingsPrivacyOnceScreenState
   static const int _pageCount = 8;
   static const int _profilePage = 2;
   static const int _introPage = 3;
-  static const int _habitudesPage = 6;
+  static const int _habitudesPage = 4;
 
-  // Schritt "Deine Vorstellung" (Ã¼berspringbar): Werte des IntroEditor.
+  // Schritt "Deine Vorstellung" (überspringbar): Werte des IntroEditor.
   String _introText = '';
   String? _introAudioPath;
 
@@ -67,7 +67,7 @@ class _SettingsPrivacyOnceScreenState
   bool _uploadingAvatar = false;
   Uint8List? _avatarBytes;
 
-  // Schritt "Passkey" (Ã¼berspringbar).
+  // Schritt "Passkey" (überspringbar).
   bool _passkeyBusy = false;
   bool _passkeyCreated = false;
 
@@ -83,7 +83,7 @@ class _SettingsPrivacyOnceScreenState
     if (prefs.location != null && _locationCtrl.text.isEmpty) {
       _locationCtrl.text = prefs.location!;
     }
-    // Vorhandene Konsum-PrÃ¤ferenzen vorbelegen, falls bereits gesetzt.
+    // Vorhandene Konsum-Präferenzen vorbelegen, falls bereits gesetzt.
     final profile = ref.read(profileProvider);
     _smoking = profile.smoking;
     _alcohol = profile.alcohol;
@@ -108,7 +108,7 @@ class _SettingsPrivacyOnceScreenState
           builder: (ctx) => AlertDialog(
             title: const Text('Einrichtung abbrechen?'),
             content: const Text(
-              'MÃ¶chtest du die Einrichtung wirklich abbrechen? '
+              'Möchtest du die Einrichtung wirklich abbrechen? '
               'Deine bisherigen Angaben werden gespeichert.',
             ),
             actions: [
@@ -140,13 +140,29 @@ class _SettingsPrivacyOnceScreenState
   }
 
   void _nextPage() {
-    // Beim Verlassen der Profil-Seite Bio/Bundesland/Interessen speichern.
+    // Pflicht-Schritte (3 Profil, 4 Vorstellung): Grundangaben muessen
+    // erledigt sein, bevor weitergeblaettert werden kann. Schritt 2
+    // (Filter) hat sinnvolle Defaults und ist damit immer gueltig.
     if (_currentPage == _profilePage) {
+      if (_bioCtrl.text.trim().isEmpty) {
+        _showStepHint('Bitte schreibe eine kurze Bio (Über mich).');
+        return;
+      }
+      if (_selectedInterests.isEmpty) {
+        _showStepHint('Bitte wähle mindestens ein Interesse.');
+        return;
+      }
       unawaited(_saveProfileExtras());
     }
-    // Beim Verlassen der Vorstellungs-Seite die Eingaben best-effort
-    // speichern â€“ der Schritt ist Ã¼berspringbar, deshalb kein Zwang.
     if (_currentPage == _introPage) {
+      if (!IntroEditor.isValid(
+          text: _introText, audioPath: _introAudioPath)) {
+        _showStepHint(
+          'Deine Vorstellung braucht Text UND Audio – andere sollen dich '
+          'kennenlernen, bevor sie dein Foto sehen.',
+        );
+        return;
+      }
       _saveIntro();
     }
     if (_currentPage == _habitudesPage) {
@@ -158,6 +174,15 @@ class _SettingsPrivacyOnceScreenState
         curve: Curves.easeInOut,
       );
     }
+  }
+
+  void _showStepHint(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   /// Speichert Text + Audio der Vorstellung (best effort, optionaler
@@ -182,7 +207,7 @@ class _SettingsPrivacyOnceScreenState
     }
   }
 
-  /// Speichert die Konsum-PrÃ¤ferenzen (Rauchen, Alkohol, Drogen) lokal
+  /// Speichert die Konsum-Präferenzen (Rauchen, Alkohol, Drogen) lokal
   /// und best-effort serverseitig. Beeinflusst den Find-your-Match-Filter.
   Future<void> _saveHabitudes() async {
     try {
@@ -250,7 +275,7 @@ class _SettingsPrivacyOnceScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Upload fehlgeschlagen. Du kannst das Bild '
-                  'jederzeit spÃ¤ter im Profil festlegen.')),
+                  'jederzeit später im Profil festlegen.')),
         );
       }
     } finally {
@@ -258,8 +283,8 @@ class _SettingsPrivacyOnceScreenState
     }
   }
 
-  /// Richtet einen Passkey ein (Ã¼berspringbarer Schritt). Fehler werden
-  /// angezeigt, blockieren aber nicht â€“ "Weiter" geht immer.
+  /// Richtet einen Passkey ein (überspringbarer Schritt). Fehler werden
+  /// angezeigt, blockieren aber nicht – "Weiter" geht immer.
   Future<void> _setupPasskey() async {
     if (_passkeyBusy || _passkeyCreated) return;
     setState(() => _passkeyBusy = true);
@@ -269,7 +294,7 @@ class _SettingsPrivacyOnceScreenState
       setState(() => _passkeyCreated = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Passkey eingerichtet. Du kannst dich kÃ¼nftig damit '
+          content: Text('Passkey eingerichtet. Du kannst dich künftig damit '
               'anmelden.'),
           behavior: SnackBarBehavior.floating,
         ),
@@ -280,7 +305,7 @@ class _SettingsPrivacyOnceScreenState
       final msg = e is AppException
           ? e.message
           : 'Passkey-Setup fehlgeschlagen oder abgebrochen. Du kannst es '
-              'spÃ¤ter jederzeit in den Einstellungen nachholen.';
+              'später jederzeit in den Einstellungen nachholen.';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -295,9 +320,10 @@ class _SettingsPrivacyOnceScreenState
   }
 
   void _acceptAndFinish() async {
-    // Zuerst Community-Richtlinien akzeptieren, dann Setup abschlieÃŸen.
+    // Zuerst Community-Richtlinien akzeptieren, dann Setup abschließen –
+    // mit dringender Sicherheitsempfehlung (Passkey/2FA), falls fehlend.
     await ref.read(settingsProvider.notifier).acceptCommunityGuidelines();
-    await _finish();
+    await _finishWithSecurityNudge();
   }
 
   Future<void> _finish() async {
@@ -312,10 +338,61 @@ class _SettingsPrivacyOnceScreenState
     }
     await _saveHabitudes();
     await settingsNotifier.completeOneTimeSettings();
-    // Setup-Stand zusÃ¤tzlich serverseitig sichern, damit die Einrichtung
+    // Setup-Stand zusätzlich serverseitig sichern, damit die Einrichtung
     // nach Neuinstallation/neuem Login nicht erneut erscheint.
     unawaited(_persistSetupFlagsToServer());
     if (mounted) context.go(AppRoutes.home);
+  }
+
+  /// Dringende Empfehlung: Wenn weder Passkey noch 2FA eingerichtet sind,
+  /// vor dem Abschluss ein deutlicher Hinweis mit Direkt-Sprüngen.
+  Future<void> _finishWithSecurityNudge() async {
+    final mfaActive =
+        ref.read(mfaStatusProvider).hasVerifiedFactors ||
+            ref.read(mfaStatusProvider).hasAnyFactor;
+    if (_passkeyCreated || mfaActive) {
+      await _finish();
+      return;
+    }
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.shield_outlined,
+            color: Theme.of(ctx).colorScheme.primary, size: 40),
+        title: const Text('Dringend empfohlen'),
+        content: const Text(
+          'Sichere dein Konto jetzt mit einem Passkey oder der '
+          'Zwei-Faktor-Authentisierung. Ohne zweiten Faktor kann jeder '
+          'mit deinem Passwort dein Konto übernehmen – bei einer '
+          'Dating-App besonders heikel.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('skip'),
+            child: const Text('Trotzdem fortfahren'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('mfa'),
+            child: const Text('2FA einrichten'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop('passkey'),
+            child: const Text('Passkey einrichten'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    switch (choice) {
+      case 'passkey':
+        _pageController.jumpToPage(5); // Passkey-Seite
+      case 'mfa':
+        _pageController.jumpToPage(6); // 2FA-Seite
+      default:
+        await _finish();
+    }
   }
 
   /// Schreibt die Setup-Flags best-effort in die profiles-Tabelle.
@@ -424,7 +501,7 @@ class _SettingsPrivacyOnceScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Standort erkannt und Ã¼bernommen (GPS Koordinaten).'),
+            content: Text('Standort erkannt und übernommen (GPS Koordinaten).'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -448,8 +525,8 @@ class _SettingsPrivacyOnceScreenState
 
     // Altersbasierte Sicherheits-Regeln.
     // WICHTIG: Solange das Profil (Geburtsdatum) noch nicht geladen ist,
-    // wird NICHT als MinderjÃ¤hriger geklemmt (Fallback 18 = Erwachsen).
-    // Vorher fÃ¼hrte der Fallback 16 dazu, dass die Altersspanne dauerhaft
+    // wird NICHT als Minderjähriger geklemmt (Fallback 18 = Erwachsen).
+    // Vorher führte der Fallback 16 dazu, dass die Altersspanne dauerhaft
     // auf 16-19 gespeichert wurde ("Alter falsch gemerkt").
     final userAge = profile.age;
     final effectiveAge = userAge ?? 18;
@@ -458,8 +535,8 @@ class _SettingsPrivacyOnceScreenState
     final clampedAgeMin = settings.ageRangeMin.clamp(allowedAgeMin, allowedAgeMax);
     final clampedAgeMax = settings.ageRangeMax.clamp(clampedAgeMin, allowedAgeMax);
 
-    // Falls Werte auÃŸerhalb erlaubtem Bereich: asynchron korrigieren â€“
-    // aber NUR, wenn das Alter tatsÃ¤chlich bekannt ist.
+    // Falls Werte außerhalb erlaubtem Bereich: asynchron korrigieren –
+    // aber NUR, wenn das Alter tatsächlich bekannt ist.
     if (userAge != null &&
         (settings.ageRangeMin != clampedAgeMin ||
             settings.ageRangeMax != clampedAgeMax)) {
@@ -478,11 +555,11 @@ class _SettingsPrivacyOnceScreenState
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Einstellungen & PrivatsphÃ¤re'),
+          title: const Text('Einstellungen & Privatsphäre'),
           leading: _currentPage > 0
               ? IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  tooltip: 'ZurÃ¼ck',
+                  tooltip: 'Zurück',
                   onPressed: _prevPage,
                 )
               : null,
@@ -524,9 +601,9 @@ class _SettingsPrivacyOnceScreenState
                   physics: const ClampingScrollPhysics(),
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   children: [
-                    // Page 1: PrivatsphÃ¤re & Theme
+                    // Page 1: Privatsphäre & Theme
                     _Page(
-                      title: 'PrivatsphÃ¤re & Darstellung',
+                      title: 'Privatsphäre & Darstellung',
                       subtitle:
                           'Wer darf dein Profil sehen? Wie soll die App aussehen?',
                       child: Column(
@@ -602,10 +679,10 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                     // Page 3: Filter & PrÃ¤ferenzen
+                     // Page 3: Filter & Präferenzen
                      _Page(
-                       title: 'Filter & PrÃ¤ferenzen',
-                       subtitle: 'Wen mÃ¶chtest du kennenlernen?',
+                       title: 'Filter & Präferenzen',
+                       subtitle: 'Wen möchtest du kennenlernen?',
                        child: Column(
                          crossAxisAlignment: CrossAxisAlignment.start,
                          children: [
@@ -615,7 +692,7 @@ class _SettingsPrivacyOnceScreenState
                             ),
                             const SizedBox(height: 12),
                             // Mehrfachauswahl per Chips (inkl. "Alle"-Kurzform).
-                            // Ein einzelnes Geschlecht kann nicht abgewÃ¤hlt
+                            // Ein einzelnes Geschlecht kann nicht abgewählt
                             // werden, solange es das letzte aktive ist.
                             const GenderPreferenceSelector(),
                            const SizedBox(height: 20),
@@ -649,7 +726,7 @@ class _SettingsPrivacyOnceScreenState
                                ),
                                DropdownMenuItem(
                                  value: RelationshipType.open,
-                                 child: Text('Offen fÃ¼r alles'),
+                                 child: Text('Offen für alles'),
                                ),
                              ],
                              onChanged: (v) {
@@ -832,7 +909,7 @@ class _SettingsPrivacyOnceScreenState
                                 v.end.round(),
                               ),
                               // Nach dem Loslassen den Fokus entfernen, damit
-                              // kein vergrÃ¶ÃŸerter Thumb-Overlay hÃ¤ngen bleibt.
+                              // kein vergrößerter Thumb-Overlay hängen bleibt.
                               onChangeEnd: (_) =>
                                   FocusManager.instance.primaryFocus?.unfocus(),
                             ),
@@ -843,9 +920,9 @@ class _SettingsPrivacyOnceScreenState
                     _Page(
                       title: 'Dein Profil',
                       subtitle:
-                          'Ein Bild, ein paar Worte Ã¼ber dich und deine '
+                          'Ein Bild, ein paar Worte über dich und deine '
                           'Interessen helfen anderen, dich kennenzulernen. '
-                          'Alles optional und spÃ¤ter Ã¤nderbar.',
+                          'Alles optional und später änderbar.',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -885,7 +962,7 @@ class _SettingsPrivacyOnceScreenState
                                                     CircularProgressIndicator(
                                                         strokeWidth: 2))
                                             : const Icon(Icons.add_a_photo),
-                                        tooltip: 'Profilbild wÃ¤hlen',
+                                        tooltip: 'Profilbild wählen',
                                       ),
                                     ),
                                   ],
@@ -900,7 +977,7 @@ class _SettingsPrivacyOnceScreenState
                             maxLines: 3,
                             maxLength: 300,
                             decoration: const InputDecoration(
-                              labelText: 'Ãœber mich (Bio)',
+                              labelText: 'Über mich (Bio)',
                               hintText: 'z. B. Hobbys, was dir wichtig ist',
                             ),
                           ),
@@ -914,7 +991,7 @@ class _SettingsPrivacyOnceScreenState
                             decoration: const InputDecoration(
                               labelText: 'Bundesland (optional)',
                             ),
-                            hint: const Text('Bitte wÃ¤hlen'),
+                            hint: const Text('Bitte wählen'),
                             items: kGermanStates
                                 .map((s) => DropdownMenuItem(
                                       value: s,
@@ -949,17 +1026,17 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                    // Page 4: Deine Vorstellung (Text + Audio, Ã¼berspringbar)
+                    // Page 4: Deine Vorstellung (Text + Audio, überspringbar)
                     _Page(
                       title: 'Deine Vorstellung',
                       subtitle:
-                          'ErzÃ¤hl von dir â€“ als Text und gesprochen. Beides '
+                          'Erzähl von dir – als Text und gesprochen. Beides '
                           'wird anderen gezeigt, bevor sie dein Foto sehen. '
-                          'Du kannst diesen Schritt auch Ã¼berspringen.',
+                          'Du kannst diesen Schritt auch überspringen.',
                       child: IntroEditor(
                         initialText: _introText,
                         initialAudioPath: _introAudioPath,
-                        required: false,
+                        required: true,
                         onChanged: (text, audioPath) {
                           setState(() {
                             _introText = text;
@@ -968,13 +1045,51 @@ class _SettingsPrivacyOnceScreenState
                         },
                       ),
                     ),
-                    // Page 4: Passkey (Ã¼berspringbar)
+                    // Page 5: Gewohnheiten (Rauchen, Alkohol, Drogen)
                     _Page(
-                      title: 'Passkey einrichten',
+                      title: 'Gewohnheiten',
+                      subtitle: 'Wie stehst du zu Rauchen, Alkohol und Drogen? '
+                          'Diese Angaben beeinflussen, wen du bei '
+                          '"Find your Match" siehst.',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Es werden nur Personen gezeigt, die maximal so '
+                            'viel konsumieren wie du. Du kannst das später in '
+                            'den Einstellungen oder im Profil ändern.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          HabitudeSelector(
+                            topic: HabitudeTopic.smoking,
+                            value: _smoking,
+                            onChanged: (v) =>
+                                setState(() => _smoking = v),
+                          ),
+                          const SizedBox(height: 16),
+                          HabitudeSelector(
+                            topic: HabitudeTopic.alcohol,
+                            value: _alcohol,
+                            onChanged: (v) =>
+                                setState(() => _alcohol = v),
+                          ),
+                          const SizedBox(height: 16),
+                          HabitudeSelector(
+                            topic: HabitudeTopic.drugs,
+                            value: _drugs,
+                            onChanged: (v) => setState(() => _drugs = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Page 4: Passkey (überspringbar)
+                    _Page(
+                      title: 'Passkey einrichten (dringend empfohlen)',
                       subtitle:
-                          'Melde dich kÃ¼nftig ohne Passwort an â€“ per '
+                          'Melde dich künftig ohne Passwort an – per '
                           'Fingerabdruck oder Gesicht. Optional, du kannst '
-                          'diesen Schritt Ã¼berspringen.',
+                          'diesen Schritt überspringen.',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -983,7 +1098,7 @@ class _SettingsPrivacyOnceScreenState
                           const Text(
                             'Ein Passkey ist die sicherste und bequemste '
                             'Anmeldeart: Kein Passwort, das du merken oder '
-                            'vergessen kannst â€“ und schwerer zu stehlen als '
+                            'vergessen kannst – und schwerer zu stehlen als '
                             'ein Passwort.',
                           ),
                           const SizedBox(height: 24),
@@ -1010,7 +1125,7 @@ class _SettingsPrivacyOnceScreenState
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Du kannst die Einrichtung jederzeit spÃ¤ter in '
+                            'Du kannst die Einrichtung jederzeit später in '
                             'den Einstellungen nachholen.',
                             style: Theme.of(context).textTheme.bodySmall,
                             textAlign: TextAlign.center,
@@ -1018,13 +1133,13 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                    // Page 5: Zwei-Faktor-Schutz (Ã¼berspringbar)
+                    // Page 5: Zwei-Faktor-Schutz (überspringbar)
                     _Page(
                       title: 'Konto absichern',
                       subtitle:
-                          'Melde dich kÃ¼nftig zusÃ¤tzlich mit einem Code aus '
+                          'Melde dich künftig zusätzlich mit einem Code aus '
                           'einer Authenticator-App an. Optional, du kannst '
-                          'diesen Schritt Ã¼berspringen.',
+                          'diesen Schritt überspringen.',
                       child: Builder(
                         builder: (context) {
                           final mfaActive = ref
@@ -1049,7 +1164,7 @@ class _SettingsPrivacyOnceScreenState
                                         'jedem Login wirst du nach dem '
                                         'Code aus deiner Authenticator-App '
                                         'gefragt.'
-                                    : 'Ein zweiter Faktor schÃ¼tzt dein '
+                                    : 'Ein zweiter Faktor schützt dein '
                                         'Konto, selbst wenn dein Passwort '
                                         'gestohlen wird. Du brauchst eine '
                                         'Authenticator-App (z. B. Google '
@@ -1069,7 +1184,7 @@ class _SettingsPrivacyOnceScreenState
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Du kannst die Einrichtung jederzeit spÃ¤ter '
+                                'Du kannst die Einrichtung jederzeit später '
                                 'in den Einstellungen nachholen.',
                                 style: Theme.of(context).textTheme.bodySmall,
                                 textAlign: TextAlign.center,
@@ -1079,45 +1194,7 @@ class _SettingsPrivacyOnceScreenState
                         },
                       ),
                     ),
-                    // Page 6: Gewohnheiten (Rauchen, Alkohol, Drogen)
-                    _Page(
-                      title: 'Gewohnheiten',
-                      subtitle: 'Wie stehst du zu Rauchen, Alkohol und Drogen? '
-                          'Diese Angaben beeinflussen, wen du bei '
-                          '"Find your Match" siehst.',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Es werden nur Personen gezeigt, die maximal so '
-                            'viel konsumieren wie du. Du kannst das spÃ¤ter in '
-                            'den Einstellungen oder im Profil Ã¤ndern.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 16),
-                          HabitudeSelector(
-                            topic: HabitudeTopic.smoking,
-                            value: _smoking,
-                            onChanged: (v) =>
-                                setState(() => _smoking = v),
-                          ),
-                          const SizedBox(height: 16),
-                          HabitudeSelector(
-                            topic: HabitudeTopic.alcohol,
-                            value: _alcohol,
-                            onChanged: (v) =>
-                                setState(() => _alcohol = v),
-                          ),
-                          const SizedBox(height: 16),
-                          HabitudeSelector(
-                            topic: HabitudeTopic.drugs,
-                            value: _drugs,
-                            onChanged: (v) => setState(() => _drugs = v),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Page 7: Community Richtlinien
+                    // Page 8: Community Richtlinien
                     _Page(
                       title: 'Community Richtlinien',
                       subtitle:
@@ -1145,8 +1222,8 @@ class _SettingsPrivacyOnceScreenState
                       ),
                     const SizedBox(height: 12),
                     Text(
-                      'Diese Einstellungen kannst du spÃ¤ter jederzeit in '
-                      'den Einstellungen Ã¤ndern.',
+                      'Diese Einstellungen kannst du später jederzeit in '
+                      'den Einstellungen ändern.',
                       style: Theme.of(context).textTheme.bodySmall,
                       textAlign: TextAlign.center,
                     ),
@@ -1170,8 +1247,8 @@ class _SettingsPrivacyOnceScreenState
         ),
         const SizedBox(height: 12),
         const Text(
-          'Diese App lebt von einem respektvollen, wertschÃ¤tzenden Umgang '
-          'miteinander, unabhÃ¤ngig von Herkunft, Geschlecht, Religion oder '
+          'Diese App lebt von einem respektvollen, wertschätzenden Umgang '
+          'miteinander, unabhängig von Herkunft, Geschlecht, Religion oder '
           'Lebensentwurf.',
         ),
         const SizedBox(height: 16),
@@ -1185,11 +1262,11 @@ class _SettingsPrivacyOnceScreenState
         ),
         const _RuleItem(
           '3',
-          'PersÃ¶nlichkeit vor Aussehen: Fotos werden erst nach Match gezeigt.',
+          'Persönlichkeit vor Aussehen: Fotos werden erst nach Match gezeigt.',
         ),
         const _RuleItem(
           '4',
-          'Respektiere Grenzen: Keine unerwÃ¼nschten Bilder oder Nachrichten.',
+          'Respektiere Grenzen: Keine unerwünschten Bilder oder Nachrichten.',
         ),
         const _RuleItem(
           '5',
@@ -1197,11 +1274,11 @@ class _SettingsPrivacyOnceScreenState
         ),
         const _RuleItem(
           '6',
-          'Bei VerstoÃŸ gegen diese Regeln kann der Zugang gesperrt werden.',
+          'Bei Verstoß gegen diese Regeln kann der Zugang gesperrt werden.',
         ),
         const SizedBox(height: 12),
         Text(
-          'Bei VerstoÃŸ kann der Zugang dauerhaft gesperrt werden.',
+          'Bei Verstoß kann der Zugang dauerhaft gesperrt werden.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.error,
               ),
@@ -1268,7 +1345,7 @@ class _Page extends StatelessWidget {
             Expanded(
               child: Scrollbar(
                 child: SingleChildScrollView(
-                  // Platz fÃ¼r die Tastatur: Der Inhalt bleibt so Ã¼ber dem
+                  // Platz für die Tastatur: Der Inhalt bleibt so über dem
                   // Keyboard scrollbar, statt dahinter zu verschwinden.
                   padding: EdgeInsets.only(
                      bottom: MediaQuery.viewInsetsOf(context).bottom,

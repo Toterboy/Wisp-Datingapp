@@ -93,6 +93,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
           .timeout(const Duration(seconds: 10), onTimeout: () => false);
       state = AsyncValue.data(loggedIn);
       if (loggedIn) {
+        // „Angemeldet bleiben"-Wunsch respektieren (Default: AN). Wenn der
+        // Nutzer die Option im Login bewusst deaktiviert hat, wird die
+        // Session beim Start still verworfen -> Login-Screen.
+        final keepLoggedIn =
+            await _ref.read(localStorageProvider).getBool('keep_logged_in') ??
+                true;
+        if (!keepLoggedIn) {
+          await _auth.logout();
+          state = const AsyncValue.data(false);
+          return;
+        }
         // Profil (Geburtsdatum/Alter!) und Setup-Flags vom Server nachladen.
         unawaited(_syncFromServer());
       }
@@ -149,14 +160,16 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
           .fetchOwnProfile()
           .timeout(const Duration(seconds: 3));
       if (profile == null) {
+        // Nur die SESSION verwerfen - lokale Daten (Profil, Einstellungen,
+        // Praeferenzen) bleiben als Cache erhalten. Vorher wurden sie hier
+        // komplett geloescht, was bei einem falsch-negativ (z. B. RLS-
+        // Strohfeuer) den Nutzer alles neu eingeben liess. Nach erneutem
+        // Login liefert der Server das Profil ohnehin wieder.
         debugPrint(
-          '[AuthNotifier] Profil fehlt trotz Session – Account wurde '
-          'serverseitig gelöscht. Lokale Session und Daten werden verworfen.',
+          '[AuthNotifier] Profil fehlt trotz Session - Session wird '
+          'verworfen (lokale Daten bleiben erhalten).',
         );
         await _auth.logout();
-        await _ref.read(settingsProvider.notifier).resetToDefaults();
-        await _ref.read(userPreferencesProvider.notifier).resetToDefaults();
-        await _ref.read(profileProvider.notifier).resetToDefaults();
         _ref.read(pendingVerificationEmailProvider.notifier).state = null;
         _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
         state = const AsyncValue.data(false);

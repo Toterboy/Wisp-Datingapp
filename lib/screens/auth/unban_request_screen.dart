@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,11 +7,11 @@ import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/unban_request_service.dart';
 import 'package:wisp/widgets/buttons.dart';
 
-/// Entsperrungsantrag fÃ¼r gesperrte E-Mail-Adressen (Plattform-Sperre,
-/// Migration 045). Erreichbar Ã¼ber [AppRoutes.unbanRequest], Ã¶ffentlich
-/// (kein Login nÃ¶tig â€“ das Konto ist ja gesperrt).
+/// Entsperrungsantrag für gesperrte E-Mail-Adressen (Plattform-Sperre,
+/// Migration 045). Erreichbar über [AppRoutes.unbanRequest], öffentlich
+/// (kein Login nötig – das Konto ist ja gesperrt).
 ///
-/// Die E-Mail-Adresse kann Ã¼ber das Router-Extra (`String`) vorbefÃ¼llt
+/// Die E-Mail-Adresse kann über das Router-Extra (`String`) vorbefüllt
 /// werden (z. B. aus dem Login-/Registrierungs-Flow).
 class UnbanRequestScreen extends ConsumerStatefulWidget {
   const UnbanRequestScreen({super.key, this.initialEmail});
@@ -53,7 +53,7 @@ class _UnbanRequestScreenState extends ConsumerState<UnbanRequestScreen> {
         final message = e is AppException
             ? e.message
             : 'Der Antrag konnte nicht gesendet werden. '
-                  'Bitte versuche es spÃ¤ter erneut.';
+                  'Bitte versuche es später erneut.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -87,14 +87,14 @@ class _UnbanRequestScreenState extends ConsumerState<UnbanRequestScreen> {
                     const SizedBox(height: 12),
                     Text(
                       'Dein Entsperrungsantrag wurde an den Support '
-                      'Ã¼bermittelt. Wir prÃ¼fen den Fall und melden uns '
+                      'übermittelt. Wir prüfen den Fall und melden uns '
                       'per E-Mail.',
                       style: Theme.of(context).textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
                     PrimaryButton(
-                      label: 'ZurÃ¼ck zur Anmeldung',
+                      label: 'Zurück zur Anmeldung',
                       onPressed: () => context.go(AppRoutes.login),
                     ),
                   ],
@@ -115,8 +115,8 @@ class _UnbanRequestScreenState extends ConsumerState<UnbanRequestScreen> {
                       Text(
                         'Diese E-Mail-Adresse ist auf der Plattform '
                         'gesperrt. Wenn du glaubst, dass ein Fehler '
-                        'vorliegt, sende einen Entsperrungsantrag â€“ '
-                        'wir prÃ¼fen den Fall.',
+                        'vorliegt, sende einen Entsperrungsantrag – '
+                        'wir prüfen den Fall.',
                         style: Theme.of(context).textTheme.bodyMedium,
                         textAlign: TextAlign.center,
                       ),
@@ -136,7 +136,7 @@ class _UnbanRequestScreenState extends ConsumerState<UnbanRequestScreen> {
                           }
                           if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
                               .hasMatch(value)) {
-                            return 'Bitte gib eine gÃ¼ltige E-Mail-Adresse ein.';
+                            return 'Bitte gib eine gültige E-Mail-Adresse ein.';
                           }
                           return null;
                         },
@@ -147,16 +147,16 @@ class _UnbanRequestScreenState extends ConsumerState<UnbanRequestScreen> {
                         maxLines: 5,
                         maxLength: 2000,
                         decoration: const InputDecoration(
-                          labelText: 'BegrÃ¼ndung',
+                          labelText: 'Begründung',
                           hintText:
-                              'ErklÃ¤re kurz, warum dein Konto entsperrt '
+                              'Erkläre kurz, warum dein Konto entsperrt '
                               'werden sollte (mindestens 20 Zeichen).',
                           border: OutlineInputBorder(),
                         ),
                         validator: (v) {
                           final value = v?.trim() ?? '';
                           if (value.length < 20) {
-                            return 'Bitte gib eine BegrÃ¼ndung mit mindestens '
+                            return 'Bitte gib eine Begründung mit mindestens '
                                 '20 Zeichen an.';
                           }
                           return null;
@@ -173,7 +173,7 @@ class _UnbanRequestScreenState extends ConsumerState<UnbanRequestScreen> {
                         onPressed: _sending
                             ? null
                             : () => context.go(AppRoutes.login),
-                        child: const Text('ZurÃ¼ck zur Anmeldung'),
+                        child: const Text('Zurück zur Anmeldung'),
                       ),
                     ],
                   ),

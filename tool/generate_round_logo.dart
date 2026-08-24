@@ -61,19 +61,24 @@ void main() {
   }
 
   final roundLogo = img.encodePng(out);
-  File('assets/images/wisp_icon_round.png').writeAsBytesSync(roundLogo);
+
+  // Dark-Variante: nahe-weiße Design-Flächen (Sprechblase) werden auf ein
+  // dunkles Grau gemappt, farbige Anteile bleiben unverändert. Damit gibt
+  // es im Dark Mode keine leuchtend weißen Stellen.
+  final dark = img.Image.from(out);
+  for (final p in dark) {
+    if (p.a > 10 && p.r > 225 && p.g > 225 && p.b > 225) {
+      p.setRgba(38, 38, 43, p.a); // #26262B
+    }
+  }
+  final roundDarkLogo = img.encodePng(dark);
+  File('assets/images/wisp_icon_round_dark.png')
+      .writeAsBytesSync(roundDarkLogo);
 
   final densities = <String>[
     'android/app/src/main/res/drawable',
     'android/app/src/main/res/drawable-hdpi',
     'android/app/src/main/res/drawable-mdpi',
-    'android/app/src/main/res/drawable-night',
-    'android/app/src/main/res/drawable-night-hdpi',
-    'android/app/src/main/res/drawable-night-mdpi',
-    'android/app/src/main/res/drawable-night-v21',
-    'android/app/src/main/res/drawable-night-xhdpi',
-    'android/app/src/main/res/drawable-night-xxhdpi',
-    'android/app/src/main/res/drawable-night-xxxhdpi',
     'android/app/src/main/res/drawable-v21',
     'android/app/src/main/res/drawable-xhdpi',
     'android/app/src/main/res/drawable-xxhdpi',
@@ -83,8 +88,24 @@ void main() {
     File('$dir/splash_raw.png').writeAsBytesSync(roundLogo);
   }
 
+  // Night-Dichteordner bekommen die Dark-Variante (gleicher Dateiname,
+  // Android wählt automatisch passend zum System-Theme).
+  final nightDensities = <String>[
+    'android/app/src/main/res/drawable-night',
+    'android/app/src/main/res/drawable-night-hdpi',
+    'android/app/src/main/res/drawable-night-mdpi',
+    'android/app/src/main/res/drawable-night-v21',
+    'android/app/src/main/res/drawable-night-xhdpi',
+    'android/app/src/main/res/drawable-night-xxhdpi',
+    'android/app/src/main/res/drawable-night-xxxhdpi',
+  ];
+  for (final dir in nightDensities) {
+    File('$dir/splash_raw.png').writeAsBytesSync(roundDarkLogo);
+  }
+
   // ignore: avoid_print
-  print('Rundes Logo erzeugt: ${size}x$size px (${densities.length + 1} Dateien)');
+  print('Rundes Logo erzeugt: ${size}x$size px '
+      '(+ Dark-Variante, ${densities.length + nightDensities.length} Splash-Dateien)');
 }
 
 double sqrtSafe(double v) => v <= 0 ? 0 : math.sqrt(v);

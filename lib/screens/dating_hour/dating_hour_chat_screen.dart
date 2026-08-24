@@ -10,6 +10,7 @@ import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/dating_hour_service.dart';
+import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/p2p_chat_service.dart';
 import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/utils/constants.dart';
@@ -32,6 +33,8 @@ class DatingHourChatScreen extends ConsumerStatefulWidget {
 }
 
 class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
+  /// Cache: Partner-Profil nur einmal pro Session laden.
+  final Map<String, Future<Map<String, dynamic>?>> partnerHabitsCache = {};
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _timer;
@@ -303,6 +306,9 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
         ? (session.isParticipantA(_currentUserId ?? '') ? 'Teilnehmer B' : 'Teilnehmer A')
         : 'Verbinde...';
 
+    // Partner-Gewohnheiten: aus public_profiles laden und als Chips zeigen.
+    final partnerId = session?.getPeerId(_currentUserId ?? '');
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -347,6 +353,55 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
                   ),
                 ],
               ),
+              if (partnerId != null)
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: partnerHabitsCache.putIfAbsent(
+                      partnerId,
+                      () => ref
+                          .read(supabaseDatabaseServiceProvider)
+                          .fetchPublicProfile(partnerId)),
+                  builder: (ctx, snap) {
+                    final habits = <String>[];
+                    final row = snap.data;
+                    if (row != null) {
+                      final s = row['smoking'] as String?;
+                      final a = row['alcohol'] as String?;
+                      final d = row['drugs'] as String?;
+                      if (s != null && s.isNotEmpty) {
+                        habits.add('Rauchen: $s');
+                      }
+                      if (a != null && a.isNotEmpty) {
+                        habits.add('Alkohol: $a');
+                      }
+                      if (d != null && d.isNotEmpty) {
+                        habits.add('Drogen: $d');
+                      }
+                    }
+                    if (habits.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 2,
+                        children: [
+                          for (final h in habits)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(h,
+                                  style: const TextStyle(fontSize: 9)),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
           ],
         ),
         leading: IconButton(

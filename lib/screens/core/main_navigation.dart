@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 
 /// Hält den aktuell aktiven Tab der Bottom-Navigation.
@@ -19,10 +20,10 @@ class MainNavigation extends ConsumerWidget {
   final Widget child;
 
   static const _tabs = [
-    _NavItem(AppRoutes.home, Icons.newspaper, 'Aktuelles'),
-    _NavItem(AppRoutes.swipeModeSelection, Icons.favorite, 'Entdecken'),
-    _NavItem(AppRoutes.interessen, Icons.people, 'Interessen'),
-    _NavItem(AppRoutes.profile, Icons.person, 'Profil'),
+    _NavItem(AppRoutes.home, Icons.newspaper, 'nav.home'),
+    _NavItem(AppRoutes.swipeModeSelection, Icons.favorite, 'nav.discover'),
+    _NavItem(AppRoutes.interessen, Icons.people, 'nav.interests'),
+    _NavItem(AppRoutes.profile, Icons.person, 'nav.profile'),
   ];
 
   static const _routes = [
@@ -100,7 +101,7 @@ class MainNavigation extends ConsumerWidget {
           .map(
             (t) => NavigationDestination(
               icon: Icon(t.icon),
-              label: t.label,
+              label: L10n.t(context, t.label),
             ),
           )
           .toList(),
@@ -121,7 +122,7 @@ class MainNavigation extends ConsumerWidget {
                       .map(
                         (t) => NavigationRailDestination(
                           icon: Icon(t.icon),
-                          label: Text(t.label),
+                          label: Text(L10n.t(context, t.label)),
                         ),
                       )
                       .toList(),

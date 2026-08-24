@@ -36,11 +36,34 @@ können sich Schnittstellen und Verhalten jederzeit ändern.
 
 - **„Match" heißt jetzt „Funke"** – deutsche, warme Bezeichnung für die
   entstehende Verbindung (Technik und Datenmodell unverändert)
+- **Angemeldet bleiben**: neuer Schalter im Login (standardmäßig AN).
+  Ein automatischer Logout löscht keine lokalen Daten mehr – nach erneutem
+  Login ist dein Profil wieder da
+- **Einrichtung**: Gewohnheiten sind jetzt Schritt 5 (vor den
+  Sicherheitsschritten); die Schritte Filter, Profil und Vorstellung sind
+  Pflicht (Bio, mindestens ein Interesse, Text- UND Audio-Vorstellung)
+- **Dating Hour**: Gewohnheiten als weiche Matching-Präferenz (wählbar in
+  den Präferenzen, Anzeige als Chips im Event-Chat)
+- **Passkey & 2FA werden dringend empfohlen**: deutlicher Hinweis am Ende
+  der Einrichtung mit Direkt-Sprung zum Einrichten; neue Passkey-Diagnose
+  in den Einstellungen zeigt die genaue Ursache bei Problemen
+- **Sprache Deutsch/Englisch**: umschaltbar im Login-Screen und in den
+  Einstellungen (Darstellung)
+- **Captcha-Dialog** kompakter (an die Cloudflare-Fenstergröße angepasst)
+- **Splash/Logo**: kleiner (60 %), Dark-Variante des Logos ohne weiße
+  Flächen (App + nativer Splash in night-Dichteordnern)
+- **Theme-Picker**: einheitliche Kachelgrößen
 - Registrierung ist jetzt **ohne Einladungscode** offen (Bot-Schutz weiter
   über optionales CAPTCHA + Rate-Limits)
 - GPS-Button beim Standortfeld sitzt als suffixIcon exakt am Eingabefeld –
   auch bei großer Systemschrift
 - App-Titel überall „WispDating"
+
+### Behoben
+
+- **CI**: Actions auf v5 (Node-20-Deprecation behoben), `.env` wird im
+  Workflow aus der Beispiel-Datei erzeugt (fehlendes Asset brach den
+  Asset-Build ab)
 
 ### Entfernt
 

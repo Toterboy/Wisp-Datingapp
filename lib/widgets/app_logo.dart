@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// App-Logo für Wisp – rund, ohne Ecken und ohne Hintergrund.
+/// App-Logo für WispDating — rund, ohne Ecken und ohne Hintergrund.
 ///
-/// Nutzt `wisp_icon_round.png`. Das Asset hat KEINE transparenten Ecken,
-/// sondern einen opaken schwarzen Hintergrund (im Dark Mode unsichtbar,
-/// im Light Mode als schwarzes Rechteck sichtbar) – deshalb schneidet ein
-/// [ClipOval] alles außerhalb des Kreises ab. So bleibt das Logo in Light-
-/// UND Dark Mode sauber rund, unabhängig vom Asset-Inhalt.
+/// Nutzt `wisp_icon_round.png` (Light) bzw. `wisp_icon_round_dark.png`
+/// (Dark: weiße Design-Flächen sind auf dunkles Grau gemappt, damit im
+/// Dark Mode keine leuchtenden Stellen übrig bleiben). Ein [ClipOval]
+/// schneidet alles außerhalb des Kreises ab, unabhängig vom Asset-Inhalt.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 120});
 
@@ -14,6 +13,10 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final asset = isDark
+        ? 'assets/images/wisp_icon_round_dark.png'
+        : 'assets/images/wisp_icon_round.png';
     final pixelRatio = MediaQuery.of(context).devicePixelRatio;
     final cacheDim = (size * pixelRatio).toInt();
     return RepaintBoundary(
@@ -23,7 +26,7 @@ class AppLogo extends StatelessWidget {
         color: Colors.transparent,
         child: ClipOval(
           child: Image.asset(
-            'assets/images/wisp_icon_round.png',
+            asset,
             width: size,
             height: size,
             cacheWidth: cacheDim,

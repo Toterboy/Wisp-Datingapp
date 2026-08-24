@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,7 +145,7 @@ class _InfoBullet extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('âœ… ', style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer)),
+          Text('✅ ', style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer)),
           Expanded(
             child: Text(
               text,
