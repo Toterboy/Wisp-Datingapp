@@ -1,0 +1,36 @@
+name: unifiedpush_android
+description: Android implementation of UnifiedPush plugin.
+version: 3.4.1
+homepage: "https://unifiedpush.org/developers/flutter"
+documentation: "https://unifiedpush.org/developers/flutter"
+repository: https://codeberg.org/UnifiedPush/flutter-connector/src/branch/main/unifiedpush_android
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  unifiedpush_platform_interface: ^4.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0 # Keep 3+ to avoid increasing min SDK.
+  dependency_validator: ^4.0.0 # Keep 4+ to avoid increasing min SDK.
+
+flutter:
+  plugin:
+    implements: unifiedpush
+    platforms:
+      android:
+        package: org.unifiedpush.flutter.connector
+        pluginClass: Plugin
+        dartPluginClass: UnifiedPushAndroid
+
+#todev#dependency_overrides:
+#todev#  unifiedpush_platform_interface:
+#todev#    path: ../unifiedpush_platform_interface
+#todev#  unifiedpush_storage_interface:
+#todev#    path: ../unifiedpush_storage_interface

@@ -1,0 +1,60 @@
+group 'org.unifiedpush.flutter.connector'
+version '1.0-SNAPSHOT'
+
+// Lokaler Fork (third_party/unifiedpush_android, Basis 3.4.1):
+// - Kein eigener buildscript-Block mehr (zog AGP 8.13 + KGP 2.2.10 als
+//   Klasspath -> Flutter-KGP-Warnung).
+// - Keine KGP-Apply-Zeile. Der Flutter-Plugin-Loader wendet KGP selbst an
+//   (android.builtInKotlin=false); mit Built-in Kotlin kompiliert AGP.
+// - Java 17 statt 1.8 (konsistent mit der App).
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'org.unifiedpush.flutter.connector'
+    }
+
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        minSdk 16
+    }
+}
+
+// Kotlin-JVM-Ziel setzen, sobald die kotlin-Extension existiert
+// (vom Loader angewendetes KGP bzw. AGP Built-in Kotlin).
+def kotlinExt = project.extensions.findByName('kotlin')
+if (kotlinExt?.hasProperty('compilerOptions')) {
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        }
+    }
+} else {
+    android.kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    api 'org.unifiedpush.android:connector:3.1.2'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
+}

@@ -1,0 +1,85 @@
+## 3.4.1
+* Fix event reception when plugins are reinitialized
+
+## 3.4.0
+* Use new platform interface
+
+## 3.3.1
+* Fix: Token duplication on re-registrations
+* Fix: Do not rotate keys on re-registrations
+* Add `--unifiedpush-bg` argument to dart entrypoint
+* Since 3.1.1:
+    * Follow AND_3.1.0 specifications, with migration and temp unavailibility
+    * Compile with SDK 36
+    * Bump lowest supported kotlin version to 2.0
+
+## 3.1.1
+* Fix events with updated Plugin
+* Bump android-connector to 3.0.10:
+    * Fix UnifiedPush service initialization from the background
+
+## 3.1.0
+* Fix exposition of android-connector by the lib
+* Compile with SDK 35
+* Upgrade android-connector to 3.0.9
+* Bump dependencies
+
+## 3.0.0
+* Use new platform interface
+* Add VAPID
+* Add messageForDistributor
+
+## 2.3.0
+* Upgrade android-connector to 2.5.0
+* Get rid of toolchains
+* Update link to repository
+
+## 2.2.3
+* Fix upload of 2.2.2 on pub.dev
+
+## 2.2.2
+* Use kotlin 1.7.20
+* Upgrade android-connector to 2.4.0
+
+## 2.2.1
+* Upgrade android-connector to 2.3.0
+
+## 2.2.0
+* Upgrade max sdk
+* Target sdk 34
+* Upgrade android-connector to 2.2.0
+
+## 2.1.2
+* Fix crash when receiving 2+ notifications while starting in background
+
+## 2.1.1
+* Fix initialized event
+
+## 2.1.0
+* Ensure the engine is intizialed only once
+
+## 2.0.1
+* getDistributor returns nullable string
+* Ensure only one FlutterEngine is created
+* Do not explicitly call _onRegistered in unregisterApp
+* Fix getEngine
+
+## 1.1.2
+* unset pluginChannel in onDetachedFromEngine()
+
+## 1.1.1
+* Use mContext instead of mActivity
+
+## 1.1.0
+* Bump android-connector to 2.1.1
+* Bump other depencies
+* Upgrade compileSdkVersion to 33
+
+## 1.0.1
+* Bump android-connector to 2.0.1
+
+## 1.0.0
+* Use a platform interface
+* Dependency on android-connector has been removed
+* Code android side is not needed anymore
+

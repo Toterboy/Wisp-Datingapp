@@ -161,6 +161,11 @@ dependency_overrides:
   # Windows. Linux-Desktop ist kein Target - siehe third_party/unifiedpush_linux.
   unifiedpush_linux:
     path: third_party/unifiedpush_linux
+  # KGP-freier Fork: unifiedpush_android zieht upstream einen eigenen
+  # buildscript-Klasspath (AGP + KGP) -> Flutter-KGP-Warnung.
+  # Siehe third_party/unifiedpush_android.
+  unifiedpush_android:
+    path: third_party/unifiedpush_android
 
 flutter_launcher_icons:
   # Legacy-Android-Icon (mipmap-*): volles Basis-PNG (weisser Hintergrund +

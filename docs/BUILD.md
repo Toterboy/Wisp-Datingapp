@@ -27,6 +27,13 @@ flutter build apk --release --flavor play --dart-define=FDROID=false
 flutter build apk --release --flavor fdroid --dart-define=FDROID=true
 ```
 
+**Wichtig:** Seit es die Flavors gibt, ist ein Build **ohne** `--flavor`
+nicht mehr möglich — Flutter findet die APK sonst nicht (Fehler
+„failed to produce an .apk file"). Immer `--flavor play` oder
+`--flavor fdroid` angeben. In IntelliJ liegen fertige Run-Konfigurationen
+bereit: **„WispDating (play)"** und **„WispDating (fdroid)"** (Dropdown
+oben in der Toolbar).
+
 Der `FDROID`-Define schaltet Firebase/FCM im Dart-Code komplett ab
 (`constants.fdroidBuild`); die fdroid-Variante MUSS damit gebaut werden,
 sonst versucht sie trotzdem, Firebase zu initialisieren (wird zwar
