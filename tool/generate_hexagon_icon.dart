@@ -1,10 +1,10 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:math';
 
 import 'package:image/image.dart' as img;
 
 Future<void> main() async {
-  const sourcePath = 'assets/images/wisp_icon_base.png';
+  const sourcePath = 'assets/images/wispdating_icon_base.png';
   const hexForegroundPath = 'assets/images/wisp_icon_hex_foreground.png';
   const hexBackgroundPath = 'assets/images/wisp_icon_hex_background.png';
 

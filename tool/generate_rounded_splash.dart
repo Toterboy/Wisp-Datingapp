@@ -1,9 +1,9 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:image/image.dart' as img;
 
 Future<void> main() async {
-  const sourcePath = 'assets/images/wisp_icon_base.png';
+  const sourcePath = 'assets/images/wispdating_icon_base.png';
   const roundedForegroundPath = 'assets/images/wisp_icon_rounded_foreground.png';
   const roundedBackgroundPath = 'assets/images/wisp_icon_rounded_background.png';
 
