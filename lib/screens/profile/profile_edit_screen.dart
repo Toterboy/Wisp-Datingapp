@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,10 +26,10 @@ import 'package:wisp/widgets/gender_preference_selector.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
 import 'package:wisp/widgets/intro_editor.dart';
 
-/// Unterstützte Wohnsitzländer (Auswahl für die Profilangabe).
+/// UnterstÃ¼tzte WohnsitzlÃ¤nder (Auswahl fÃ¼r die Profilangabe).
 const kSupportedCountries = <String>[
   'Deutschland',
-  'Österreich',
+  'Ã–sterreich',
   'Schweiz',
   'Luxemburg',
   'Belgien',
@@ -40,11 +40,11 @@ const kSupportedCountries = <String>[
   'Portugal',
   'Polen',
   'Tschechien',
-  'Dänemark',
+  'DÃ¤nemark',
   'Schweden',
   'Norwegen',
   'Finnland',
-  'Vereinigtes Königreich',
+  'Vereinigtes KÃ¶nigreich',
   'Irland',
   'USA',
   'Kanada',
@@ -54,9 +54,9 @@ const kSupportedCountries = <String>[
 
 // kGermanStates ist zentral in lib/utils/constants.dart definiert.
 
-/// Profil bearbeiten: Name, Geburtsdatum, Geschlecht, Präferenzen, Bio,
+/// Profil bearbeiten: Name, Geburtsdatum, Geschlecht, PrÃ¤ferenzen, Bio,
 /// Beziehungsart, Standort, Entfernungsfilter, Interessen und die
-/// Vorstellung für "Find your Match" (Text + Audio).
+/// Vorstellung fÃ¼r "Find your Match" (Text + Audio).
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
 
@@ -74,6 +74,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   /// Stadt beim Oeffnen des Screens (fuer Change-Detection beim Speichern).
   String? _loadedCity;
 
+  /// true, waehrend _save() laeuft (Spinner im Speichern-Button).
+  bool _saving = false;
+
   late Gender _gender;
   late RelationshipType _relationshipType;
   DateTime? _birthDate;
@@ -87,7 +90,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String _introTextValue = '';
   String? _introAudioPath;
 
-  // Konsum-Präferenzen (Rauchen, Alkohol, Drogen) – beeinflussen den
+  // Konsum-PrÃ¤ferenzen (Rauchen, Alkohol, Drogen) â€“ beeinflussen den
   // Find-your-Match-Filter.
   HabitudeLevel? _smoking;
   HabitudeLevel? _alcohol;
@@ -115,14 +118,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     // geaenderter Stadt ausfuehren (Performance).
     _loadedCity = p.city;
 
-    // Initial signed URL für aktuelles Profilbild laden.
+    // Initial signed URL fÃ¼r aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
       _signedAvatarUrlFuture = ref
           .read(supabaseStorageServiceProvider)
           .getSignedAvatarUrl(p.photos.first);
     }
 
-    // Falls das Profil später nachgeladen wird, die Felder nachziehen.
+    // Falls das Profil spÃ¤ter nachgeladen wird, die Felder nachziehen.
     _profileSub = ref.listenManual<UserProfile>(profileProvider, (prev, next) {
       if (!mounted) return;
       if (_nameCtrl.text != next.name) {
@@ -178,7 +181,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               DateTime.now().day),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
-      helpText: 'Wähle dein Geburtsdatum',
+      helpText: 'WÃ¤hle dein Geburtsdatum',
     );
     if (picked != null) {
       setState(() => _birthDate = picked);
@@ -188,7 +191,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   Future<void> _pickProfileImage() async {
     try {
-      final bytes = await pickAndCropAvatar();
+      final bytes = await pickAndCropAvatar(context);
       if (bytes == null) return;
 
       final storageService = ref.read(supabaseStorageServiceProvider);
@@ -264,7 +267,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         }
       }
 
-      // Serverseitigen Standort-Check via Edge Function auslösen.
+      // Serverseitigen Standort-Check via Edge Function auslÃ¶sen.
       final auth = SupabaseService.currentUser;
       if (auth != null) {
         unawaited(
@@ -284,7 +287,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Standort erkannt und übernommen.'),
+            content: Text('Standort erkannt und Ã¼bernommen.'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -338,14 +341,17 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    final age = Validators.ageFromBirthDate(_birthDate);
-    if (age == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte wähle dein Geburtsdatum')),
-      );
-      return;
-    }
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      if (!_formKey.currentState!.validate()) return;
+      final age = Validators.ageFromBirthDate(_birthDate);
+      if (age == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bitte wÃ¤hle dein Geburtsdatum')),
+        );
+        return;
+      }
 
     final location = _cityCtrl.text.trim().isEmpty
         ? null
@@ -414,6 +420,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       } else {
         context.go(AppRoutes.profile);
       }
+    }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -532,7 +541,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     ),
                     child: Text(
                       _birthDate == null
-                          ? 'Bitte auswählen'
+                          ? 'Bitte auswÃ¤hlen'
                           : '${_birthDate!.day}.${_birthDate!.month}.'
                               '${_birthDate!.year}',
                     ),
@@ -595,7 +604,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     ),
                     DropdownMenuItem(
                       value: RelationshipType.open,
-                      child: Text('Offen für alles'),
+                      child: Text('Offen fÃ¼r alles'),
                     ),
                   ],
                   onChanged: (v) {
@@ -656,7 +665,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     if (v != null) {
                       setState(() => _countryValue = v);
                       if (v != 'Deutschland') {
-                        // Bundesland nur für Deutschland sinnvoll.
+                        // Bundesland nur fÃ¼r Deutschland sinnvoll.
                         _stateCtrl.clear();
                       }
                     }
@@ -670,7 +679,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         ? null
                         : _stateCtrl.text,
                     decoration: const InputDecoration(labelText: 'Bundesland'),
-                    hint: const Text('Bitte wählen'),
+                    hint: const Text('Bitte wÃ¤hlen'),
                     items: kGermanStates
                         .map((s) =>
                             DropdownMenuItem(value: s, child: Text(s)))
@@ -682,12 +691,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 )
               else
                 const Text(
-                  'Bundesland entfällt außerhalb Deutschlands.',
+                  'Bundesland entfÃ¤llt auÃŸerhalb Deutschlands.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               const SizedBox(height: 16),
               const Text(
-                'Filter & Präferenzen',
+                'Filter & PrÃ¤ferenzen',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 12),
@@ -696,7 +705,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   initialValue:
                       ref.read(userPreferencesProvider).distanceFilterMode,
                   decoration: const InputDecoration(
-                    labelText: 'Suchradius definieren über',
+                    labelText: 'Suchradius definieren Ã¼ber',
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -730,7 +739,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       initialValue: prefs.preferredState,
                       decoration: const InputDecoration(labelText: 'Bundesland'),
                       items: const [
-                        DropdownMenuItem(value: 'BW', child: Text('Baden-Württemberg')),
+                        DropdownMenuItem(value: 'BW', child: Text('Baden-WÃ¼rttemberg')),
                         DropdownMenuItem(value: 'BY', child: Text('Bayern')),
                         DropdownMenuItem(value: 'BE', child: Text('Berlin')),
                         DropdownMenuItem(value: 'BB', child: Text('Brandenburg')),
@@ -745,7 +754,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         DropdownMenuItem(value: 'SN', child: Text('Sachsen')),
                         DropdownMenuItem(value: 'ST', child: Text('Sachsen-Anhalt')),
                         DropdownMenuItem(value: 'SH', child: Text('Schleswig-Holstein')),
-                        DropdownMenuItem(value: 'TH', child: Text('Thüringen')),
+                        DropdownMenuItem(value: 'TH', child: Text('ThÃ¼ringen')),
                       ],
                       onChanged: (v) {
                         if (v != null) {
@@ -758,7 +767,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   }
                   if (prefs.distanceFilterMode == DistanceFilterMode.germany) {
                     return const Text(
-                      'Keine geografische Einschränkung, Suche in ganz Deutschland.',
+                      'Keine geografische EinschrÃ¤nkung, Suche in ganz Deutschland.',
                       style: TextStyle(color: Colors.grey),
                     );
                   }
@@ -820,7 +829,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         'Wie stehst du zu ...? Diese Angaben beeinflussen, '
-                        'wen du bei "Find your Match" siehst – es werden nur '
+                        'wen du bei "Find your Match" siehst â€“ es werden nur '
                         'Personen gezeigt, die maximal so viel konsumieren wie du.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
@@ -868,12 +877,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               if (profile.personalityResult != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'Persönlichkeitstest: ${profile.personalityResult}',
+                  'PersÃ¶nlichkeitstest: ${profile.personalityResult}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
               const SizedBox(height: 16),
-              // Persönlichkeitstest (statt in den Einstellungen).
+              // PersÃ¶nlichkeitstest (statt in den Einstellungen).
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -881,7 +890,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Persönlichkeitstest',
+                        'PersÃ¶nlichkeitstest',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
@@ -902,7 +911,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                 .watch(settingsProvider)
                                 .personalityTestCompleted
                             ? 'Test wiederholen'
-                            : 'Persönlichkeitstest starten',
+                            : 'PersÃ¶nlichkeitstest starten',
                         onPressed: () =>
                             context.push(AppRoutes.personalityTest),
                       ),
@@ -911,7 +920,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              PrimaryButton(label: 'Speichern', onPressed: _save),
+              PrimaryButton(
+                label: 'Speichern',
+                loading: _saving,
+                onPressed: _saving ? null : _save,
+              ),
             ],
           ),
         ),

@@ -1237,7 +1237,7 @@ packages:
     source: hosted
     version: "0.4.3+3"
   passkeys_doctor:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: passkeys_doctor
       sha256: e8c9285f36ef0161c865e268f4f2873b9d5826fcf8fb6b418bcf28243483463e

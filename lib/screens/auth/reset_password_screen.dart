@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,12 +11,12 @@ import 'package:wisp/widgets/buttons.dart';
 
 /// Screen zum Setzen eines neuen Passworts nach der Passwort-Reset-Mail.
 ///
-/// Erreichbar ausschließlich über den Recovery-Deep-Link
+/// Erreichbar ausschlieÃŸlich Ã¼ber den Recovery-Deep-Link
 /// (`wisp://reset-password`), den der eingebaute Deep-Link-Observer
 /// (app_links + detectSessionInUriPredicate in main.dart) verarbeitet und
 /// als `passwordRecovery`-Event anmeldet ([passwordRecoveryPendingProvider]).
-/// Das neue Passwort wird serverseitig per `updateUser` gesetzt – der
-/// Client besitzt nie einen Admin-Schlüssel.
+/// Das neue Passwort wird serverseitig per `updateUser` gesetzt â€“ der
+/// Client besitzt nie einen Admin-SchlÃ¼ssel.
 class ResetPasswordScreen extends ConsumerStatefulWidget {
   const ResetPasswordScreen({super.key});
 
@@ -48,8 +48,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       await SupabaseService.client.auth.updateUser(
         UserAttributes(password: _passwordCtrl.text),
       );
-      // Reset abgeschlossen: Recovery-Flag löschen, damit der Router wieder
-      // die normale Flusslogik übernimmt (Home bzw. offene Setup-Schritte).
+      // Reset abgeschlossen: Recovery-Flag lÃ¶schen, damit der Router wieder
+      // die normale Flusslogik Ã¼bernimmt (Home bzw. offene Setup-Schritte).
       ref.read(passwordRecoveryPendingProvider.notifier).state = false;
       if (!mounted) return;
       setState(() => _done = true);
@@ -67,8 +67,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     }
   }
 
-  /// Bricht den Reset ab (z. B. Link versehentlich geöffnet): Recovery-Flag
-  /// löschen und abmelden, damit keine halbe Reset-Session hängen bleibt.
+  /// Bricht den Reset ab (z. B. Link versehentlich geÃ¶ffnet): Recovery-Flag
+  /// lÃ¶schen und abmelden, damit keine halbe Reset-Session hÃ¤ngen bleibt.
   Future<void> _cancel() async {
     ref.read(passwordRecoveryPendingProvider.notifier).state = false;
     await ref.read(authProvider.notifier).logout();
@@ -102,7 +102,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Passwort geändert',
+                      'Passwort geÃ¤ndert',
                       style: Theme.of(context).textTheme.headlineSmall,
                       textAlign: TextAlign.center,
                     ),
@@ -125,8 +125,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.lock_reset,
-                          size: 64, color: Color(0xFFE9457B)),
+                      Icon(Icons.lock_reset, size: 64, color: Theme.of(context).colorScheme.primary),
                       const SizedBox(height: 16),
                       Text(
                         'Neues Passwort festlegen',
@@ -135,7 +134,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Wähle ein neues Passwort für dein Konto. '
+                        'WÃ¤hle ein neues Passwort fÃ¼r dein Konto. '
                         'Es muss mindestens 8 Zeichen lang sein und '
                         'Buchstaben und Zahlen enthalten.',
                         style: Theme.of(context).textTheme.bodyMedium,
@@ -175,7 +174,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                             return 'Bitte wiederhole das Passwort';
                           }
                           if (v != _passwordCtrl.text) {
-                            return 'Die Passwörter stimmen nicht überein.';
+                            return 'Die PasswÃ¶rter stimmen nicht Ã¼berein.';
                           }
                           return null;
                         },

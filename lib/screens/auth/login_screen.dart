@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,13 +21,13 @@ import 'package:wisp/widgets/captcha_challenge.dart';
 ///
 /// Registrierung erfasst Name, Geburtsdatum (statt Alter), E-Mail,
 /// Passwort und Geschlecht - alle Pflichtfelder werden validiert
-/// (inkl. 16+-Prüfung basierend auf dem Geburtsdatum).
+/// (inkl. 16+-PrÃ¼fung basierend auf dem Geburtsdatum).
 ///
 /// Verbesserungen:
 /// - Fehler werden erst NACH einer Eingabe oder einem Absende-Versuch gezeigt.
 /// - Eindeutige Fehlermeldungen bei falschen Zugangsdaten bzw. technischen
 ///   Fehlern.
-/// - Ladeanzeige (Spinner) im Button während der Netzwerk-Aktion.
+/// - Ladeanzeige (Spinner) im Button wÃ¤hrend der Netzwerk-Aktion.
 /// - "Passwort anzeigen"-Icon sowie "Passwort vergessen?"-Link.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -43,7 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   Gender _gender = Gender.diverse;
   DateTime? _birthDate;
-  // Login-Modus als Default: Beim Erststart führt der Router zuerst über die
+  // Login-Modus als Default: Beim Erststart fÃ¼hrt der Router zuerst Ã¼ber die
   // Willkommensscreens; der "Konto erstellen"-Modus soll nicht vorab als
   // erstes sichtbar sein (und auch bei transientem Rendern nicht aufblitzen).
   bool _isRegister = false;
@@ -68,19 +68,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               DateTime.now().day),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
-      helpText: 'Wähle dein Geburtsdatum',
+      helpText: 'WÃ¤hle dein Geburtsdatum',
     );
     if (picked != null) {
       setState(() => _birthDate = picked);
       // NICHT _formKey.currentState?.validate() aufrufen!
       // Validierung erfolgt erst nach Klick auf "Registrieren"/"Anmelden"
-      // über _submitAttempted-State und autovalidateMode.
+      // Ã¼ber _submitAttempted-State und autovalidateMode.
     }
   }
 
   Future<void> _submit() async {
     debugPrint('[LoginScreen] _submit aufgerufen (isRegister=$_isRegister)');
-    // Markiere, dass ein Absende-Versuch stattfand - erst jetzt dürfen
+    // Markiere, dass ein Absende-Versuch stattfand - erst jetzt dÃ¼rfen
     // die Pflichtfeld-Fehler angezeigt werden.
     setState(() => _submitAttempted = true);
     if (!_formKey.currentState!.validate()) {
@@ -88,9 +88,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    // Eigener Ladezustand für den Absende-Button. Bewusst NICHT an
-    // `authProvider.isLoading` gekoppelt: Sonst wären auch der
-    // "Passwort vergessen?"-Button und der Modus-Wechsel während eines
+    // Eigener Ladezustand fÃ¼r den Absende-Button. Bewusst NICHT an
+    // `authProvider.isLoading` gekoppelt: Sonst wÃ¤ren auch der
+    // "Passwort vergessen?"-Button und der Modus-Wechsel wÃ¤hrend eines
     // (langsamen) Logins deaktiviert bzw. der ganze Screen wirkte "laggy".
     setState(() => _submitting = true);
     try {
@@ -103,7 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Bitte wähle dein Geburtsdatum.'),
+                content: Text('Bitte wÃ¤hle dein Geburtsdatum.'),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -113,9 +113,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         debugPrint('[LoginScreen] Registriere Nutzer...');
 
         // CAPTCHA (Bot-Schutz): Zeigt die Challenge VOR der Registrierung,
-        // wenn im Build konfiguriert (AppConstants.captchaEnabled) – Details
+        // wenn im Build konfiguriert (AppConstants.captchaEnabled) â€“ Details
         // siehe widgets/captcha_challenge.dart. Der Nutzer muss die Aufgabe
-        // lösen (Token) oder bricht ab.
+        // lÃ¶sen (Token) oder bricht ab.
         String? captchaToken;
         if (AppConstants.captchaEnabled) {
           captchaToken = await showCaptchaChallenge(context);
@@ -124,7 +124,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Bitte schließe den Sicherheitscheck ab, um dich zu '
+                    'Bitte schlieÃŸe den Sicherheitscheck ab, um dich zu '
                     'registrieren.',
                   ),
                   behavior: SnackBarBehavior.floating,
@@ -144,10 +144,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           captchaToken: captchaToken,
         );
         // Profil wurde bereits in AuthNotifier.register() via setProfile()
-        // gesetzt – kein redundantes update() nötig.
+        // gesetzt â€“ kein redundantes update() nÃ¶tig.
       } else {
         // CAPTCHA (Bot-Schutz) auch beim Login: gleicher Ablauf wie bei der
-        // Registrierung – Challenge lösen oder abbrechen.
+        // Registrierung â€“ Challenge lÃ¶sen oder abbrechen.
         String? captchaToken;
         if (AppConstants.captchaEnabled) {
           captchaToken = await showCaptchaChallenge(context);
@@ -156,7 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Bitte schließe den Sicherheitscheck ab, um dich '
+                    'Bitte schlieÃŸe den Sicherheitscheck ab, um dich '
                     'anzumelden.',
                   ),
                   behavior: SnackBarBehavior.floating,
@@ -192,8 +192,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       // Explizite Navigation nach erfolgreichem Login/Registrierung.
       // Der Router-Redirect ist ein Fallback, aber explizites Navigieren ist
-      // zuverlässiger (vermeidet Timing-Probleme bei Provider-Initialisierung).
-      // Nach Registrierung: zuerst E-Mail-Verifizierung, dann Einstellungen & Privatsphäre.
+      // zuverlÃ¤ssiger (vermeidet Timing-Probleme bei Provider-Initialisierung).
+      // Nach Registrierung: zuerst E-Mail-Verifizierung, dann Einstellungen & PrivatsphÃ¤re.
       // Nach Login: Home - Redirect-Logik leitet basierend auf Setup-Fortschritt weiter.
       debugPrint('[LoginScreen] Auth erfolgreich, navigiere zu: '
           '${_isRegister ? AppRoutes.emailVerification : AppRoutes.home}');
@@ -217,12 +217,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         } else if (e is AppException) {
           message = e.message;
         } else if (e is AuthException) {
-          // Supabase-Fehlertexte nicht direkt anzeigen, sondern übersetzen.
+          // Supabase-Fehlertexte nicht direkt anzeigen, sondern Ã¼bersetzen.
           final lower = e.message.toLowerCase();
           if (lower.contains('invalid login credentials')) {
             message = 'Email oder Passwort ist falsch.';
           } else if (lower.contains('not confirmed')) {
-            message = 'Bitte bestätige zuerst deine Emailadresse.';
+            message = 'Bitte bestÃ¤tige zuerst deine Emailadresse.';
           } else if (lower.contains('user already registered')) {
             message = 'Diese Emailadresse ist bereits registriert.';
           } else if (lower.contains('too many') || lower.contains('rate')) {
@@ -230,14 +230,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 'Zu viele Anfragen in kurzer Zeit. Bitte warte einen Moment '
                 'und versuche es erneut.';
           } else if (lower.contains('weak password')) {
-            // zxcvbn-Komplexitäts-Prüfung (Password Strength Policy im
-            // Dashboard): Länge allein reicht nicht.
-            message = 'Das Passwort ist zu schwach. Bitte wähle ein längeres '
-                'Passwort mit Groß-/Kleinbuchstaben, Zahlen und '
+            // zxcvbn-KomplexitÃ¤ts-PrÃ¼fung (Password Strength Policy im
+            // Dashboard): LÃ¤nge allein reicht nicht.
+            message = 'Das Passwort ist zu schwach. Bitte wÃ¤hle ein lÃ¤ngeres '
+                'Passwort mit GroÃŸ-/Kleinbuchstaben, Zahlen und '
                 'Sonderzeichen.';
           } else if (lower.contains('password should')) {
             // Server-Meldung durchreichen (z. B. "Password should be at
-            // least 12 characters") – die Mindestlänge steht im Dashboard.
+            // least 12 characters") â€“ die MindestlÃ¤nge steht im Dashboard.
             message = e.message;
           } else if (lower.contains('captcha')) {
             message = 'Der Sicherheitscheck wurde vom Server abgelehnt. '
@@ -245,7 +245,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           } else if (lower.contains('database error') ||
               lower.contains('saving new user')) {
             message = 'Registrierung auf dem Server fehlgeschlagen. '
-                'Bitte versuche es später erneut.';
+                'Bitte versuche es spÃ¤ter erneut.';
           } else {
             // Generischer Fallback. Im Debug-Modus wird die Original-
             // Server-Meldung direkt mit angezeigt, damit die Ursache
@@ -275,18 +275,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// Meldet den Nutzer per Passkey (WebAuthn) an, ohne E-Mail/Passwort.
   ///
-  /// Läuft nur im Supabase-Modus. Nach erfolgreicher Zeremonie setzt der
+  /// LÃ¤uft nur im Supabase-Modus. Nach erfolgreicher Zeremonie setzt der
   /// AuthNotifier den Status via `onAuthStateChange` (signedIn) und der
-  /// Router leitet automatisch weiter (Home bzw. Setup-Redirect) – daher
+  /// Router leitet automatisch weiter (Home bzw. Setup-Redirect) â€“ daher
   /// wird hier NICHT explizit navigiert. Eine sofortige `context.go(home)`
-  /// würde den Redirect vor dem Aktualisieren des Auth-Status auslösen und
-  /// den Nutzer kurz zurück zum Login werfen.
+  /// wÃ¼rde den Redirect vor dem Aktualisieren des Auth-Status auslÃ¶sen und
+  /// den Nutzer kurz zurÃ¼ck zum Login werfen.
   Future<void> _signInWithPasskey() async {
     setState(() => _passkeyLoading = true);
     try {
       await PasskeyAuth.signIn();
       // Kein explizites Navigieren: Der Auth-State-Listener setzt den
-      // Status auf "eingeloggt" und der Router übernimmt die Weiterleitung.
+      // Status auf "eingeloggt" und der Router Ã¼bernimmt die Weiterleitung.
     } catch (e) {
       if (mounted) {
         final message = e is AppException
@@ -304,10 +304,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  /// Formularfeld mit fest reserviertem Platz für die Fehlermeldung,
+  /// Formularfeld mit fest reserviertem Platz fÃ¼r die Fehlermeldung,
   /// damit sich die anderen Felder bei Validierungsfehlern nicht verschieben.
   ///
-  /// [showError] steuert, ob die Fehlermeldung überhaupt angezeigt wird - erst
+  /// [showError] steuert, ob die Fehlermeldung Ã¼berhaupt angezeigt wird - erst
   /// nach einer Eingabe oder nach einem Absende-Versuch.
   Widget _field({
     required Widget child,
@@ -318,7 +318,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         child,
-        // Fester, reservierter Bereich für die Fehlermeldung (2 Zeilen).
+        // Fester, reservierter Bereich fÃ¼r die Fehlermeldung (2 Zeilen).
         const SizedBox(height: 4),
         SizedBox(
           height: 34,
@@ -346,7 +346,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       appBar: _isRegister
           ? null
-          : AppBar(title: const Text('Willkommen zurück')),
+          : AppBar(title: const Text('Willkommen zurÃ¼ck')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -359,11 +359,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.favorite,
-                      size: 64, color: Color(0xFFE9457B)),
+                  Icon(Icons.favorite, size: 64, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 12),
                   Text(
-                    _isRegister ? 'Konto erstellen' : 'Willkommen zurück',
+                    _isRegister ? 'Konto erstellen' : 'Willkommen zurÃ¼ck',
                     style: Theme.of(context).textTheme.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -394,7 +393,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                            ),
                            child: Text(
                              _birthDate == null
-                                 ? 'Bitte auswählen'
+                                 ? 'Bitte auswÃ¤hlen'
                                  : '${_birthDate!.day}.${_birthDate!.month}.'
                                      '${_birthDate!.year}',
                            ),
@@ -421,7 +420,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           onFieldSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
                             labelText: 'Passwort',
-                            helperText: 'Mindestens 8 Zeichen, mit Groß- und '
+                            helperText: 'Mindestens 8 Zeichen, mit GroÃŸ- und '
                                 'Kleinbuchstaben, einer Zahl und einem '
                                 'Sonderzeichen',
                             suffixIcon: IconButton(
@@ -446,10 +445,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           items: const [
                             DropdownMenuItem(
                                 value: Gender.male,
-                                child: Text('Männlich')),
+                                child: Text('MÃ¤nnlich')),
                             DropdownMenuItem(
                                 value: Gender.maleTrans,
-                                child: Text('Männlich (F to M)')),
+                                child: Text('MÃ¤nnlich (F to M)')),
                             DropdownMenuItem(
                                 value: Gender.female,
                                 child: Text('Weiblich')),
@@ -517,7 +516,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 24),
                   PrimaryButton(
                     label: _submitting
-                        ? 'Bitte warten …'
+                        ? 'Bitte warten â€¦'
                         : (_isRegister ? 'Registrieren' : 'Einloggen'),
                     onPressed: _submitting ? null : _submit,
                     loading: _submitting,

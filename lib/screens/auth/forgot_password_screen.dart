@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,11 +7,11 @@ import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/validators.dart';
 import 'package:wisp/widgets/buttons.dart';
 
-/// Platzhalter-Screen für "Passwort vergessen?" (Prototyp).
+/// Platzhalter-Screen fÃ¼r "Passwort vergessen?" (Prototyp).
 ///
 /// Da die Authentifizierung nur ein lokaler Mock ist, wird hier keine echte
-/// E-Mail versendet. Der Nutzer gibt seine E-Mail ein und erhält eine
-/// Bestätigung, dass (im echten Betrieb) ein Link gesendet würde.
+/// E-Mail versendet. Der Nutzer gibt seine E-Mail ein und erhÃ¤lt eine
+/// BestÃ¤tigung, dass (im echten Betrieb) ein Link gesendet wÃ¼rde.
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -71,11 +71,10 @@ class _ForgotPasswordScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.lock_reset,
-                      size: 64, color: Color(0xFFE9457B)),
+                  Icon(Icons.lock_reset, size: 64, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 16),
                   Text(
-                    'Passwort zurücksetzen',
+                    'Passwort zurÃ¼cksetzen',
                     style: Theme.of(context).textTheme.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -83,9 +82,9 @@ class _ForgotPasswordScreenState
                   Text(
                     _sent
                         ? 'Wenn ein Konto mit dieser Email existiert, '
-                            'haben wir einen Link zum Zurücksetzen gesendet.'
+                            'haben wir einen Link zum ZurÃ¼cksetzen gesendet.'
                         : 'Gib deine Emailadresse ein. Wir senden dir '
-                            'einen Link, um dein Passwort zurückzusetzen.',
+                            'einen Link, um dein Passwort zurÃ¼ckzusetzen.',
                     style: Theme.of(context).textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),
@@ -124,8 +123,8 @@ class _ForgotPasswordScreenState
                   const SizedBox(height: 24),
                    PrimaryButton(
                     label: _sending
-                        ? 'Sende …'
-                        : (_sent ? 'Zurück zum Login' : 'Link senden'),
+                        ? 'Sende â€¦'
+                        : (_sent ? 'ZurÃ¼ck zum Login' : 'Link senden'),
                     onPressed: _sending
                         ? null
                         : (_sent

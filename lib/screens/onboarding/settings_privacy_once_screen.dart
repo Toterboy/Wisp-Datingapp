@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -32,8 +32,8 @@ import 'package:wisp/widgets/intro_editor.dart';
 import 'package:wisp/widgets/selectable_tile.dart';
 import 'package:wisp/widgets/theme_picker.dart';
 
-/// Einmaliger Einstellungen- & Privatsphäre-Screen direkt nach der Anmeldung.
-/// Danach sind diese Einstellungen jederzeit in den normalen Einstellungen änderbar.
+/// Einmaliger Einstellungen- & PrivatsphÃ¤re-Screen direkt nach der Anmeldung.
+/// Danach sind diese Einstellungen jederzeit in den normalen Einstellungen Ã¤nderbar.
 class SettingsPrivacyOnceScreen extends ConsumerStatefulWidget {
   const SettingsPrivacyOnceScreen({super.key});
 
@@ -56,7 +56,7 @@ class _SettingsPrivacyOnceScreenState
   static const int _introPage = 3;
   static const int _habitudesPage = 6;
 
-  // Schritt "Deine Vorstellung" (überspringbar): Werte des IntroEditor.
+  // Schritt "Deine Vorstellung" (Ã¼berspringbar): Werte des IntroEditor.
   String _introText = '';
   String? _introAudioPath;
 
@@ -67,7 +67,7 @@ class _SettingsPrivacyOnceScreenState
   bool _uploadingAvatar = false;
   Uint8List? _avatarBytes;
 
-  // Schritt "Passkey" (überspringbar).
+  // Schritt "Passkey" (Ã¼berspringbar).
   bool _passkeyBusy = false;
   bool _passkeyCreated = false;
 
@@ -83,7 +83,7 @@ class _SettingsPrivacyOnceScreenState
     if (prefs.location != null && _locationCtrl.text.isEmpty) {
       _locationCtrl.text = prefs.location!;
     }
-    // Vorhandene Konsum-Präferenzen vorbelegen, falls bereits gesetzt.
+    // Vorhandene Konsum-PrÃ¤ferenzen vorbelegen, falls bereits gesetzt.
     final profile = ref.read(profileProvider);
     _smoking = profile.smoking;
     _alcohol = profile.alcohol;
@@ -108,7 +108,7 @@ class _SettingsPrivacyOnceScreenState
           builder: (ctx) => AlertDialog(
             title: const Text('Einrichtung abbrechen?'),
             content: const Text(
-              'Möchtest du die Einrichtung wirklich abbrechen? '
+              'MÃ¶chtest du die Einrichtung wirklich abbrechen? '
               'Deine bisherigen Angaben werden gespeichert.',
             ),
             actions: [
@@ -145,7 +145,7 @@ class _SettingsPrivacyOnceScreenState
       unawaited(_saveProfileExtras());
     }
     // Beim Verlassen der Vorstellungs-Seite die Eingaben best-effort
-    // speichern – der Schritt ist überspringbar, deshalb kein Zwang.
+    // speichern â€“ der Schritt ist Ã¼berspringbar, deshalb kein Zwang.
     if (_currentPage == _introPage) {
       _saveIntro();
     }
@@ -182,7 +182,7 @@ class _SettingsPrivacyOnceScreenState
     }
   }
 
-  /// Speichert die Konsum-Präferenzen (Rauchen, Alkohol, Drogen) lokal
+  /// Speichert die Konsum-PrÃ¤ferenzen (Rauchen, Alkohol, Drogen) lokal
   /// und best-effort serverseitig. Beeinflusst den Find-your-Match-Filter.
   Future<void> _saveHabitudes() async {
     try {
@@ -231,7 +231,7 @@ class _SettingsPrivacyOnceScreenState
     if (_uploadingAvatar) return;
     setState(() => _uploadingAvatar = true);
     try {
-      final bytes = await pickAndCropAvatar();
+      final bytes = await pickAndCropAvatar(context);
       if (bytes == null) return;
 
       // Lokale Vorschau sofort zeigen.
@@ -250,7 +250,7 @@ class _SettingsPrivacyOnceScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Upload fehlgeschlagen. Du kannst das Bild '
-                  'jederzeit später im Profil festlegen.')),
+                  'jederzeit spÃ¤ter im Profil festlegen.')),
         );
       }
     } finally {
@@ -258,8 +258,8 @@ class _SettingsPrivacyOnceScreenState
     }
   }
 
-  /// Richtet einen Passkey ein (überspringbarer Schritt). Fehler werden
-  /// angezeigt, blockieren aber nicht – "Weiter" geht immer.
+  /// Richtet einen Passkey ein (Ã¼berspringbarer Schritt). Fehler werden
+  /// angezeigt, blockieren aber nicht â€“ "Weiter" geht immer.
   Future<void> _setupPasskey() async {
     if (_passkeyBusy || _passkeyCreated) return;
     setState(() => _passkeyBusy = true);
@@ -269,7 +269,7 @@ class _SettingsPrivacyOnceScreenState
       setState(() => _passkeyCreated = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Passkey eingerichtet. Du kannst dich künftig damit '
+          content: Text('Passkey eingerichtet. Du kannst dich kÃ¼nftig damit '
               'anmelden.'),
           behavior: SnackBarBehavior.floating,
         ),
@@ -280,7 +280,7 @@ class _SettingsPrivacyOnceScreenState
       final msg = e is AppException
           ? e.message
           : 'Passkey-Setup fehlgeschlagen oder abgebrochen. Du kannst es '
-              'später jederzeit in den Einstellungen nachholen.';
+              'spÃ¤ter jederzeit in den Einstellungen nachholen.';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -295,7 +295,7 @@ class _SettingsPrivacyOnceScreenState
   }
 
   void _acceptAndFinish() async {
-    // Zuerst Community-Richtlinien akzeptieren, dann Setup abschließen.
+    // Zuerst Community-Richtlinien akzeptieren, dann Setup abschlieÃŸen.
     await ref.read(settingsProvider.notifier).acceptCommunityGuidelines();
     await _finish();
   }
@@ -312,7 +312,7 @@ class _SettingsPrivacyOnceScreenState
     }
     await _saveHabitudes();
     await settingsNotifier.completeOneTimeSettings();
-    // Setup-Stand zusätzlich serverseitig sichern, damit die Einrichtung
+    // Setup-Stand zusÃ¤tzlich serverseitig sichern, damit die Einrichtung
     // nach Neuinstallation/neuem Login nicht erneut erscheint.
     unawaited(_persistSetupFlagsToServer());
     if (mounted) context.go(AppRoutes.home);
@@ -424,7 +424,7 @@ class _SettingsPrivacyOnceScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Standort erkannt und übernommen (GPS Koordinaten).'),
+            content: Text('Standort erkannt und Ã¼bernommen (GPS Koordinaten).'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -448,8 +448,8 @@ class _SettingsPrivacyOnceScreenState
 
     // Altersbasierte Sicherheits-Regeln.
     // WICHTIG: Solange das Profil (Geburtsdatum) noch nicht geladen ist,
-    // wird NICHT als Minderjähriger geklemmt (Fallback 18 = Erwachsen).
-    // Vorher führte der Fallback 16 dazu, dass die Altersspanne dauerhaft
+    // wird NICHT als MinderjÃ¤hriger geklemmt (Fallback 18 = Erwachsen).
+    // Vorher fÃ¼hrte der Fallback 16 dazu, dass die Altersspanne dauerhaft
     // auf 16-19 gespeichert wurde ("Alter falsch gemerkt").
     final userAge = profile.age;
     final effectiveAge = userAge ?? 18;
@@ -458,8 +458,8 @@ class _SettingsPrivacyOnceScreenState
     final clampedAgeMin = settings.ageRangeMin.clamp(allowedAgeMin, allowedAgeMax);
     final clampedAgeMax = settings.ageRangeMax.clamp(clampedAgeMin, allowedAgeMax);
 
-    // Falls Werte außerhalb erlaubtem Bereich: asynchron korrigieren –
-    // aber NUR, wenn das Alter tatsächlich bekannt ist.
+    // Falls Werte auÃŸerhalb erlaubtem Bereich: asynchron korrigieren â€“
+    // aber NUR, wenn das Alter tatsÃ¤chlich bekannt ist.
     if (userAge != null &&
         (settings.ageRangeMin != clampedAgeMin ||
             settings.ageRangeMax != clampedAgeMax)) {
@@ -478,11 +478,11 @@ class _SettingsPrivacyOnceScreenState
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Einstellungen & Privatsphäre'),
+          title: const Text('Einstellungen & PrivatsphÃ¤re'),
           leading: _currentPage > 0
               ? IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  tooltip: 'Zurück',
+                  tooltip: 'ZurÃ¼ck',
                   onPressed: _prevPage,
                 )
               : null,
@@ -524,9 +524,9 @@ class _SettingsPrivacyOnceScreenState
                   physics: const ClampingScrollPhysics(),
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   children: [
-                    // Page 1: Privatsphäre & Theme
+                    // Page 1: PrivatsphÃ¤re & Theme
                     _Page(
-                      title: 'Privatsphäre & Darstellung',
+                      title: 'PrivatsphÃ¤re & Darstellung',
                       subtitle:
                           'Wer darf dein Profil sehen? Wie soll die App aussehen?',
                       child: Column(
@@ -602,10 +602,10 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                     // Page 3: Filter & Präferenzen
+                     // Page 3: Filter & PrÃ¤ferenzen
                      _Page(
-                       title: 'Filter & Präferenzen',
-                       subtitle: 'Wen möchtest du kennenlernen?',
+                       title: 'Filter & PrÃ¤ferenzen',
+                       subtitle: 'Wen mÃ¶chtest du kennenlernen?',
                        child: Column(
                          crossAxisAlignment: CrossAxisAlignment.start,
                          children: [
@@ -615,7 +615,7 @@ class _SettingsPrivacyOnceScreenState
                             ),
                             const SizedBox(height: 12),
                             // Mehrfachauswahl per Chips (inkl. "Alle"-Kurzform).
-                            // Ein einzelnes Geschlecht kann nicht abgewählt
+                            // Ein einzelnes Geschlecht kann nicht abgewÃ¤hlt
                             // werden, solange es das letzte aktive ist.
                             const GenderPreferenceSelector(),
                            const SizedBox(height: 20),
@@ -649,7 +649,7 @@ class _SettingsPrivacyOnceScreenState
                                ),
                                DropdownMenuItem(
                                  value: RelationshipType.open,
-                                 child: Text('Offen für alles'),
+                                 child: Text('Offen fÃ¼r alles'),
                                ),
                              ],
                              onChanged: (v) {
@@ -832,7 +832,7 @@ class _SettingsPrivacyOnceScreenState
                                 v.end.round(),
                               ),
                               // Nach dem Loslassen den Fokus entfernen, damit
-                              // kein vergrößerter Thumb-Overlay hängen bleibt.
+                              // kein vergrÃ¶ÃŸerter Thumb-Overlay hÃ¤ngen bleibt.
                               onChangeEnd: (_) =>
                                   FocusManager.instance.primaryFocus?.unfocus(),
                             ),
@@ -843,9 +843,9 @@ class _SettingsPrivacyOnceScreenState
                     _Page(
                       title: 'Dein Profil',
                       subtitle:
-                          'Ein Bild, ein paar Worte über dich und deine '
+                          'Ein Bild, ein paar Worte Ã¼ber dich und deine '
                           'Interessen helfen anderen, dich kennenzulernen. '
-                          'Alles optional und später änderbar.',
+                          'Alles optional und spÃ¤ter Ã¤nderbar.',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -885,7 +885,7 @@ class _SettingsPrivacyOnceScreenState
                                                     CircularProgressIndicator(
                                                         strokeWidth: 2))
                                             : const Icon(Icons.add_a_photo),
-                                        tooltip: 'Profilbild wählen',
+                                        tooltip: 'Profilbild wÃ¤hlen',
                                       ),
                                     ),
                                   ],
@@ -900,7 +900,7 @@ class _SettingsPrivacyOnceScreenState
                             maxLines: 3,
                             maxLength: 300,
                             decoration: const InputDecoration(
-                              labelText: 'Über mich (Bio)',
+                              labelText: 'Ãœber mich (Bio)',
                               hintText: 'z. B. Hobbys, was dir wichtig ist',
                             ),
                           ),
@@ -914,7 +914,7 @@ class _SettingsPrivacyOnceScreenState
                             decoration: const InputDecoration(
                               labelText: 'Bundesland (optional)',
                             ),
-                            hint: const Text('Bitte wählen'),
+                            hint: const Text('Bitte wÃ¤hlen'),
                             items: kGermanStates
                                 .map((s) => DropdownMenuItem(
                                       value: s,
@@ -949,13 +949,13 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                    // Page 4: Deine Vorstellung (Text + Audio, überspringbar)
+                    // Page 4: Deine Vorstellung (Text + Audio, Ã¼berspringbar)
                     _Page(
                       title: 'Deine Vorstellung',
                       subtitle:
-                          'Erzähl von dir – als Text und gesprochen. Beides '
+                          'ErzÃ¤hl von dir â€“ als Text und gesprochen. Beides '
                           'wird anderen gezeigt, bevor sie dein Foto sehen. '
-                          'Du kannst diesen Schritt auch überspringen.',
+                          'Du kannst diesen Schritt auch Ã¼berspringen.',
                       child: IntroEditor(
                         initialText: _introText,
                         initialAudioPath: _introAudioPath,
@@ -968,13 +968,13 @@ class _SettingsPrivacyOnceScreenState
                         },
                       ),
                     ),
-                    // Page 4: Passkey (überspringbar)
+                    // Page 4: Passkey (Ã¼berspringbar)
                     _Page(
                       title: 'Passkey einrichten',
                       subtitle:
-                          'Melde dich künftig ohne Passwort an – per '
+                          'Melde dich kÃ¼nftig ohne Passwort an â€“ per '
                           'Fingerabdruck oder Gesicht. Optional, du kannst '
-                          'diesen Schritt überspringen.',
+                          'diesen Schritt Ã¼berspringen.',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -983,7 +983,7 @@ class _SettingsPrivacyOnceScreenState
                           const Text(
                             'Ein Passkey ist die sicherste und bequemste '
                             'Anmeldeart: Kein Passwort, das du merken oder '
-                            'vergessen kannst – und schwerer zu stehlen als '
+                            'vergessen kannst â€“ und schwerer zu stehlen als '
                             'ein Passwort.',
                           ),
                           const SizedBox(height: 24),
@@ -1010,7 +1010,7 @@ class _SettingsPrivacyOnceScreenState
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Du kannst die Einrichtung jederzeit später in '
+                            'Du kannst die Einrichtung jederzeit spÃ¤ter in '
                             'den Einstellungen nachholen.',
                             style: Theme.of(context).textTheme.bodySmall,
                             textAlign: TextAlign.center,
@@ -1018,13 +1018,13 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                    // Page 5: Zwei-Faktor-Schutz (überspringbar)
+                    // Page 5: Zwei-Faktor-Schutz (Ã¼berspringbar)
                     _Page(
                       title: 'Konto absichern',
                       subtitle:
-                          'Melde dich künftig zusätzlich mit einem Code aus '
+                          'Melde dich kÃ¼nftig zusÃ¤tzlich mit einem Code aus '
                           'einer Authenticator-App an. Optional, du kannst '
-                          'diesen Schritt überspringen.',
+                          'diesen Schritt Ã¼berspringen.',
                       child: Builder(
                         builder: (context) {
                           final mfaActive = ref
@@ -1049,7 +1049,7 @@ class _SettingsPrivacyOnceScreenState
                                         'jedem Login wirst du nach dem '
                                         'Code aus deiner Authenticator-App '
                                         'gefragt.'
-                                    : 'Ein zweiter Faktor schützt dein '
+                                    : 'Ein zweiter Faktor schÃ¼tzt dein '
                                         'Konto, selbst wenn dein Passwort '
                                         'gestohlen wird. Du brauchst eine '
                                         'Authenticator-App (z. B. Google '
@@ -1069,7 +1069,7 @@ class _SettingsPrivacyOnceScreenState
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Du kannst die Einrichtung jederzeit später '
+                                'Du kannst die Einrichtung jederzeit spÃ¤ter '
                                 'in den Einstellungen nachholen.',
                                 style: Theme.of(context).textTheme.bodySmall,
                                 textAlign: TextAlign.center,
@@ -1090,8 +1090,8 @@ class _SettingsPrivacyOnceScreenState
                         children: [
                           const Text(
                             'Es werden nur Personen gezeigt, die maximal so '
-                            'viel konsumieren wie du. Du kannst das später in '
-                            'den Einstellungen oder im Profil ändern.',
+                            'viel konsumieren wie du. Du kannst das spÃ¤ter in '
+                            'den Einstellungen oder im Profil Ã¤ndern.',
                             style: TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                           const SizedBox(height: 16),
@@ -1145,8 +1145,8 @@ class _SettingsPrivacyOnceScreenState
                       ),
                     const SizedBox(height: 12),
                     Text(
-                      'Diese Einstellungen kannst du später jederzeit in '
-                      'den Einstellungen ändern.',
+                      'Diese Einstellungen kannst du spÃ¤ter jederzeit in '
+                      'den Einstellungen Ã¤ndern.',
                       style: Theme.of(context).textTheme.bodySmall,
                       textAlign: TextAlign.center,
                     ),
@@ -1170,8 +1170,8 @@ class _SettingsPrivacyOnceScreenState
         ),
         const SizedBox(height: 12),
         const Text(
-          'Diese App lebt von einem respektvollen, wertschätzenden Umgang '
-          'miteinander, unabhängig von Herkunft, Geschlecht, Religion oder '
+          'Diese App lebt von einem respektvollen, wertschÃ¤tzenden Umgang '
+          'miteinander, unabhÃ¤ngig von Herkunft, Geschlecht, Religion oder '
           'Lebensentwurf.',
         ),
         const SizedBox(height: 16),
@@ -1185,11 +1185,11 @@ class _SettingsPrivacyOnceScreenState
         ),
         const _RuleItem(
           '3',
-          'Persönlichkeit vor Aussehen: Fotos werden erst nach Match gezeigt.',
+          'PersÃ¶nlichkeit vor Aussehen: Fotos werden erst nach Match gezeigt.',
         ),
         const _RuleItem(
           '4',
-          'Respektiere Grenzen: Keine unerwünschten Bilder oder Nachrichten.',
+          'Respektiere Grenzen: Keine unerwÃ¼nschten Bilder oder Nachrichten.',
         ),
         const _RuleItem(
           '5',
@@ -1197,11 +1197,11 @@ class _SettingsPrivacyOnceScreenState
         ),
         const _RuleItem(
           '6',
-          'Bei Verstoß gegen diese Regeln kann der Zugang gesperrt werden.',
+          'Bei VerstoÃŸ gegen diese Regeln kann der Zugang gesperrt werden.',
         ),
         const SizedBox(height: 12),
         Text(
-          'Bei Verstoß kann der Zugang dauerhaft gesperrt werden.',
+          'Bei VerstoÃŸ kann der Zugang dauerhaft gesperrt werden.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.error,
               ),
@@ -1268,7 +1268,7 @@ class _Page extends StatelessWidget {
             Expanded(
               child: Scrollbar(
                 child: SingleChildScrollView(
-                  // Platz für die Tastatur: Der Inhalt bleibt so über dem
+                  // Platz fÃ¼r die Tastatur: Der Inhalt bleibt so Ã¼ber dem
                   // Keyboard scrollbar, statt dahinter zu verschwinden.
                   padding: EdgeInsets.only(
                      bottom: MediaQuery.viewInsetsOf(context).bottom,

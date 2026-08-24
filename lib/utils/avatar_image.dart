@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color, Colors;
+﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show BuildContext, Color, Colors, Theme;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -7,8 +7,12 @@ import 'package:image_picker/image_picker.dart';
 ///
 /// Wird von der Einrichtung ("Dein Profil") und "Profil bearbeiten"
 /// genutzt, damit beide identisch funktionieren. Gibt null zurueck, wenn
-/// der Nutzer abgebrochen hat.
-Future<Uint8List?> pickAndCropAvatar() async {
+/// der Nutzer abgebrochen hat. [context] ist optional und faerbt den
+/// Crop-Screen im aktiven Theme.
+Future<Uint8List?> pickAndCropAvatar([BuildContext? context]) async {
+  // Farben VOR den async-Aufrufen lesen (keine Context-Nutzung nach Gaps).
+  final scheme = context == null ? null : Theme.of(context).colorScheme;
+  final brand = scheme?.primary ?? const Color(0xFFE9457B);
   final picker = ImagePicker();
   final picked = await picker.pickImage(
     source: ImageSource.gallery,
@@ -27,9 +31,9 @@ Future<Uint8List?> pickAndCropAvatar() async {
     uiSettings: [
       AndroidUiSettings(
         toolbarTitle: 'Bild zuschneiden',
-        toolbarColor: const Color(0xFFFF6B9D),
-        toolbarWidgetColor: Colors.white,
-        activeControlsWidgetColor: const Color(0xFFFF6B9D),
+        toolbarColor: brand,
+        toolbarWidgetColor: scheme?.onPrimary ?? Colors.white,
+        activeControlsWidgetColor: brand,
         lockAspectRatio: true,
         hideBottomControls: false,
       ),
