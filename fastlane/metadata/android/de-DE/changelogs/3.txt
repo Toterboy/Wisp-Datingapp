@@ -1,0 +1,11 @@
+﻿Bugfix-Release auf 0.6.0:
+
+• Behoben: Automatischer Logout beim App-Neustart (Daten bleiben erhalten)
+• Neu: "Angemeldet bleiben"-Schalter im Login
+• Neu: Sprache Deutsch/Englisch umschaltbar (Login + Einstellungen)
+• Neu: Passkey-Diagnose zeigt die genaue Ursache bei Problemen
+• Neu: Dating Hour mit Gewohnheiten (Präferenz + Anzeige im Chat)
+• Einrichtung: Gewohnheiten jetzt Schritt 5, Grundangaben sind Pflicht
+• Passkey & 2FA werden dringend empfohlen (mit Direkt-Sprung)
+• App-Logo mit Dark-Variante, Splash kleiner, Captcha kompakter
+• CI-Pipeline wieder grün
