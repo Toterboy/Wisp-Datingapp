@@ -26,10 +26,10 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.35.0
+          flutter-version: 3.44.6
           cache: true
 
-      # pubspec.yaml bindet .env als Asset ein - ohne Datei schlaegt der
+      # pubspec.yaml bindet .env als Asset ein - ohne Datei schlägt der
       # Asset-Build von flutter test fehl.
       - name: .env aus Beispiel erzeugen
         run: cp .env.example .env
@@ -59,7 +59,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.35.0
+          flutter-version: 3.44.6
           cache: true
 
       - name: .env aus Beispiel erzeugen

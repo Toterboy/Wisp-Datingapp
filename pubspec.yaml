@@ -1,10 +1,10 @@
-name: wisp
-description: Eine moderne, datenschutzfreundliche Dating-App mit Blind Mode (Persönlichkeit zuerst).
+﻿name: wisp
+description: Eine moderne, datenschutzfreundliche Dating-App mit Blind Mode (PersÃ¶nlichkeit zuerst).
 publish_to: 'none'
 version: 0.6.0+2
 
 environment:
-  sdk: ^3.9.0
+  sdk: ^3.10.0
   flutter: ^3.35.0
 
 dependencies:
@@ -26,48 +26,48 @@ dependencies:
   # Lokale, sichere Datenspeicherung (Einstellungen, Profil, Auth-Token)
   shared_preferences: ^2.2.3
 
-  # Schöne Icons & Utilities
+  # SchÃ¶ne Icons & Utilities
   flutter_svg: ^2.0.10
   intl: ^0.20.3
   share_plus: ^13.2.1
 
-  # App-Informationen für Bug-Reports (Version)
+  # App-Informationen fÃ¼r Bug-Reports (Version)
   package_info_plus: ^10.0.0
 
-  # Öffnen externer Links (GitHub Issues)
+  # Ã–ffnen externer Links (GitHub Issues)
   url_launcher: ^6.3.1
 
-  # Bildauswahl für Bug-Reports
+  # Bildauswahl fÃ¼r Bug-Reports
   image_picker: ^1.1.2
 
-  # Firebase für Server-Zeit & Cloud-Functions
-  # ENTFERNT: Wird nicht mehr benötigt, ersetzt durch Supabase.
+  # Firebase fÃ¼r Server-Zeit & Cloud-Functions
+  # ENTFERNT: Wird nicht mehr benÃ¶tigt, ersetzt durch Supabase.
 
-  # === NEUE DEPENDENCIES FÜR SICHERHEITS-FEATURES ===
+  # === NEUE DEPENDENCIES FÃœR SICHERHEITS-FEATURES ===
 
-  # E2E-Verschlüsselung (Signal Protocol)
+  # E2E-VerschlÃ¼sselung (Signal Protocol)
   libsignal_protocol_dart: ^0.8.2
 
-  # WebRTC für P2P-Kommunikation
+  # WebRTC fÃ¼r P2P-Kommunikation
   flutter_webrtc: ^1.6.0
 
-  # WebSocket für Signaling-Server-Kommunikation
+  # WebSocket fÃ¼r Signaling-Server-Kommunikation
   web_socket_channel: ^3.0.1
 
-  # HTTP-Client für REST-API (mit Zertifikat-Pinning)
+  # HTTP-Client fÃ¼r REST-API (mit Zertifikat-Pinning)
   http: ^1.2.1
 
-  # Kryptographische Hash-Funktionen (für Zertifikat-Pinning)
+  # Kryptographische Hash-Funktionen (fÃ¼r Zertifikat-Pinning)
   crypto: ^3.0.5
 
-  # Sichere, verschlüsselte lokale Speicherung von Tokens (statt SharedPreferences)
+  # Sichere, verschlÃ¼sselte lokale Speicherung von Tokens (statt SharedPreferences)
   flutter_secure_storage: ^11.0.0
 
-  # Hive für lokale verschlüsselte Speicherung der Signal-Keys
+  # Hive fÃ¼r lokale verschlÃ¼sselte Speicherung der Signal-Keys
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  # Kamera & Video für Verifizierung
+  # Kamera & Video fÃ¼r Verifizierung
   camera: ^0.12.0
   video_player: ^2.9.1
 
@@ -77,20 +77,20 @@ dependencies:
   # Standort
   geolocator: ^14.0.3
 
-  # Geocoding für Ortserkennung
+  # Geocoding fÃ¼r Ortserkennung
   geocoding: ^4.0.0
 
-  # Bildverarbeitung für Moderation (Placeholder für ML-Kit)
+  # Bildverarbeitung fÃ¼r Moderation (Placeholder fÃ¼r ML-Kit)
   image: ^4.2.0
 
-  # Path Provider für Dateipfade
+  # Path Provider fÃ¼r Dateipfade
   path_provider: ^2.1.4
 
   # Benachrichtigungen (Nachrichten, Likes, Matches, Event-Erinnerungen)
   flutter_local_notifications: ^22.1.0
 
-  # EU-Push über Supabase Push (Verarbeitung in eu-central-1, Free Tier).
-  # FCM dient nur als Zustell-Transport (kostenloses Firebase-Konto nötig).
+  # EU-Push Ã¼ber Supabase Push (Verarbeitung in eu-central-1, Free Tier).
+  # FCM dient nur als Zustell-Transport (kostenloses Firebase-Konto nÃ¶tig).
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
 
@@ -100,21 +100,21 @@ dependencies:
   flutter_timezone: ^5.1.0
 
   # Nativer Splash (Preserve/Remove-API wird zur Laufzeit in main.dart genutzt,
-  # daher als reguläre Dependency statt dev_dependency)
+  # daher als regulÃ¤re Dependency statt dev_dependency)
   flutter_native_splash: ^2.4.8
 
-  # Crypto für Key-Backup-Verschlüsselung
+  # Crypto fÃ¼r Key-Backup-VerschlÃ¼sselung
   pointycastle: ^4.0.0
 
-  # Supabase für Auth + Datenbank (RLS-abgesichert) + Supabase Push (EU)
+  # Supabase fÃ¼r Auth + Datenbank (RLS-abgesichert) + Supabase Push (EU)
   flutter_dotenv: ^6.0.1
   supabase_flutter: ^2.17.1
 
   # Passkeys (WebAuthn): native Passkey-Dialoge (FaceID/TouchID/Biometrie).
-  # Der Plugin-Code läuft auf iOS 16+ / Android; es reicht die
+  # Der Plugin-Code lÃ¤uft auf iOS 16+ / Android; es reicht die
   # Plattform-Prompts an Supabase Auth weiter (siehe lib/services/passkey_auth.dart).
-  # ACHTUNG: Benötigt Flutter 3.35+ / Dart 3.9+ und supabase_flutter mit
-  # Passkey-Unterstützung (signInWithPasskey/registerPasskey).
+  # ACHTUNG: BenÃ¶tigt Flutter 3.35+ / Dart 3.9+ und supabase_flutter mit
+  # Passkey-UnterstÃ¼tzung (signInWithPasskey/registerPasskey).
   passkeys: ^2.21.0
 
   # QR-Code (Profil teilen + Scannen)
@@ -131,17 +131,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Lint-Regeln für sauberen, modernen Code
+  # Lint-Regeln fÃ¼r sauberen, modernen Code
   flutter_lints: ^6.0.0
 
-  # Code Generation für Hive
+  # Code Generation fÃ¼r Hive
   build_runner: ^2.4.13
   hive_generator: ^2.0.1
 
   # Launcher-Icons aus einem Basis-Bild generieren
   flutter_launcher_icons: ^0.14.4
 
-# Lokale Forks der drei Plugins, die noch kein Built-in Kotlin unterstützen
+# Lokale Forks der drei Plugins, die noch kein Built-in Kotlin unterstÃ¼tzen
 # (KGP-Warnung beim Build). Die Forks enthalten KEINE KGP-Apply-Zeilen mehr;
 # der Flutter-Plugin-Loader wendet KGP dann selbst an (builtInKotlin=false).
 dependency_overrides:
@@ -164,7 +164,7 @@ dependency_overrides:
 
 flutter_launcher_icons:
   # Legacy-Android-Icon (mipmap-*): volles Basis-PNG (weisser Hintergrund +
-  # Badge) – entspricht exakt der hochgeladenen PNG.
+  # Badge) â€“ entspricht exakt der hochgeladenen PNG.
   image_path: "assets/images/wisp_icon_base.png"
   # iOS-Icon: voll opake 1024er-Variante (Apple maskt selbst, Transparenz
   # ist auf iOS nicht erlaubt).
@@ -175,7 +175,7 @@ flutter_launcher_icons:
   # Adaptive Icon (Android 8+): weisser Hintergrund (wie im Original-PNG) +
   # transparentes Foreground, in dem das Badge zentriert auf 66 % der
   # Safe-Zone eingebacken ist (generiert via tool/generate_icons.ps1).
-  # KEINE hex-Varianten! Die enthalten schwarze Ränder/Dreiecke.
+  # KEINE hex-Varianten! Die enthalten schwarze RÃ¤nder/Dreiecke.
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/images/wisp_icon_foreground.png"
   # Safe-Zone steckt bereits im Foreground -> kein zusaetzlicher Inset,
@@ -200,4 +200,4 @@ flutter:
     - assets/images/wisp_icon_round_dark.png
     - .env
 
-  # Hinweis: In einer echten App würden hier weitere Assets (Bilder, Fonts) registriert.
+  # Hinweis: In einer echten App wÃ¼rden hier weitere Assets (Bilder, Fonts) registriert.
