@@ -7,7 +7,7 @@ und folgt der [Semantic Versioning Specification (SemVer)](https://semver.org/la
 Solange die Versionsnummer mit `0.` beginnt (Initial Development Phase nach SemVer §4),
 können sich Schnittstellen und Verhalten jederzeit ändern.
 
-## [0.6.1] – 2026-08-24
+## [0.7.0] – 2026-08-24
 
 ### Behoben
 
