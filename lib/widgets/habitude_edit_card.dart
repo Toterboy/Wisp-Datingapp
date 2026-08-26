@@ -54,7 +54,7 @@ class HabitudeEditCard extends ConsumerWidget {
             const SizedBox(height: 4),
             const Text(
               'Wie stehst du zu ...? Diese Angaben beeinflussen, wen du bei '
-              '"Find your Match" siehst – es werden nur Personen gezeigt, '
+              '"Find your Match" siehst. Es werden nur Personen gezeigt, '
               'die maximal so viel konsumieren wie du.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),

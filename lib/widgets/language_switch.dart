@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisp/l10n/app_strings.dart';
 
-/// Sprachumschalter (DE/EN) als kompakte Segmented-Button-Reihe.
+/// Sprachumschalter (DE/EN) als Translate-Icon mit Popup-Menü.
 ///
-/// Variante für die Einstellungen: mit Label darüber. Für den Login-
-/// Screen [compact] setzen (nur die beiden Kürzel, rechtsbündig).
+/// Ein Klick auf das Icon öffnet ein kleines Menü mit „Deutsch"/
+/// „Englisch"; die aktive Sprache ist mit einem Häkchen markiert.
+///
+/// Varianten:
+/// - [compact] (Login-Screen): nur das Icon, z. B. rechts oben.
+/// - Einstellungen (Default): Label „Sprache" + Icon-Button.
 class LanguageSwitch extends ConsumerWidget {
   const LanguageSwitch({super.key, this.compact = false});
 
@@ -17,41 +21,36 @@ class LanguageSwitch extends ConsumerWidget {
     final locale = ref.watch(localeProvider);
     final current = locale.languageCode;
 
-    final segments = <String, String>{
-      'de': compact ? 'DE' : 'Deutsch',
-      'en': compact ? 'EN' : 'English',
-    };
-
-    final control = SegmentedButton<String>(
-      segments: [
-        for (final entry in segments.entries)
-          ButtonSegment(
-            value: entry.key,
-            label: Text(entry.value),
-          ),
+    final menu = PopupMenuButton<String>(
+      tooltip: L10n.t(context, 'settings.language'),
+      icon: const Icon(Icons.translate),
+      initialValue: current,
+      onSelected: (code) => saveLocale(ref, Locale(code)),
+      itemBuilder: (context) => [
+        CheckedPopupMenuItem(
+          value: 'de',
+          checked: current == 'de',
+          child: Text(L10n.t(context, 'language.german')),
+        ),
+        CheckedPopupMenuItem(
+          value: 'en',
+          checked: current == 'en',
+          child: Text(L10n.t(context, 'language.english')),
+        ),
       ],
-      selected: {current},
-      onSelectionChanged: (selection) {
-        saveLocale(ref, Locale(selection.first));
-      },
-      style: compact
-          ? const ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            )
-          : null,
     );
 
     if (compact) {
-      return control;
+      return menu;
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+
+    return Row(
       children: [
-        Text(L10n.t(context, 'settings.language'),
-            style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        control,
+        Expanded(
+          child: Text(L10n.t(context, 'settings.language'),
+              style: Theme.of(context).textTheme.titleMedium),
+        ),
+        menu,
       ],
     );
   }

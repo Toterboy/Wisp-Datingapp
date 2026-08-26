@@ -75,7 +75,7 @@ class VerificationInfoScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 12),
                       const _InfoBullet('Das Video wird **lokal verschlüsselt** gespeichert.'),
-                      const _InfoBullet('Nach dem Einreichen liegt es in einem **privaten Speicher** – nur der Support kann es zur Prüfung ansehen.'),
+                      const _InfoBullet('Nach dem Einreichen liegt es in einem **privaten Speicher**. Nur der Support kann es zur Prüfung ansehen.'),
                       const _InfoBullet('Es dient der **persönlichen Prüfung durch den Support** (Mensch-Verifizierung).'),
                       const _InfoBullet('Es wird **niemals** öffentlich angezeigt oder an Dritte weitergegeben.'),
                       const _InfoBullet('Du kannst es jederzeit löschen; bei Ablehnung wird es automatisch entfernt.'),
@@ -476,7 +476,7 @@ class VerificationSuccessScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(
                 'Dein Video wurde sicher übermittelt und liegt jetzt in einem '
-                'privaten Speicher. Der Support prüft es persönlich – sobald '
+                'privaten Speicher. Der Support prüft es persönlich, sobald '
                 'es freigegeben ist, erscheint das Verifiziert-Zeichen in '
                 'deinem Profil.',
                 style: Theme.of(context).textTheme.bodyLarge,

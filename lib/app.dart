@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,6 +42,12 @@ class App extends ConsumerWidget {
       title: 'WispDating',
       debugShowCheckedModeBanner: false,
       locale: locale,
+      // Audit/Fix: Delegates fuer de+en PFLICHT. Ohne sie unterstuetzt
+      // Flutters DefaultMaterialLocalizations nur 'en' - bei gesetzter
+      // Locale 'de' wurde gar kein MaterialLocalizations geladen und
+      // Material-Widgets (AppBar, PopupMenuButton, Tooltips) crashten
+      // mit "No MaterialLocalizations found" (grauer Fehler-Screen).
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: const [Locale('de'), Locale('en')],
       theme: AppTheme.light(theme: theme),
       darkTheme: AppTheme.dark(theme: theme),

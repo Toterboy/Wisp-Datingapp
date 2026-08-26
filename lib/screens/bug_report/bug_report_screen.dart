@@ -78,6 +78,20 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
     }
 
     final compressed = await _compressImage(bytes);
+    if (compressed == null) {
+      // Audit M-21: Fail-closed - ohne erfolgreiches Re-Encoding (und damit
+      // EXIF-Entfernung) wird der Screenshot NICHT angehängt.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Screenshot konnte nicht aufbereitet werden (Metadaten-Entfernung '
+            'fehlgeschlagen) und wurde nicht angehängt.',
+          ),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _images.add(compressed);
@@ -111,10 +125,13 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
     return 'application/octet-stream';
   }
 
-  Future<Uint8List> _compressImage(Uint8List bytes) async {
+  /// Audit M-21: Dekodieren + Neu-Encodieren entfernt ALLE Metadaten
+  /// (EXIF/GPS). Rückgabe `null` bei Fehlschlag - die Originalbytes mit
+  /// potenziellen GPS-/Gerätedaten werden NIE durchgereicht.
+  Future<Uint8List?> _compressImage(Uint8List bytes) async {
     try {
       final image = img.decodeImage(bytes);
-      if (image == null) return bytes;
+      if (image == null) return null;
 
       final resized = img.copyResize(
         image,
@@ -125,7 +142,7 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
       final compressed = img.encodeJpg(resized, quality: 75);
       return Uint8List.fromList(compressed);
     } catch (_) {
-      return bytes;
+      return null;
     }
   }
 

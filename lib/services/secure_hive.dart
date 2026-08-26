@@ -122,7 +122,7 @@ class SecureHive {
       // Meta-Box unlesbar (Schlüsselwechsel/-verlust): zurücksetzen. Alle
       // Datenboxen laufen dann durch den Migrations-/Reset-Pfad.
       if (kDebugMode) {
-        debugPrint('[SecureHive] Meta-Box unlesbar – wird zurückgesetzt: $e');
+        debugPrint('[SecureHive] Meta-Box unlesbar, wird zurückgesetzt: $e');
       }
       await Hive.deleteBoxFromDisk(_metaBoxName);
       meta = await Hive.openBox<String>(_metaBoxName, encryptionCipher: cipher);
@@ -138,7 +138,7 @@ class SecureHive {
       } catch (e) {
         if (kDebugMode) {
           debugPrint('[SecureHive] Box "$name" nicht verschlüsselt öffnbar '
-              '($e) – versuche Migration von Klartext-Altbestand.');
+              '($e). Versuche Migration von Klartext-Altbestand.');
         }
       }
     }
@@ -158,7 +158,7 @@ class SecureHive {
       // akzeptiert: E2E-Keys dürfen niemals unverschlüsselt weiterverwendet
       // werden).
       if (kDebugMode) {
-        debugPrint('[SecureHive] Box "$name" unlesbar – wird zurückgesetzt: $e');
+        debugPrint('[SecureHive] Box "$name" unlesbar, wird zurückgesetzt: $e');
       }
       try {
         await Hive.deleteBoxFromDisk(name);

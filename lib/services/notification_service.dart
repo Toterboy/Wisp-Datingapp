@@ -198,6 +198,11 @@ class NotificationService {
       color: const Color(0xFFFF6B9D),
       importance: Importance.high,
       priority: Priority.high,
+      // Audit N-16: Nachrichteninhalte nicht auf dem Sperrbildschirm
+      // zeigen (privat = nur entsperrent sichtbar). Andere Kategorien
+      // enthalten ohnehin nur Metadaten.
+      visibility:
+          channelId == 'messages' ? NotificationVisibility.private : null,
     );
     const iosDetails = DarwinNotificationDetails(
       presentSound: true,

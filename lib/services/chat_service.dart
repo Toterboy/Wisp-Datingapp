@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 
 import 'package:wisp/models/match.dart';
 import 'package:wisp/models/message.dart';
@@ -15,56 +12,26 @@ import 'package:wisp/utils/constants.dart';
 /// Der echte Nachrichtenaustausch läuft E2E-verschlüsselt über den
 /// P2P-DataChannel (P2PChatService); hier landen gesendete UND empfangene
 /// Nachrichten nur für die Anzeige.
+///
+/// Audit N-8: Die frühere OPTIONALE Hive-Persistenz (`messagesBox`) wurde
+/// ENTFERNT. Sie war eine Fußfalle: Jeder künftige Aufrufer, der eine
+/// plain `Hive.openBox` statt einer [SecureHive]-Box übergeben hätte,
+/// hätte entschlüsselte Chat-Texte im Klartext auf der Platte abgelegt -
+/// im Widerspruch zur Design-Entscheidung, Nachrichten bewusst NICHT zu
+/// persistieren (chat_provider.dart). Persistente Verläufe sind damit
+/// strukturell ausgeschlossen.
 class ChatService {
-  ChatService({this.messagesBox}) {
-    if (messagesBox != null) {
-      _loadFromBox();
+  ChatService() {
+    // Früher wurden hier persistierte Nachrichten geladen - nach der
+    // Entfernung der Persistenz (N-8) verbleibt ein bewusst In-Memory-
+    // only Speicher.
+    if (kDebugMode) {
+      debugPrint('[ChatService] In-Memory-only Modus (keine Persistenz).');
     }
   }
-
-  /// Optionale Hive-Box für persistente Nachrichten-Speicherung.
-  /// Wenn gesetzt, überleben Nachrichten App-Neustarts.
-  final Box<String>? messagesBox;
-
-  static const _boxPrefix = 'chat_msgs_';
 
   final List<Match> _matches = [];
   final Map<String, List<Message>> _messages = {};
-
-  /// Lädt persistierte Nachrichten aus der Hive-Box (falls vorhanden).
-  void _loadFromBox() {
-    if (messagesBox == null) return;
-    for (final key in messagesBox!.keys) {
-      if (key is String && key.startsWith(_boxPrefix)) {
-        final matchId = key.substring(_boxPrefix.length);
-        try {
-          final jsonStr = messagesBox!.get(key);
-          if (jsonStr == null) continue;
-          final list = (jsonDecode(jsonStr) as List)
-              .map((j) => Message.fromJson(j as Map<String, dynamic>))
-              .toList();
-          _messages[matchId] = list;
-        } catch (e) {
-          debugPrint('[ChatService] Fehler beim Laden von $matchId: $e');
-        }
-      }
-    }
-  }
-
-  /// Persistiert die Nachrichten eines Matches.
-  void _persist(String matchId) {
-    if (messagesBox == null) return;
-    final msgs = _messages[matchId];
-    if (msgs == null) {
-      messagesBox!.delete('$_boxPrefix$matchId');
-      return;
-    }
-    messagesBox!.put(
-      '$_boxPrefix$matchId',
-      jsonEncode(msgs.map((m) => m.toJson()).toList()),
-    );
-    messagesBox!.flush();
-  }
 
   /// Liefert alle aktuellen Matches.
   List<Match> getMatches() => List.unmodifiable(_matches);
@@ -99,7 +66,6 @@ class ChatService {
   /// P2P-Nachrichten: gesendet wie empfangen). Löst KEINEN Mock-Auto-Reply aus.
   void addMessage(String matchId, Message msg) {
     _messages.putIfAbsent(matchId, () => []).add(msg);
-    _persist(matchId);
   }
 
   /// Setzt den ungelesen-Zähler eines Matches zurück.
@@ -118,7 +84,6 @@ class ChatService {
     if (idx == -1) return false;
     _matches.removeAt(idx);
     _messages.remove(matchId);
-    _persist(matchId);
     return true;
   }
 
@@ -131,7 +96,6 @@ class ChatService {
   void resetMatch(String matchId, {UserProfile? partner}) {
     _matches.removeWhere((m) => m.id == matchId);
     _messages.remove(matchId);
-    _persist(matchId);
     if (partner != null) {
       createMatch(partner);
     }

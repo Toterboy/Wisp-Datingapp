@@ -7,7 +7,130 @@ und folgt der [Semantic Versioning Specification (SemVer)](https://semver.org/la
 Solange die Versionsnummer mit `0.` beginnt (Initial Development Phase nach SemVer §4),
 können sich Schnittstellen und Verhalten jederzeit ändern.
 
-## [0.7.0] – 2026-08-24
+## [0.7.1] – 2026-08-26
+
+Polish- und Fix-Release zu 0.7.0 (das nie veröffentlicht wurde): Sprach-
+Complettierung, Farbwelt-Rahmen, App-Start-Logo, 2FA-Navigation und
+Passkey-Konfiguration.
+
+### Behoben
+
+- **Deutsch funktioniert jetzt überall**: Die App crashte bei gesetzter
+  Sprache Deutsch mit "No MaterialLocalizations found" (fehlende
+  Lokalisierungs-Delegates) - Login/Registrierung waren unbenutzbar
+- **2FA "Später erinnern"**: Ein Sync-Fehler blockierte die Rückkehr aus
+  dem "Konto absichern"-Dialog
+- **Einrichtung erscheint nicht mehr erneut**: Der Server-Stand wurde nur
+  "best-effort" gesichert (stiller Fehlschlag) - jetzt mit sichtbarem
+  Hinweis UND Selbstheilung beim nächsten Login (lokale erledigt-Flags
+  werden zum Server nachgezogen)
+- **Audio-Vorstellung**: Erneutes Hochladen schlug mit StorageException
+  409 "Duplicate" fehl - jetzt mit Upsert
+- **App-Start-Logo**: Es wurde das runde Benachrichtigungs-Icon statt des
+  vollständigen Logos gezeigt, außerdem zu groß gerendert (Schrift
+  abgeschnitten). Jetzt korrektes, skaliertes Logo inkl. Android-12+
+  Kreis-Maske
+- **Farbwelten**: Rahmen von Eingabefeldern folgten hartcodiert der
+  Classic-Pink; jetzt übernimmt jede Farbwelt (Ozean, Wald, Sonnen-
+  untergang, Lavendel, Schiefer) auch die Rahmen
+- **Registrierung**: Migration 063 entfernt Invite-Reste von
+  Bestandsservern (Invite-Enforcement blockierte die offene
+  Registrierung mit "database error saving new user")
+- Begrüßung ohne Namen jetzt "Hallo, du!" statt "Hallo, schönen Menschen!"
+
+### Geändert
+
+- **Einrichtung: Swipen deaktiviert** - nur die Buttons führen die
+  pro Schritt erforderliche Validierung/Speicherung aus; vorher konnten
+  per Swipe Schritte übersprungen werden, wodurch Angaben nicht ins
+  Profil übernommen wurden
+- **Profil bearbeiten**: Ungespeicherte Änderungen fragen beim Verlassen
+  (Tab-Wechsel und Zurück) nach Speichern/Verwerfen; nach fehlge-
+  schlagener Validierung erscheint ein Hinweis direkt am Speichern-Button
+- Sprach-Button: Übersetzen-Symbol mit Popup-Menü (Deutsch/Englisch),
+  nur noch ein Button, positioniert auf Höhe der Überschrift; die
+  "Einloggen"-Kopfzeile entfällt, Inhalt rückt höher
+- Englisch vervollständigt: Login-/Registrierungs-Screen, Sicherheits-
+  check-Dialog und alle Auth-Fehlermeldungen sind zweisprachig
+- Standort-Autoerkennung trägt einen ORTSNAMEN ein (Plattform-Reverse-
+  Geocoder) statt Koordinaten; Fallback: grobe Region
+- Geschlecht-Auswahlmenü abgerundet (konsistent zum Rest der App)
+- Texte: keine Gedankenstriche mehr in Nutzersichtbaren Sätzen
+
+### Sicherheit
+
+- Passkeys: assetlinks.json korrigiert (Fingerprint-Format mit
+  Doppelpunkten wie von der Android-API geliefert, ergänzter web-Eintrag)
+  und die apk-key-hash-Origins auf die tatsächlichen Keystores korrigiert
+  (Release + Debug); Root-Domain-Datei für App-Links dokumentiert
+- Datenschutz-Entwurf (intern) angelegt
+
+## [0.7.0] – 2026-08-26
+
+Security- & Privacy-Release: Umsetzung des umfassenden Sicherheitsaudits
+(App, Edge Functions, Datenbank). **Enthält Pflicht-Migrationen (056–062)
+und Edge-Function-Updates – zuerst ausrollen** (siehe
+`releases/v0.7.0/RELEASE_NOTES.md`).
+
+### Sicherheit
+
+- **Jugendschutz serverseitig erzwungen**: Alters-Sichtbarkeits- und
+  Paarungsregeln (16–17 getrennt; stufenweise ab 18) gelten jetzt in
+  Profil-Sicht, Feeds, Likes, Matches, Random Chat und Dating Hour
+- **Geburtsdatum unveränderlich** nach Registrierung (serverseitig)
+- **Session im Keystore/Keychain** statt Klartext-Speicher
+  (Access-/Refresh-Token)
+- **E2E (Signal Protocol) repariert**: PreKeys überleben Neustarts,
+  Bundle wird automatisch veröffentlicht, One-Time-Key-Rotation,
+  SignedPreKey-Rotation (90 Tage), persistenter Identity-Trust mit
+  Blockade + Warn-Dialog bei Schlüsselwechsel
+- **Account-Löschung vollständig**: Storage-Objekte (Avatare,
+  Intro-Audios, Verifizierungs-Videos) und alle lokalen Schlüssel/Daten
+  werden entfernt; Fehler werden angezeigt statt verschwiegen
+- **Anti-Trilateration**: max. 5 Standort-Änderungen/Tag,
+  Speed-Plausibilität serverseitig, ~1-km-Rundung „at rest",
+  gedrosselte Distanzabfragen
+- Like-/Report-/Dating-Hour-Rate-Limits inkl. Schließung des direkten
+  DB-Pfads für Likes
+- Dating-Hour: Regressionen aus Migration 055 behoben (Blockier-Schutz
+  wiederhergestellt, Scheduler wieder intern), Entscheidungen nach
+  Session-Ende unveränderlich
+- WebRTC: autorisierte Private Channels für Signaling, optionaler TURN
+  (kurzlebige Credentials), SSRF-Guard für UnifiedPush-Endpunkte
+- Cert-Pinning: Rotation-Fallback nur noch bei exakt gepinntem Intermediate
+
+### Geändert
+
+- **Registrierung ohne Einladungscode**: Invite-System komplett entfernt
+  (Tabelle + RPCs gelöscht); Schutz läuft über CAPTCHA (Dashboard-Pflicht!)
+  und Rate-Limits
+- Passwort-Reset meldet alle Geräte ab (Global-SignOut)
+- Match-Profil zeigt Alter statt Geburtsdatum; Anti-Fraud-Flag verlässt
+  den Server nicht mehr
+- Quiz-Antwortoptionen werden pro Match gemischt (kein „immer Antwort 1")
+- Standort-Anzeige als grobe Region (~11 km) statt Koordinaten
+- Entschlüsselte Sprachnachrichten werden nach dem Anhören gelöscht;
+  Verifizierungs-Videos liegen app-privat statt im System-Temp
+- Bilder werden vor Versand/Upload neu enkodiert (EXIF/GPS garantiert
+  entfernt)
+
+### Behoben
+
+- Entschlüsselte Voice-Notes akkumulierten im Temp-Verzeichnis ohne
+  Löschung
+- Geburtsdaten fremder Nutzer konnten in Release-Logs landen
+  (Debug-Guards ergänzt)
+- `city`/`state`-Spalten fehlten in den Migrationen (Schema-Drift behoben)
+- Doppelte Random-Chat-Warteschlangen pro Nutzer ausgeschlossen
+  (partieller Unique-Index)
+
+### Intern
+
+- Persistente DB-Rate-Limits in `prekeys` und `process-location-check`;
+  konstante Zeitvergleiche; `user_reports`-Retention (180 Tage);
+  Standard-Privilegien für künftige Tabellen entfernt; `prekeys` own-only
+
+## [0.6.1] – 2026-08-24 *(interner Stand, nie veröffentlicht – geht mit 0.7.0 erstmals raus)*
 
 ### Behoben
 

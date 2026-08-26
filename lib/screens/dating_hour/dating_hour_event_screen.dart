@@ -101,7 +101,7 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
       id: event.id.hashCode,
       when: remindAt,
       title: 'Dating Hour startet gleich',
-      body: 'In 10 Minuten geht es los – sei dabei!',
+      body: 'In 10 Minuten geht es los, sei dabei!',
       channelId: 'events',
     );
   }
@@ -218,7 +218,7 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
         SnackBar(
           content: Text(rejoin
               ? 'Du bist beim nächsten Dating Hour automatisch dabei.'
-              : 'Alles klar – du wirst beim nächsten Mal gefragt.'),
+              : 'Alles klar, du wirst beim nächsten Mal gefragt.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -500,7 +500,7 @@ class _ServerTimeWarningBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Die Server-Zeit konnte nicht verifiziert werden – '
+              'Die Server-Zeit konnte nicht verifiziert werden. '
               'Countdown und Status basieren auf der lokalen Gerätezeit.',
               style: theme.textTheme.bodySmall,
             ),

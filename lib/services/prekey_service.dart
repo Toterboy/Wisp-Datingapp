@@ -82,7 +82,7 @@ class PreKeyService {
       // nichts und verzögert nur die Fehlermeldung. Sofort abbrechen.
       if (response.status == 404) {
         throw StateError(
-          'PreKey Bundle für $peerId existiert nicht (404) — der Partner hat '
+          'PreKey Bundle für $peerId existiert nicht (404). Der Partner hat '
           'vermutlich noch keine PreKeys hochgeladen oder ist kein gültiger '
           'Nutzer.',
         );
@@ -122,6 +122,31 @@ class PreKeyService {
     await publishOwnPreKeys(bundle);
     // PreKey-Rotation prüfen: falls Vorrat knapp, nachgenerieren.
     await _encryption.maybeRotatePreKeys();
+  }
+
+  /// Audit H-7/E-3: Stellt sicher, dass ein eigenes Bundle auf dem Server
+  /// liegt - der fehlende Aufruf nach Registrierung/Login war der Grund,
+  /// warum E2E-Aufbau für Normalnutzer fehlschlug (404 beim Bundle-Fetch).
+  ///
+  /// Wird nach Login/Session-Restore ([AuthNotifier._syncFromServer])
+  /// aufgerufen. Fail-open: Eine fehlgeschlagene Prüfung blockiert den
+  /// Login nicht.
+  Future<void> ensureOwnBundlePublished() async {
+    try {
+      await _encryption.initialized;
+      final myId = Supabase.instance.client.auth.currentUser?.id;
+      if (myId == null || !isValidPeerId(myId)) return;
+      final response = await Supabase.instance.client.functions.invoke(
+        'prekeys/${Uri.encodeComponent(myId)}',
+        method: HttpMethod.get,
+      );
+      if (response.status == 404) {
+        await publishOwnPreKeysFromStore();
+      }
+    } catch (_) {
+      // Fail-open wie dokumentiert: Der Login wird nicht blockiert; beim
+      // nächsten Start wird erneut geprüft.
+    }
   }
 
   /// Entfernt eine (z. B. beendete) Session aus dem Cache.

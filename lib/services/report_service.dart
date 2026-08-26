@@ -57,7 +57,10 @@ class ReportService {
       id: 'report_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(0xFFFFFF)}',
       // Reporter-ID nur als SHA-256-Hash speichern (X-M-08/H-06).
       reporterId: hashPii(reporterId),
-      reportedUserId: reportedUserId,
+      // Audit N-18: Auch die gemeldete User-ID wird nur gehasht gespeichert
+      // (Pseudonymisierung am Ruhe-Zustand). Die ROH-ID geht ausschließlich
+      // an den Server (dort für Moderation/RLS erforderlich).
+      reportedUserId: hashPii(reportedUserId),
       type: type,
       description: description,
       createdAt: DateTime.now(),
@@ -67,7 +70,11 @@ class ReportService {
     // Zentrale Ablage beim Support (best effort). Nur dieser Weg
     // übermittelt Nachrichten-Inhalte an Dritte – der Rest des Chats
     // bleibt Ende-zu-Ende-verschlüsselt auf den Geräten.
-    unawaited(_submitToServer(report, messages));
+    unawaited(_submitToServer(
+      report,
+      messages,
+      reportedUserIdRaw: reportedUserId,
+    ));
     return report;
   }
 
@@ -75,14 +82,15 @@ class ReportService {
   /// Nachrichten an Supabase (Tabelle user_reports).
   Future<void> _submitToServer(
     UserReport report,
-    List<Message>? messages,
-  ) async {
+    List<Message>? messages, {
+    required String reportedUserIdRaw,
+  }) async {
     if (!SupabaseService.isInitialized) return;
     try {
       await SupabaseService.client.rpc(
         'submit_report',
         params: {
-          'p_reported_user_id': report.reportedUserId,
+          'p_reported_user_id': reportedUserIdRaw,
           'p_report_type': report.type.value,
           'p_description': report.description,
           'p_messages': (messages ?? const <Message>[]).map((m) {
@@ -112,8 +120,10 @@ class ReportService {
   }
 
   List<UserReport> getReportsAgainstUser(String userId) {
+    // Audit N-18: Lookup über den Hash (lokale Speicherung ist gehasht).
+    final hash = hashPii(userId);
     return _box.values
-        .where((r) => r.reportedUserId == userId)
+        .where((r) => r.reportedUserId == hash)
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }

@@ -57,7 +57,7 @@ class PhotoModerationService {
       return const ModerationResult(
         approved: false,
         needsReview: true,
-        reason: 'Moderation temporär nicht verfügbar — Foto wird geprüft.',
+        reason: 'Moderation temporär nicht verfügbar, Foto wird geprüft.',
         type: PhotoModerationType.otherViolation,
       );
     }
@@ -68,7 +68,7 @@ class PhotoModerationService {
     if (shouldBan) {
       return const ModerationResult(
         approved: false,
-        reason: 'Wiederholter Verstoß — Konto gesperrt.',
+        reason: 'Wiederholter Verstoß: Konto gesperrt.',
         type: PhotoModerationType.nudityContent,
       );
     }

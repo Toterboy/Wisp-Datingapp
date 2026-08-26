@@ -422,8 +422,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             children: [
                               Text(
                                 'Wie stehst du zu folgenden Dingen? Diese Angaben '
-                                'beeinflussen, wen du bei "Find your Match" siehst – '
-                                'es werden nur Personen gezeigt, die maximal so '
+                                'beeinflussen, wen du bei "Find your Match" siehst. '
+                                'Es werden nur Personen gezeigt, die maximal so '
                                 'viel konsumieren wie du.',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),

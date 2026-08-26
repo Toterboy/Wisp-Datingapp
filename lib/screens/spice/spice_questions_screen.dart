@@ -84,7 +84,7 @@ class _SpiceQuestionsScreenState extends ConsumerState<SpiceQuestionsScreen> {
     } else if (result.bothAnswered) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Beide haben geantwortet — Antwort aufgedeckt!'),
+          content: Text('Beide haben geantwortet: Antwort aufgedeckt!'),
         ),
       );
     } else {
@@ -208,19 +208,19 @@ class _QuestionCard extends StatelessWidget {
             if (bothAnswered) ...[
               _AnswerBox(
                 label: 'Deine Antwort',
-                text: question.myAnswer ?? '—',
+                text: question.myAnswer ?? '(offen)',
                 color: theme.colorScheme.primaryContainer,
               ),
               const SizedBox(height: 8),
               _AnswerBox(
                 label: 'Antwort von deinem Match',
-                text: question.partnerAnswer ?? '—',
+                text: question.partnerAnswer ?? '(offen)',
                 color: theme.colorScheme.tertiaryContainer,
               ),
             ] else if (question.answeredByMe) ...[
               _AnswerBox(
                 label: 'Deine Antwort',
-                text: question.myAnswer ?? '—',
+                text: question.myAnswer ?? '(offen)',
                 color: theme.colorScheme.primaryContainer,
               ),
               const SizedBox(height: 8),

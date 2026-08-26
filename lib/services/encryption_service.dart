@@ -1,7 +1,7 @@
 ﻿import 'dart:async';
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
+import 'package:crypto/crypto.dart' show sha512;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
@@ -17,20 +17,34 @@ import 'package:wisp/services/secure_hive.dart';
 /// Kapselt alle kryptographischen Operationen:
 /// - Identitätsschlüsselpaar (Identity Key Pair)
 /// - PreKeys (einmalige Schlüssel für neue Sessions)
-/// - Signed PreKeys (langfristige signierte Schlüssel)
+/// - Signed PreKeys (langfristige signierte Schlüssel, mit Zeitrotation)
 /// - Session-Management (Verschlüsselung/Entschlüsselung)
 /// - Persistente Speicherung der Identität via Hive
 ///
-/// Nutzt den [InMemorySignalProtocolStore] von libsignal für die
-/// Laufzeit-Verwaltung der Schlüssel und persistiert das Identitäts-
-/// schlüsselpaar (inklusive Registrierungs-ID) verschlüsselt in Hive,
-/// damit es Neustarts übersteht.
+/// Audit H-7-Fixes (PreKey-Lifecycle):
+/// - E-2: PreKeys und der Signed PreKey werden jetzt PERSISTIERT
+///   (verschlüsselte Hive-Boxen). Bisher wurden sie bei jedem Start neu
+///   generiert, während der Server das ALTE Bundle auslieferte -> alle
+///   neuen eingehenden Sessions brachen nach einem Neustart.
+/// - E-1: [exportPreKeyBundle] rückt den Cursor nach jeder Auslieferung
+///   vor; aufeinanderfolgende Bundles enthalten unterschiedliche
+///   One-Time-PreKeys statt denselben an alle Peers.
+/// - E-3: Der Signed PreKey rotiert zeitbasiert (90 Tage); alte Keys
+///   bleiben zur Entschlüsselung laufender Sessions erhalten.
+/// - E-4: Identity-Trust wird persistent ([HiveSignalProtocolStore]);
+///   ein bekannter Peer-Key-Change wirft jetzt eine Exception
+///   ('peer_identity_changed') statt still akzeptiert zu werden.
 class EncryptionService {
   static const String _boxNameIdentity = 'signal_identity';
   static const String _boxNameSessions = 'signal_sessions';
   static const String _boxNamePeerTrust = 'signal_peer_trust';
+  static const String _boxNamePreKeys = 'signal_prekeys';
+  static const String _boxNameSignedPreKeys = 'signal_signed_prekeys';
+  static const String _boxNameIdentityTrust = 'signal_identity_trust';
   static const String _identityKey = 'identity';
   static const String _registrationIdKey = 'registration_id';
+  static const String _preKeyCursorKey = 'prekey_cursor';
+  static const String _signedPreKeyActiveKey = 'signed_prekey_active';
 
   late final Box<SignalIdentityKeyPairAdapter> _identityBox;
   late final Box<SignalSessionRecordAdapter> _sessionBox;
@@ -41,9 +55,20 @@ class EncryptionService {
   /// (Als JSON-String, weil Hive für Map keinen eingebauten Adapter hat.)
   late final Box<String> _peerTrustBox;
 
+  /// Persistente PreKey-/SignedPreKey-Store (Audit H-7/E-2).
+  late final Box<SignalPreKeyRecordAdapter> _preKeysBox;
+  late final Box<SignalSignedPreKeyRecordAdapter> _signedPreKeysBox;
+
+  /// Persistenter libsignal-Identity-Trust (Audit H-7/E-4).
+  late final Box<SignalIdentityKeyStoreAdapter> _identityTrustBox;
+
   HiveSignalProtocolStore? _store;
   IdentityKeyPair? _identityKeyPair;
   int _registrationId = 1;
+
+  /// Eigene User-ID (für Safety-Numbers via NumericFingerprintGenerator).
+  /// Wird vom Auth-Flow gesetzt (Login/Restore) und von WebRTC als Fallback.
+  String? localUserId;
 
   /// Future, das abschließt, sobald [initialize] fertig ist. Ermöglicht
   /// anderen Services (z. B. [PreKeyService]), sicher auf initialisierte
@@ -51,12 +76,16 @@ class EncryptionService {
   Future<void> get initialized => _initCompleter.future;
   final _initCompleter = Completer<void>();
 
-  static const int _preKeyStartId = 1;
-  static const int _signedPreKeyId = 1;
+  static const int _firstPreKeyId = 1;
   static const int _preKeyCount = 100;
 
   /// Cursor für PreKey-Auswahl, wandert vorwärts und wrappt.
   int _preKeyIndex = 0;
+
+  /// Gültigkeit des aktiven Signed PreKeys (Signal-Empfehlung: Wochen bis
+  /// Monate). Nach Ablauf wird ein neuer erzeugt, der alte bleibt für
+  /// laufende Sessions erhalten.
+  static const Duration _signedPreKeyLifetime = Duration(days: 90);
 
   /// Mindestanzahl unbenutzter PreKeys, bevor eine Neugeneration ausgelöst wird.
   static const int _preKeyLowWatermark = 10;
@@ -64,8 +93,9 @@ class EncryptionService {
   /// Initialisiert den Service und öffnet die Hive-Boxen.
   ///
   /// Die Boxen werden AES-256-verschlüsselt geöffnet (Schlüssel liegt im
-  /// Keystore/Keychain, siehe [SecureHive]) – der private Identity-Key und
-  /// die Session-Ratchet-States liegen damit nicht im Klartext auf der Platte.
+  /// Keystore/Keychain, siehe [SecureHive]) – der private Identity-Key,
+  /// die PreKeys und die Session-Ratchet-States liegen damit nicht im
+  /// Klartext auf der Platte.
   Future<void> initialize() async {
     _identityBox = await SecureHive.instance.openBox<SignalIdentityKeyPairAdapter>(
       _boxNameIdentity,
@@ -74,17 +104,24 @@ class EncryptionService {
       _boxNameSessions,
     );
     _peerTrustBox = await SecureHive.instance.openBox<String>(_boxNamePeerTrust);
+    _preKeysBox =
+        await SecureHive.instance.openBox<SignalPreKeyRecordAdapter>(_boxNamePreKeys);
+    _signedPreKeysBox = await SecureHive.instance
+        .openBox<SignalSignedPreKeyRecordAdapter>(_boxNameSignedPreKeys);
+    _identityTrustBox = await SecureHive.instance
+        .openBox<SignalIdentityKeyStoreAdapter>(_boxNameIdentityTrust);
 
     await _loadOrCreateIdentity();
     _store = await HiveSignalProtocolStore.open(
       identityKeyPair: _identityKeyPair!,
       localRegistrationId: _registrationId,
       sessionBox: _sessionBox,
+      identityTrustBox: _identityTrustBox,
     );
 
-    // Stelle sicher, dass genügend PreKeys und ein Signed PreKey vorhanden sind.
-    await _ensurePreKeys(count: _preKeyCount);
-    await _ensureSignedPreKey();
+    // Persistierte Keys laden; fehlende generieren (Audit H-7/E-2).
+    await _loadOrEnsurePreKeys();
+    await _loadOrRotateSignedPreKey();
     // Initialisierung abgeschlossen - wartende Consumer (PreKeyService) können
     // nun Sessions aufbauen / Bundles exportieren.
     if (!_initCompleter.isCompleted) _initCompleter.complete();
@@ -117,6 +154,8 @@ class EncryptionService {
         ),
       );
     }
+    _preKeyIndex =
+        int.tryParse(_identityBox.get(_preKeyCursorKey)?.identityKeyPairJson ?? '') ?? 0;
   }
 
   /// Gibt das eigene Identitätsschlüsselpaar zurück.
@@ -126,39 +165,70 @@ class EncryptionService {
   String get identityKeyPublicBase64 =>
       base64Encode(_identityKeyPair!.getPublicKey().serialize());
 
-  /// Stellt sicher, dass genügend PreKeys existieren.
-  Future<void> _ensurePreKeys({int count = _preKeyCount}) async {
-    final store = _store!;
+  // ==========================================================================
+  // PreKey-Verwaltung (persistiert, Audit H-7/E-2)
+  // ==========================================================================
+
+  Future<void> _storePreKeyPersistent(int keyId, PreKeyRecord record) async {
+    await _store!.storePreKey(keyId, record);
+    await _preKeysBox.put(
+      keyId.toString(),
+      SignalPreKeyRecordAdapter(
+        keyId: keyId,
+        keyPairJson: base64Encode(record.serialize()),
+      ),
+    );
+  }
+
+  /// Lädt persistierte PreKeys in den Store und füllt Lücken auf.
+  Future<void> _loadOrEnsurePreKeys({int count = _preKeyCount}) async {
+    var available = 0;
     for (var i = 0; i < count; i++) {
-      final keyId = _preKeyStartId + i;
-      if (await store.containsPreKey(keyId)) continue;
-      final preKey = generatePreKeys(keyId, 1).first;
-      await store.storePreKey(keyId, preKey);
+      final keyId = _firstPreKeyId + i;
+      final persisted = _preKeysBox.get(keyId.toString());
+      if (persisted != null) {
+        try {
+          final record = PreKeyRecord.fromBuffer(base64Decode(persisted.keyPairJson));
+          await _store!.storePreKey(keyId, record);
+          available++;
+          continue;
+        } catch (_) {
+          // Beschädigter Eintrag -> neu generieren.
+          await _preKeysBox.delete(keyId.toString());
+        }
+      }
+      if (!(await _store!.containsPreKey(keyId))) {
+        final preKey = generatePreKeys(keyId, 1).first;
+        await _storePreKeyPersistent(keyId, preKey);
+        available++;
+      } else {
+        available++;
+      }
     }
+    debugPrint('[EncryptionService] PreKeys verfügbar: $available');
   }
 
-  /// Stellt sicher, dass ein Signed PreKey existiert.
-  Future<void> _ensureSignedPreKey() async {
-    final store = _store!;
-    if (await store.containsSignedPreKey(_signedPreKeyId)) return;
-    final signedPreKey = generateSignedPreKey(_identityKeyPair!, _signedPreKeyId);
-    await store.storeSignedPreKey(_signedPreKeyId, signedPreKey);
-  }
-
-  /// Holt den nächsten unbenutzten PreKey via Cursor.
+  /// Holt den nächsten unbenutzten PreKey via Cursor UND rückt den Cursor
+  /// vor (Audit H-7/E-1): Aufeinanderfolgende Bundle-Exporte liefern
+  /// verschiedene One-Time-Keys statt denselben an alle Peers.
   ///
   /// Durchläuft den Key-Raum `[1, 100]` zyklisch; konsumierte Keys werden
   /// von libsignal automatisch aus dem Store entfernt. Liefert `null`, wenn
-  /// keine unbenutzten Keys mehr existieren (Löser: `_ensurePreKeys`).
+  /// keine unbenutzten Keys mehr existieren (Löser: `_loadOrEnsurePreKeys`).
   Future<PreKeyRecord?> getUnusedPreKey() async {
     final store = _store!;
     for (var attempt = 0; attempt < _preKeyCount; attempt++) {
-      final keyId = _preKeyStartId + _preKeyIndex;
+      final keyId = _firstPreKeyId + _preKeyIndex;
+      // Cursor sofort weiterstellen (auch wenn dieser Key nicht passt),
+      // damit parallele Exporte nicht denselben Key bekommen.
+      _preKeyIndex = (_preKeyIndex + 1) % _preKeyCount;
+      await _identityBox.put(
+        _preKeyCursorKey,
+        SignalIdentityKeyPairAdapter(identityKeyPairJson: _preKeyIndex.toString()),
+      );
       if (await store.containsPreKey(keyId)) {
         return store.loadPreKey(keyId);
       }
-      // Weiter zum nächsten Key, zyklisch wrappen.
-      _preKeyIndex = (_preKeyIndex + 1) % _preKeyCount;
     }
     return null;
   }
@@ -167,7 +237,7 @@ class EncryptionService {
   Future<int> get availablePreKeyCount async {
     final store = _store!;
     var count = 0;
-    for (var i = _preKeyStartId; i < _preKeyStartId + _preKeyCount; i++) {
+    for (var i = _firstPreKeyId; i < _firstPreKeyId + _preKeyCount; i++) {
       if (await store.containsPreKey(i)) count++;
     }
     return count;
@@ -177,15 +247,69 @@ class EncryptionService {
   Future<void> maybeRotatePreKeys() async {
     final available = await availablePreKeyCount;
     if (available < _preKeyLowWatermark) {
-      await _ensurePreKeys(count: _preKeyCount);
+      await _loadOrEnsurePreKeys();
     }
   }
 
-  /// Holt den aktuellen Signed PreKey.
+  /// Lädt den persistierten Signed PreKey bzw. rotiert ihn zeitbasiert
+  /// (Audit H-7/E-2 + E-3). Alte Signed PreKeys bleiben zur Entschlüsselung
+  /// bereits etablierter Sessions im Store.
+  Future<void> _loadOrRotateSignedPreKey() async {
+    final activeIdStr =
+        _identityBox.get(_signedPreKeyActiveKey)?.identityKeyPairJson;
+    final activeId = int.tryParse(activeIdStr ?? '');
+
+    if (activeId != null) {
+      final persisted = _signedPreKeysBox.get(activeId.toString());
+      if (persisted != null) {
+        try {
+          final record = SignedPreKeyRecord.fromSerialized(
+            base64Decode(persisted.keyPairJson),
+          );
+          final age = DateTime.now().millisecondsSinceEpoch - persisted.timestamp;
+          if (Duration(milliseconds: age) < _signedPreKeyLifetime ||
+              !(await _store!.containsSignedPreKey(activeId))) {
+            await _store!.storeSignedPreKey(activeId, record);
+            if (Duration(milliseconds: age) >= _signedPreKeyLifetime) {
+              // Abgelaufenen Key reaktivieren wäre falsch -> Rotation unten.
+            } else {
+              debugPrint('[EncryptionService] SignedPreKey $activeId geladen.');
+              return;
+            }
+          }
+        } catch (_) {
+          await _signedPreKeysBox.delete(activeId.toString());
+        }
+      }
+    }
+
+    // Neuen Signed PreKey erzeugen (Erstinstallation oder Rotation).
+    final newId = (activeId ?? 0) + 1;
+    final signedPreKey = generateSignedPreKey(_identityKeyPair!, newId);
+    await _store!.storeSignedPreKey(newId, signedPreKey);
+    await _signedPreKeysBox.put(
+      newId.toString(),
+      SignalSignedPreKeyRecordAdapter(
+        keyId: newId,
+        keyPairJson: base64Encode(signedPreKey.serialize()),
+        signatureJson: base64Encode(signedPreKey.signature),
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+    await _identityBox.put(
+      _signedPreKeyActiveKey,
+      SignalIdentityKeyPairAdapter(identityKeyPairJson: newId.toString()),
+    );
+    debugPrint('[EncryptionService] SignedPreKey $newId erzeugt (Rotation).');
+  }
+
+  /// Holt den AKTIVEN Signed PreKey (höchste/latest ID, siehe Box-Metadaten).
   Future<SignedPreKeyRecord?> getCurrentSignedPreKey() async {
-    final store = _store!;
-    if (await store.containsSignedPreKey(_signedPreKeyId)) {
-      return store.loadSignedPreKey(_signedPreKeyId);
+    final activeIdStr =
+        _identityBox.get(_signedPreKeyActiveKey)?.identityKeyPairJson;
+    final activeId = int.tryParse(activeIdStr ?? '') ?? 1;
+    if (await _store!.containsSignedPreKey(activeId)) {
+      return _store!.loadSignedPreKey(activeId);
     }
     return null;
   }
@@ -194,8 +318,8 @@ class EncryptionService {
   /// Server (GET/POST /api/prekeys). Enthält ausschließich öffentliche
   /// Schlüssel - der private Identity-Key verlässt das Gerät niemals.
   ///
-  /// Nutzt den Cursor-basierten PreKey-Selektor; löst automatisch Rotation
-  /// aus, wenn der Vorrat knapp wird.
+  /// Nutzt den Cursor-basierten PreKey-Selektor (mit Vorwärts-Schritt,
+  /// Audit H-7/E-1); löst automatisch Rotation aus, wenn der Vorrat knapp wird.
   Future<Map<String, dynamic>> exportPreKeyBundle() async {
     final store = _store!;
     final identityPub = _identityKeyPair!.getPublicKey().serialize();
@@ -203,31 +327,35 @@ class EncryptionService {
     if (preKey == null) {
       throw StateError(
         'Keine unbenutzten PreKeys verfügbar. '
-        'Rufe _ensurePreKeys() vor exportPreKeyBundle() auf.',
+        'Rufe _loadOrEnsurePreKeys() vor exportPreKeyBundle() auf.',
       );
     }
-    final signedPreKey = await store.loadSignedPreKey(_signedPreKeyId);
+    final activeIdStr =
+        _identityBox.get(_signedPreKeyActiveKey)?.identityKeyPairJson;
+    final activeSignedPreKeyId = int.tryParse(activeIdStr ?? '') ?? 1;
+    final signedPreKey = await store.loadSignedPreKey(activeSignedPreKeyId);
     return {
       'identityKeyPublic': base64Encode(identityPub),
       'registrationId': _registrationId,
       'preKeyId': preKey.id,
       'preKeyPublic': base64Encode(preKey.getKeyPair().publicKey.serialize()),
-      'signedPreKeyId': _signedPreKeyId,
+      'signedPreKeyId': activeSignedPreKeyId,
       'signedPreKeyPublic': base64Encode(signedPreKey.getKeyPair().publicKey.serialize()),
       'signedPreKeySignature': base64Encode(signedPreKey.signature),
     };
   }
 
+  // ==========================================================================
+  // Session-Aufbau & Peer-Trust (Audit H-7/E-4)
+  // ==========================================================================
+
   /// Erstellt eine neue Session mit einem Empfänger (Signal Session Builder).
   ///
-  /// [recipientRegistrationId] muss der echten Registration-ID des Empfängers
-  /// entsprechen (wird vom Server via [PreKeyService.fetchPeerPreKeys] geliefert).
-  /// Ein hartcodierter Wert (z.B. 1) führt zu Key-Derivation-Fehlern und
-  /// nicht-dechiffrierbaren Nachrichten.
-  ///
-  /// Seit Audit B2 wird die Peer-Identity zusätzlich im Trust-Store
-  /// persistiert – sie ist die Grundlage der Safety-Number
-  /// ([safetyNumberFor]) und damit des Out-of-Band-Fingerprint-Vergleichs.
+  /// Wirft [StateError] ('peer_identity_changed'), wenn der Peer bereits
+  /// einen ANDEREN Identity-Key im Trust-Store hat - ein unterschobenes
+  /// Bundle (kompromittierter Server) wird damit NICHT mehr still
+  /// akzeptiert. Der Nutzer muss dem neuen Key explizit per
+  /// [resetPeerTrust] zustimmen (Safety-Number-Vergleich im UI).
   Future<void> buildSession(
     String recipientId,
     String recipientIdentityKeyB64,
@@ -238,6 +366,15 @@ class EncryptionService {
     String recipientSignedPreKeySignatureB64,
     int recipientRegistrationId,
   ) async {
+    final existingEntry = _decodeTrustEntry(recipientId);
+    final existingKey = existingEntry?['identityKeyPublic'] as String?;
+    if (existingKey != null && existingKey != recipientIdentityKeyB64) {
+      throw StateError(
+        'peer_identity_changed: Der Identity-Key von $recipientId hat sich '
+        'geändert. Safety-Number prüfen und Vertrauen ggf. zurücksetzen.',
+      );
+    }
+
     final recipientIdentityKey =
         IdentityKey.fromBytes(base64Decode(recipientIdentityKeyB64), 0);
     final recipientPreKey =
@@ -262,17 +399,19 @@ class EncryptionService {
       ),
     );
 
-    // Peer-Identity für Safety-Number persistieren. Ändert sich der Key
-    // (Server schiebt anderes Bundle unter), wird die Verifikation
-    // zurückgesetzt (TOFU mit Reset bei Key-Wechsel).
-    final existingEntry = _decodeTrustEntry(recipientId);
-    final existingKey = existingEntry?['identityKeyPublic'] as String?;
-    if (existingKey != recipientIdentityKeyB64) {
-      await _peerTrustBox.put(recipientId, jsonEncode({
-        'identityKeyPublic': recipientIdentityKeyB64,
-        'verified': false,
-      }));
-    }
+    // Peer-Identity für Safety-Number persistieren (TOFU; weitere
+    // Änderungen werden durch den Check oben blockiert).
+    await _peerTrustBox.put(recipientId, jsonEncode({
+      'identityKeyPublic': recipientIdentityKeyB64,
+      'verified': false,
+    }));
+  }
+
+  /// Setzt den gespeicherten Trust für einen Peer zurück (NUR nach
+  /// Nutzer-Bestätigung im "Sicherheitsnummer geändert"-Dialog).
+  Future<void> resetPeerTrust(String peerId) async {
+    await _peerTrustBox.delete(peerId);
+    await _store?.forgetIdentity(peerId);
   }
 
   Map<String, dynamic>? _decodeTrustEntry(String peerId) {
@@ -286,21 +425,15 @@ class EncryptionService {
   }
 
   // ==========================================================================
-  // Safety-Numbers (Audit B2: Out-of-Band-Fingerprint-Vergleich)
+  // Safety-Numbers (Audit B2 / N-6)
   // ==========================================================================
 
   /// Berechnet die Safety-Number zwischen zwei öffentlichen Identity-Keys.
   ///
-  /// Symmetrisch (Reihenfolge der Keys egal): BEIDE Seiten berechnen für
-  /// dieselbe Session dieselbe Nummer und können sie out-of-band (persönlich,
-  /// Telefon) vergleichen – ein unterschobenes PreKey-Bundle (kompromittierter
-  /// Server) führt zu ABWEICHENDEN Nummern und wird erkannt.
-  ///
-  /// Verfahren (vereinfachtes Signal-Safety-Number-Schema):
+  /// DEPRECATED-Pfad ohne Stable-Identifiers (nur noch für Tests):
   /// 5200-fach iteriertes SHA-512 über die byte-lexikografisch sortierte
   /// Konkatenation beider öffentlicher Keys; die ersten 15 Bytes werden
-  /// auf je 2 Dezimalziffern (byte % 100) abgebildet → 30 Ziffern,
-  /// gruppiert in 6 Blöcke à 5 Ziffern.
+  /// auf je 2 Dezimalziffern abgebildet → 30 Ziffern in 6 Blöcken à 5.
   @visibleForTesting
   static String computeSafetyNumber(Uint8List ourIdentityPub, Uint8List theirIdentityPub) {
     // Kanonische Reihenfolge: byte-lexikografisch kleinerer Key zuerst
@@ -341,11 +474,35 @@ class EncryptionService {
     return x.length.compareTo(y.length);
   }
 
+  /// Berechnet die Safety-Number gemäß Signal-Standard
+  /// ([NumericFingerprintGenerator], Audit N-6) mit den STABLE IDENTIFIERS
+  /// beider User-IDs - das vetted Verfahren statt eines eigenen Schemas.
+  String fingerprintSafetyNumber(String peerId, String peerIdentityKeyB64) {
+    final generator = NumericFingerprintGenerator(5200);
+    final fp = generator.createFor(
+      0,
+      Uint8List.fromList(utf8.encode(localUserId ?? '')),
+      _identityKeyPair!.getPublicKey(),
+      Uint8List.fromList(utf8.encode(peerId)),
+      IdentityKey.fromBytes(base64Decode(peerIdentityKeyB64), 0),
+    );
+    return fp.displayableFingerprint.getDisplayText();
+  }
+
   /// Safety-Number für [peerId] (oder `null`, wenn noch keine Session bzw.
-  /// keine gespeicherte Peer-Identity existiert).
+  /// keine gespeicherte Peer-Identity existiert). Bevorzugt der
+  /// Signal-Standard-Fingerprint (N-6); fällt ohne bekannte eigene User-ID
+  /// auf das Legacy-Schema zurück.
   String? safetyNumberFor(String peerId) {
     final peerKeyB64 = _decodeTrustEntry(peerId)?['identityKeyPublic'] as String?;
     if (peerKeyB64 == null || _identityKeyPair == null) return null;
+    if (localUserId != null) {
+      try {
+        return fingerprintSafetyNumber(peerId, peerKeyB64);
+      } catch (_) {
+        // Fall through zum Legacy-Schema.
+      }
+    }
     return computeSafetyNumber(
       _identityKeyPair!.getPublicKey().serialize(),
       base64Decode(peerKeyB64),
@@ -367,6 +524,10 @@ class EncryptionService {
       'verified': verified,
     }));
   }
+
+  // ==========================================================================
+  // Encrypt / Decrypt
+  // ==========================================================================
 
   /// Verschlüsselt eine Nachricht für einen Empfänger.
   Future<CiphertextMessage> encryptMessage(
@@ -426,8 +587,12 @@ class EncryptionService {
     await _identityBox.clear();
     await _sessionBox.clear();
     await _peerTrustBox.clear();
+    await _preKeysBox.clear();
+    await _signedPreKeysBox.clear();
+    await _identityTrustBox.clear();
     _identityKeyPair = null;
     _store = null;
+    _preKeyIndex = 0;
   }
 
   /// Erstellt ein AES-256-GCM-verschlüsseltes Backup der Identität.
@@ -480,6 +645,9 @@ class EncryptionService {
     await _identityBox.close();
     await _sessionBox.close();
     await _peerTrustBox.close();
+    await _preKeysBox.close();
+    await _signedPreKeysBox.close();
+    await _identityTrustBox.close();
   }
 }
 
@@ -497,4 +665,3 @@ final encryptionServiceProvider = Provider<EncryptionService>((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
-

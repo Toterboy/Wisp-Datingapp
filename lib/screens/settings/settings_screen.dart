@@ -198,7 +198,7 @@ class SettingsScreen extends ConsumerWidget {
                       title: const Text('Zwei-Faktor-Schutz (2FA)'),
                       subtitle: Text(
                         ref.watch(mfaStatusProvider).hasVerifiedFactors
-                            ? 'Aktiv – Login nur mit Authenticator-Code'
+                            ? 'Aktiv: Login nur mit Authenticator-Code'
                             : 'Login zusätzlich mit Authenticator-App sichern',
                       ),
                       trailing: const Icon(Icons.chevron_right),

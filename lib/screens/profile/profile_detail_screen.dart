@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -127,7 +128,12 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
       revealPhotosAfterMatch: settings.revealPhotosAfterMatch,
       isMatched: true, // Im Kontext von Chat/Matches ist ein Match gegeben.
     );
-    debugPrint('[PROFILE_DETAIL] targetAge=${profile.age}, viewerAge=${me.age}, targetBirthDate=${profile.birthDate}, viewerBirthDate=${me.birthDate}');
+    // Audit M-18: Geburtsdaten (auch fremder Nutzer!) sind PII - nur im
+    // Debug-Build loggen.
+    if (kDebugMode) {
+      debugPrint('[PROFILE_DETAIL] targetAge=${profile.age}, viewerAge=${me.age}, '
+          'targetBirthDate=${profile.birthDate}, viewerBirthDate=${me.birthDate}');
+    }
 
     return Scaffold(
       appBar: AppBar(

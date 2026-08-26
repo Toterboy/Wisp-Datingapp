@@ -501,7 +501,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
           Icon(Icons.favorite_border, color: Colors.white),
           SizedBox(width: 8),
           Text(
-            'Kein Funke diesmal – aber weiter so!',
+                  'Kein Funke diesmal, aber weiter so!',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
         ],

@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:pointycastle/export.dart';
 
 import 'package:wisp/services/app_auth_service.dart';
 import 'package:wisp/services/auth_exception.dart';
@@ -107,13 +107,14 @@ class AuthService implements AppAuthService {
     await _storeUserId(_currentUserId!);
   }
 
-  /// Hasht E-Mail + Passwort mit SHA-256 und Zufalls-Salt — NUR für den
-  /// lokalen Demo-Modus.
+  /// Hasht E-Mail + Passwort mit PBKDF2-HMAC-SHA256 und Zufalls-Salt —
+  /// NUR für den lokalen Demo-Modus.
   ///
-  /// Format: `<saltHex>$<sha256(salt + email + \x00 + password)>`.
-  /// ⚠️ Kein KDF (PBKDF2/Argon2) – für den Mock ausreichend, da die Daten
-  /// ausschließlich im Keystore liegen und niemals echte User-Daten berührt
-  /// werden. In Produktion hasht Supabase Auth (GoTrue) serverseitig.
+  /// Format: `<saltHex>$<pbkdf2(salt + email + \x00 + password)>`.
+  /// Audit N-5: Statt eines einzelnen SHA-256-Durchlaufs wird ein echter
+  /// KDF (PBKDF2, 50k Iterationen - Demo-Modus-Balance) verwendet; ein
+  /// extrahierter Hash ist damit offline nicht trivial brute-force-bar.
+  /// In Produktion hasht Supabase Auth (GoTrue) serverseitig.
   @visibleForTesting
   static String hashCredentialsForTest(String email, String password) {
     final salt = List<int>.generate(16, (_) => _random.nextInt(256));
@@ -133,11 +134,20 @@ class AuthService implements AppAuthService {
 
   static final Random _random = Random.secure();
 
+  /// PBKDF2-Iterationen für den Demo-Modus (reduziert ggü. Backup-KDF).
+  static const int _demoKdfIterations = 50000;
+
   static String _hash(List<int> salt, String email, String password) {
-    final digest = sha256.convert(
-      salt + utf8.encode('$email\x00$password'),
+    final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
+      ..init(Pbkdf2Parameters(
+        Uint8List.fromList(salt),
+        _demoKdfIterations,
+        32,
+      ));
+    final derived = derivator.process(
+      Uint8List.fromList(utf8.encode('$email\x00$password')),
     );
-    return digest.toString();
+    return _hex(derived);
   }
 
   static String _hex(List<int> bytes) =>

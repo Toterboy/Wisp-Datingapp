@@ -48,8 +48,20 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       await SupabaseService.client.auth.updateUser(
         UserAttributes(password: _passwordCtrl.text),
       );
+      // Audit M-13: Nach einem Passwortwechsel werden ALLE Sessions
+      // (auch die dieses Geräts) global invalidiert - ein gestohlener
+      // Refresh-Token überlebt den Passwortwechsel damit nicht. Der
+      // Nutzer meldet sich einfach mit dem neuen Passwort neu an.
+      try {
+        await SupabaseService.client.auth
+            .signOut(scope: SignOutScope.global)
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // Fail-open beim lokalen SignOut: Das Passwort ist trotzdem
+        // geändert; beim nächsten App-Start greift die Session-Validierung.
+      }
       // Reset abgeschlossen: Recovery-Flag löschen, damit der Router wieder
-      // die normale Flusslogik übernimmt (Home bzw. offene Setup-Schritte).
+      // die normale Flusslogik übernimmt (Login mit dem neuen Passwort).
       ref.read(passwordRecoveryPendingProvider.notifier).state = false;
       if (!mounted) return;
       setState(() => _done = true);
@@ -108,15 +120,16 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Dein neues Passwort wurde gespeichert. '
-                      'Du bist jetzt angemeldet.',
+                      'Dein neues Passwort wurde gespeichert. Aus '
+                      'Sicherheitsgründen wurdest du auf allen Geräten '
+                      'abgemeldet. Bitte melde dich neu an.',
                       style: Theme.of(context).textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
                     PrimaryButton(
-                      label: 'Weiter zur App',
-                      onPressed: () => context.go(AppRoutes.home),
+                      label: 'Zum Login',
+                      onPressed: () => context.go(AppRoutes.login),
                     ),
                   ],
                 )

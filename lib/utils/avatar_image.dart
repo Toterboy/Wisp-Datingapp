@@ -3,6 +3,8 @@ import 'package:flutter/material.dart' show BuildContext, Color, Colors, Theme;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:wisp/utils/exif_stripper.dart';
+
 /// Profilbild auswaehlen und interaktiv quadratisch zuschneiden.
 ///
 /// Wird von der Einrichtung ("Dein Profil") und "Profil bearbeiten"
@@ -51,5 +53,8 @@ Future<Uint8List?> pickAndCropAvatar([BuildContext? context]) async {
   if (kDebugMode) {
     debugPrint('[AvatarImage] zugeschnitten: ${bytes.length} Bytes');
   }
-  return bytes;
+  // Audit M-21: EXIF (GPS, Geräteinfos) explizit entfernen - der Avatar
+  // wird an Matches ausgeliefert. Fail-closed: Ohne erfolgreiches
+  // Re-Encoding wird kein Bild hochgeladen.
+  return stripImageMetadata(bytes);
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:wisp/models/gender.dart';
 import 'package:wisp/services/local_storage.dart';
@@ -128,16 +129,37 @@ class UserPreferences {
 }
 
 /// StateNotifier für Nutzerpräferenzen.
+///
+/// Audit M-16: Die Präferenzen enthalten Art.-9-nahe Daten
+/// (Gender-/Beziehungsvorlieben) und einen Standort-String - sie werden
+/// deshalb im Keystore/Keychain ([SecurePreferencesStorage]) statt im
+/// Klartext-[SharedPreferences] gespeichert. Bestehende Klartext-Einträge
+/// werden beim Laden migriert und entfernt.
 class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
-  UserPreferencesNotifier(this._storage) : super(UserPreferences.defaults()) {
+  UserPreferencesNotifier(this._storage, this._legacyRawPrefs)
+      : super(UserPreferences.defaults()) {
     _load();
   }
 
   final LocalStorage _storage;
 
+  /// Zugrundeliegende Klartext-Preferences (nur für die Einmal-Migration;
+  /// darf NULL sein).
+  final SharedPreferences? _legacyRawPrefs;
+
   static const _prefsKey = 'user_preferences';
 
   Future<void> _load() async {
+    // Migration: alten Klartext-Eintrag in den sicheren Speicher übernehmen.
+    final storage = _storage;
+    final legacyPrefs = _legacyRawPrefs;
+    if (storage is SecurePreferencesStorage && legacyPrefs != null) {
+      try {
+        await storage.migrateStringFrom(legacyPrefs, _prefsKey);
+      } catch (_) {
+        // Migration ist Best-Effort.
+      }
+    }
     final raw = await _storage.getString(_prefsKey);
     if (raw != null && raw.isNotEmpty) {
       try {
@@ -146,6 +168,17 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
       } catch (_) {
         // Bei korrupten Daten: Defaults beibehalten.
       }
+      return;
+    }
+    // Fallback: alter Stand (falls die Migration noch nicht lief).
+    final legacyRaw = _legacyRawPrefs?.getString(_prefsKey);
+    if (legacyRaw != null && legacyRaw.isNotEmpty) {
+      try {
+        state =
+            UserPreferences.fromJson(jsonDecode(legacyRaw) as Map<String, dynamic>);
+        await _persist(); // Sofort im sicheren Speicher ablegen.
+        await _legacyRawPrefs?.remove(_prefsKey);
+      } catch (_) {}
     }
   }
 
@@ -219,9 +252,17 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
   }
 }
 
-/// Provider für die Nutzerpräferenzen.
+/// Provider für die Nutzerpräferenzen (Audit M-16: sicher gespeichert).
 final userPreferencesProvider =
     StateNotifierProvider<UserPreferencesNotifier, UserPreferences>((ref) {
-  final storage = ref.watch(localStorageProvider);
-  return UserPreferencesNotifier(storage);
+  final storage = ref.watch(securePrefsProvider);
+  return UserPreferencesNotifier(storage, ref.watch(sharedPrefsProvider));
 });
+
+/// Audit M-16: Sichere Speicher-Instanz für sensible Präferenzen.
+final securePrefsProvider = Provider<SecurePreferencesStorage>((ref) {
+  return SecurePreferencesStorage();
+});
+
+/// Zugriff auf die rohen SharedPreferences (für Migrationen/Bestandssysteme).
+final sharedPrefsProvider = Provider<SharedPreferences?>((ref) => null);

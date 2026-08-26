@@ -251,7 +251,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
             const SizedBox(height: 4),
             Text(
               'Personen mit passenden Gewohnheiten werden dir beim Matching '
-              'zuerst vorgeschlagen – ausgeschlossen wird niemand.',
+                     'zuerst vorgeschlagen, ausgeschlossen wird niemand.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

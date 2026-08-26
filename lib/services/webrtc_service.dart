@@ -132,7 +132,7 @@ class WebRTCService {
       _cacheExpiry = now.add(Duration(seconds: ttl));
       return servers;
     } catch (e) {
-      debugPrint('[WebRTC] ice-config nicht verfügbar, Fallback aktiv: $e');
+      if (kDebugMode) debugPrint('[WebRTC] ice-config nicht verfügbar, Fallback aktiv.');
       return _fallbackIceServers;
     }
   }
@@ -198,12 +198,20 @@ class WebRTCService {
   ///   nicht mehr durch eingehende Nachrichten (kein TOCTOU/Hijacking).
   /// - Ausgehende Nachrichten tragen als `from` die EIGENE User-ID, nicht
   ///   die des Peers.
+  ///
+  /// Audit M-10/W-3: Der Kanal ist jetzt ein REALTIME PRIVATE CHANNEL
+  /// (`private: true`). Realtime autorisiert Join UND Broadcast per RLS
+  /// (Migration 062): nur die beiden im Topic genannten Nutzer dürfen den
+  /// Kanal nutzen - Dritt-Injektion mit gefälschtem Absender ist
+  /// serverseitig unmöglich.
   Future<void> connect({
     required String myUserId,
     required String peerId,
   }) async {
     _myUserId = myUserId;
     _currentPeerId = peerId;
+    // Safety-Numbers benötigen die eigene User-ID (Signal-Fingerprint).
+    _encryptionService.localUserId ??= myUserId;
 
     // Deterministischer Kanal-Name (lexikografisch sortiert).
     final ids = [myUserId, peerId]..sort();
@@ -212,9 +220,10 @@ class WebRTCService {
 
     _signalingChannel = Supabase.instance.client.channel(
       channelName,
-      opts: const RealtimeChannelConfig(),
+      opts: const RealtimeChannelConfig(private: true),
     );
 
+    final subscribed = Completer<void>();
     _signalingChannel!.onBroadcast(
       event: 'signal',
       callback: (payload) {
@@ -222,39 +231,44 @@ class WebRTCService {
           final msg = Map<String, dynamic>.from(payload as Map);
           _routeSignaling(msg);
         } catch (e) {
-          debugPrint('[WebRTC] Fehler beim Signaling-Routing: $e');
+          if (kDebugMode) debugPrint('[WebRTC] Fehler beim Signaling-Routing: $e');
         }
       },
     );
 
-    _signalingChannel!.subscribe();
+    _signalingChannel!.subscribe((status, error) {
+      if (subscribed.isCompleted) return;
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        subscribed.complete();
+      } else if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut ||
+          status == RealtimeSubscribeStatus.closed) {
+        subscribed.completeError(
+          StateError('Signaling-Kanal nicht verfügbar (${status.name}).'),
+        );
+      }
+    });
+
+    try {
+      await subscribed.future.timeout(const Duration(seconds: 10));
+    } catch (_) {
+      await _signalingChannel?.unsubscribe();
+      _signalingChannel = null;
+      rethrow;
+    }
   }
 
-  /// Sendet eine Signaling-Nachricht an den Peer via Supabase Broadcast REST API.
+  /// Sendet eine Signaling-Nachricht an den Peer über den autorisierten
+  /// Broadcast des Private Channels (Audit M-10/W-3). Die REST-Broadcast-
+  /// API wurde entfernt: Sie hätte Dritten mit gültigem JWT weiterhin
+  /// erlaubt, beliebige Topics zu beschreiben.
   Future<void> _sendSignaling(Map<String, dynamic> message) async {
+    final channel = _signalingChannel;
+    if (channel == null) return;
     try {
-      final supabaseUrl = Supabase.instance.client.rest.url;
-      final token = Supabase.instance.client.auth.currentSession?.accessToken;
-      if (token == null) return;
-      // Gepinnter Client (kein statisches http.post).
-      await _httpClient.post(
-        Uri.parse('$supabaseUrl/realtime/v1/api/broadcast'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'messages': [
-            {
-              'topic': _signalingTopic,
-              'event': 'signal',
-              'payload': message,
-            },
-          ],
-        }),
-      );
+      await channel.sendBroadcastMessage(event: 'signal', payload: message);
     } catch (e) {
-      debugPrint('[WebRTC] Broadcast-Fehler: $e');
+      if (kDebugMode) debugPrint('[WebRTC] Broadcast-Fehler: $e');
     }
   }
 
@@ -272,7 +286,9 @@ class WebRTCService {
       final type = msg['type'] as String?;
       final from = msg['from'] as String?;
       if (from == null || from != _currentPeerId) {
-        debugPrint('[WebRTC] Signaling von unerwartetem Absender verworfen: $from');
+        if (kDebugMode) {
+          debugPrint('[WebRTC] Signaling von unerwartetem Absender verworfen.');
+        }
         return;
       }
       switch (type) {
@@ -303,7 +319,7 @@ class WebRTCService {
           break;
       }
     } catch (e) {
-      debugPrint('[WebRTC] Fehler bei Signaling-Routing: $e');
+      if (kDebugMode) debugPrint('[WebRTC] Fehler bei Signaling-Routing: $e');
     }
   }
 
@@ -469,7 +485,7 @@ class WebRTCService {
 
     channel.onDataChannelState = (state) {
       _connectionStateController.add(state);
-      debugPrint('[WebRTC] DataChannel state: $state');
+      if (kDebugMode) debugPrint('[WebRTC] DataChannel state: $state');
     };
 
     channel.onMessage = (message) {
@@ -534,7 +550,7 @@ class WebRTCService {
         }
       }
     } catch (e) {
-      debugPrint('[WebRTC] Fehler beim Entschlüsseln: $e');
+      if (kDebugMode) debugPrint('[WebRTC] Fehler beim Entschlüsseln: $e');
     }
   }
 

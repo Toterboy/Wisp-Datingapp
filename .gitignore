@@ -58,9 +58,12 @@ supabase/.branches/
 PLAN.md
 PLAN_ERWEITERUNGEN.md
 ANALYSE.md
-# Secrets & lokale Dateien
-.env
+# Rechts-/Datenschutz-Entwürfe mit Betreiber-Internas (privat halten)
+docs/DATENSCHUTZ-ENTWURF.md
+# Secrets & lokale Umgebungsdateien (.env*, *.env), nur .env.example ist erlaubt
+.env*
 *.env
+!.env.example
 rotate.sql
 
 android/key.properties

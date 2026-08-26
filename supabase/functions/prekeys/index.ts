@@ -89,8 +89,31 @@ serve(async (req) => {
       );
     }
 
+    // Strikt validieren: nur UUIDs sind erlaubte Pfad-Parameter.
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(userId)) {
+      return new Response(
+        JSON.stringify({ error: "userId muss eine UUID sein." }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     // Zusätzliches Rate-Limit pro authentifiziertem User.
     if (isRateLimited(rateLimitKey(req, callerAuth.user.id))) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests" }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // M-23: Persistentes DB-Rate-Limit (überlebt Cold Starts).
+    const { data: dbRateOk } = await supabaseAdmin.rpc("consume_rate_limit", {
+      p_key: `prekeys_get:${callerAuth.user.id}`,
+      p_max_hits: 60,
+      p_window_seconds: 3600,
+    });
+    if (dbRateOk !== true) {
       return new Response(
         JSON.stringify({ error: "Too many requests" }),
         { status: 429, headers: { "Content-Type": "application/json" } },
@@ -150,6 +173,19 @@ serve(async (req) => {
 
     // Zusätzliches Rate-Limit pro authentifiziertem User.
     if (isRateLimited(rateLimitKey(req, userId))) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests" }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // M-23: Persistentes DB-Rate-Limit (überlebt Cold Starts).
+    const { data: dbRateOk } = await supabaseAdmin.rpc("consume_rate_limit", {
+      p_key: `prekeys_post:${userId}`,
+      p_max_hits: 30,
+      p_window_seconds: 3600,
+    });
+    if (dbRateOk !== true) {
       return new Response(
         JSON.stringify({ error: "Too many requests" }),
         { status: 429, headers: { "Content-Type": "application/json" } },

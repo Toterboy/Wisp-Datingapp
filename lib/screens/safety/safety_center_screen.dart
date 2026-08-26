@@ -41,7 +41,7 @@ class SafetyCenterScreen extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Bei akuter Gefahr rufe sofort die Polizei: 110. '
-                      'Du bist nicht allein – die folgenden Stellen helfen '
+                      'Du bist nicht allein. Die folgenden Stellen helfen '
                       'kostenlos und vertraulich.',
                       style: Theme.of(context)
                           .textTheme
@@ -119,7 +119,7 @@ class SafetyCenterScreen extends StatelessWidget {
                 child: Text(
                   'Chat-Menü (drei Punkte) → Blockieren. Likes und Match '
                   'werden entfernt; künftige Interaktionen werden serverseitig '
-                  'verhindert – die Person erfährt nicht davon.',
+                  'verhindert. Die Person erfährt nicht davon.',
                 ),
               ),
             ],
@@ -152,11 +152,11 @@ class SafetyCenterScreen extends StatelessWidget {
           const SizedBox(height: 4),
           const Text(
             'Wenn dir jemand online (oder offline) nachstellt:\n'
-            '1. Nicht antworten – Kontakt bewusst abbrechen.\n'
+            '1. Nicht antworten, Kontakt bewusst abbrechen.\n'
             '2. Alles dokumentieren: Screenshots mit Datum, Chatverlauf, '
             'Profilnamen.\n'
-            '3. In-App blockieren und uns über die Melde-Funktion informieren '
-            '– wir können Accounts dauerhaft sperren.\n'
+            '3. In-App blockieren und uns über die Melde-Funktion informieren. '
+            'Wir können Accounts dauerhaft sperren.\n'
             '4. Passwörter ändern und 2FA aktivieren (Einstellungen).\n'
             '5. Bei Bedrohung oder Angst: Polizei (110) bzw. 116 006 kontaktieren.',
             style: TextStyle(height: 1.4),

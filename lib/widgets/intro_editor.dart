@@ -261,7 +261,8 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${IntroEditor.minAudioSeconds}–${IntroEditor.maxAudioSeconds} '
+                  '${IntroEditor.minAudioSeconds} bis '
+                  '${IntroEditor.maxAudioSeconds} '
                   'Sekunden. Du kannst jede Aufnahme vor dem Speichern anhören.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color:

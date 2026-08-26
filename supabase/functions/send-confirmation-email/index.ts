@@ -81,6 +81,26 @@ async function verifyWebhookSignature(
   return provided.includes(sigB64);
 }
 
+/// Zeitkonstanter String-Vergleich (N-10) - length-leak ist hier
+/// irrelevant (Secret-Länge ist kein Geheimnis), aber jede Byte-Position
+/// muss konstant verglichen werden.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    // Vergleich trotzdem durchführen, um timing auf Längenunterschied
+    // hin konstant zu halten.
+    let dummy = 0;
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      dummy |= (a.charCodeAt(i % a.length || 1) ^ b.charCodeAt(i % b.length || 1));
+    }
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 serve(async (req) => {
   // Fail-closed: Ohne konfiguriertes HOOK_SECRET ist diese Funktion
   // nicht aufrufbar (Schutz gegen Missbrauch/Spam).
@@ -121,9 +141,10 @@ serve(async (req) => {
     }
   } else {
     // Legacy-Fallback (ältere GoTrue-Versionen): Authorization-Bearer-Secret.
+    // N-10: zeitkonstanter Vergleich statt === (Timing-Leak).
     const auth = req.headers.get("Authorization") ?? "";
     const token = auth.replace(/^Bearer\s+/i, "");
-    authorized = token === HOOK_SECRET;
+    authorized = timingSafeEqual(token, HOOK_SECRET);
   }
 
   if (!authorized) {

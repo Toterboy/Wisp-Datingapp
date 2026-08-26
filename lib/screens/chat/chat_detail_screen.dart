@@ -22,12 +22,14 @@ import 'package:wisp/services/report_service.dart';
 import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/p2p_chat_service.dart';
 import 'package:wisp/services/photo_moderation_service.dart';
+import 'package:wisp/services/prekey_service.dart';
 import 'package:wisp/services/quiz_service.dart';
 import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
+import 'package:wisp/utils/exif_stripper.dart';
 import 'package:wisp/widgets/audio_review_sheet.dart';
 import 'package:wisp/widgets/meet_intent_card.dart';
 import 'package:wisp/widgets/funke_streak.dart';
@@ -73,6 +75,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   // Audio-Aufnahme und -Wiedergabe (echte Mikrofon/Playback-Pakete).
   final _audioRecorder = AudioRecorder();
   String? _recordingPath;
+
+  // Audit M-17: Lokal entschlüsselte Voice-Dateien (werden nach Wiedergabe
+  // bzw. spätestens beim Verlassen des Chats gelöscht).
+  final List<String> _voiceTempFiles = [];
 
   // Quiz-Sperre: Find-your-Match-Matches sind bis zum bestandenen
   // Kennenlern-Quiz für Chat, Bilder und Anrufe gesperrt (serverseitig
@@ -176,6 +182,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       await _p2p!.connect(myUserId: _myUserId!, peerId: match.partner.id);
       if (mounted) setState(() => _p2pConnected = _p2p!.isConnected);
     } catch (e) {
+      // Audit H-7/E-4: Der Peer hat einen ANDEREN Identity-Key als beim
+      // ersten Kontakt -> Session wird blockiert statt still aufgebaut.
+      if (e.toString().contains('peer_identity_changed')) {
+        await _showIdentityChangedDialog(match.partner.id);
+        return;
+      }
       if (mounted) {
         setState(() => _p2pConnected = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -211,6 +223,51 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     });
   }
 
+  /// Audit H-7/E-4: Dialog bei Peer-Identity-Wechsel. Der Nutzer muss dem
+  /// neuen Schlüssel explizit zustimmen (Safety-Number-Vergleich), bevor
+  /// die Session neu aufgebaut wird - kein stiller MITM-Accept mehr.
+  Future<void> _showIdentityChangedDialog(String partnerId) async {
+    if (!mounted) return;
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sicherheitsnummer hat sich geändert'),
+        content: const Text(
+          'Der Verschlüsselungsschlüssel deines Kontakts hat sich geändert. '
+          'Das kann nach einer Neuinstallation passieren - oder darauf '
+          'hindeuten, dass sich jemand in die Verbindung einschleichen will.\n\n'
+          'Vergleiche die Sicherheitsnummer über einen zweiten Kanal (z. B. '
+          'Anruf oder persönlich), bevor du fortfährst.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Nummer geprüft: akzeptieren'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    try {
+      // Alten Trust + Session-Cache verwerfen, dann erneut verbinden.
+      await ref.read(encryptionServiceProvider).resetPeerTrust(partnerId);
+      ref.read(preKeyServiceProvider).forget(partnerId);
+      await _p2p?.connect(myUserId: _myUserId!, peerId: partnerId);
+      if (mounted) setState(() => _p2pConnected = true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Verbindung weiterhin fehlgeschlagen.')),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _msgSub?.cancel();
@@ -220,6 +277,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     _ctrl.dispose();
     _recordTimer?.cancel();
     _audioRecorder.dispose();
+    // Audit M-17: Entschlüsselte Voice-Reste entfernen.
+    for (final path in List<String>.from(_voiceTempFiles)) {
+      _deleteVoiceFile(path);
+    }
     super.dispose();
   }
 
@@ -343,7 +404,28 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         return;
       }
 
-      final bytes = await File(picked.path).readAsBytes();
+      final rawBytes = await File(picked.path).readAsBytes();
+
+      // Audit M-21: EXIF (GPS, Geräteinfos) VOR Moderation/Versand
+      // entfernen - fail-closed, wenn das Bild nicht re-encodierbar ist.
+      final bytes = stripImageMetadata(
+        Uint8List.fromList(rawBytes),
+        jpegQuality: 70,
+      );
+      if (bytes == null) {
+        if (mounted) setState(() => _uploadingImage = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Bild konnte nicht sicher aufbereitet werden und '
+                      'wurde nicht gesendet.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
 
       // NSFW-Moderation via Hugging Face API.
       if (_myUserId != null) {
@@ -486,7 +568,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Moderation nicht verfügbar. Ein Admin prüft dein '
-              'Foto — es wird danach automatisch gesendet.'),
+              'Foto. Es wird danach automatisch gesendet.'),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 6),
         ),
@@ -735,7 +817,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     ? 'Noch keine verschlüsselte Verbindung zu $peerName '
                         'aufgebaut. Die Nummer erscheint nach der ersten '
                         'Nachricht.'
-                    : 'Vergleiche diese Nummer mit $peerName – am besten '
+                    : 'Vergleiche diese Nummer mit $peerName, am besten '
                         'persönlich oder telefonisch:',
               ),
               if (safetyNumber != null) ...[
@@ -823,7 +905,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           '$peerName wird dauerhaft blockiert: Der Funke wird beendet und '
           'diese Person kann dich nicht mehr liken, einen Funke setzen oder dir '
           'Nachrichten senden. Die Blockierung kann später über den '
-          'Support-Dialog nicht aufgehoben werden – nur du selbst kannst '
+          'Support-Dialog nicht aufgehoben werden. Nur du selbst kannst '
           'sie in den Einstellungen entfernen.',
         ),
         actions: [
@@ -913,15 +995,35 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   /// Schreibt empfangene Voice-Bytes in eine temporäre Datei.
+  ///
+  /// Audit M-17: Der Pfad wird zusätzlich in [_voiceTempFiles] registriert;
+  /// die Datei wird nach der Wiedergabe bzw. beim Verlassen des Chats
+  /// gelöscht (entschlüsselte Sprache darf nicht akkumulierend im Temp-
+  /// Verzeichnis liegen).
   Future<String?> _writeVoiceFile(String msgId, Uint8List data) async {
     try {
       final dir = Directory.systemTemp;
       final path = '${dir.path}/wisp_incoming_$msgId.m4a';
       await File(path).writeAsBytes(data);
+      _voiceTempFiles.add(path);
       return path;
     } catch (e) {
       debugPrint('[ChatDetail] Voice-Datei konnte nicht geschrieben werden: $e');
       return null;
+    }
+  }
+
+  /// Entfernt eine wiedergegebene Voice-Datei sofort (Audit M-17).
+  Future<void> _deleteVoiceFile(String? path) async {
+    if (path == null) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+      _voiceTempFiles.remove(path);
+    } catch (_) {
+      // Best-effort: Der globale Sweep (temp_cleanup) entfernt Reste.
     }
   }
 
@@ -1327,6 +1429,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
       _stateSub = player.playerStateStream.listen((state) {
         if (state.processingState == ProcessingState.completed && mounted) {
           setState(() => _playing = false);
+          // Audit M-17: Nach der Wiedergabe wird die entschlüsselte Datei
+          // sofort entfernt.
+          unawaited(_deletePlayedFile(path));
         }
       });
       await player.play();
@@ -1343,6 +1448,19 @@ class _MessageBubbleState extends State<_MessageBubble> {
   void _markViewed() {
     _viewedOnceIds.add(widget.msg.id);
     setState(() {});
+  }
+
+  /// Audit M-17: Löscht die lokal entschlüsselte Voice-Datei nach der
+  /// Wiedergabe (Bubble-lokal, ohne Zugriff auf den Parent-State).
+  Future<void> _deletePlayedFile(String path) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Best-effort: der globale Sweep (temp_cleanup) entfernt Reste.
+    }
   }
 
   @override

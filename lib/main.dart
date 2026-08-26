@@ -12,10 +12,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:wisp/app.dart';
+import 'package:wisp/providers/user_preferences_provider.dart' show sharedPrefsProvider;
 import 'package:wisp/services/server_time_service.dart';
 import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/notification_service.dart';
 import 'package:wisp/services/secure_location_storage.dart';
+import 'package:wisp/services/secure_supabase_session_storage.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/models/signal_key_models.dart';
 import 'package:wisp/models/photo_moderation_models.dart';
@@ -104,6 +106,7 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         localStorageProvider.overrideWithValue(storage),
+        sharedPrefsProvider.overrideWithValue(prefs),
         localeProvider.overrideWith((ref) => Locale(savedLocaleCode)),
       ],
       child: const L10nScope(child: App()),
@@ -145,10 +148,13 @@ Future<void> _initializeFirebase() async {
         .requestPermission()
         .timeout(const Duration(seconds: 5));
     FirebaseMessaging.onMessage.listen((message) {
-      debugPrint('[MAIN] FCM-Message erhalten: ${message.notification?.title}');
+      // N-17: Kein Benachrichtigungsinhalt in Release-Logs.
+      if (kDebugMode) {
+        debugPrint('[MAIN] FCM-Message erhalten: ${message.notification?.title}');
+      }
     });
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-      debugPrint('[MAIN] FCM-Token erneuert');
+      if (kDebugMode) debugPrint('[MAIN] FCM-Token erneuert');
     });
   } catch (e) {
     debugPrint('[MAIN] FCM-Listener/Permission fehlgeschlagen: $e');
@@ -188,6 +194,9 @@ Future<void> _initializeSupabase() async {
       // QR-Deep-Links (wisp://user/...) tragen kein Auth-Token und fallen
       // weiterhin NICHT darunter.
       authOptions: FlutterAuthClientOptions(
+        // Audit H-6: Session (inkl. Refresh-Token) im Keystore/Keychain
+        // statt im Klartext-SharedPreferences persistieren.
+        localStorage: SecureSupabaseLocalStorage(),
         detectSessionInUriPredicate: (uri) {
           final query = uri.queryParameters;
           final fragment = Uri.splitQueryString(uri.fragment);
@@ -201,7 +210,7 @@ Future<void> _initializeSupabase() async {
       ),
     ).timeout(const Duration(seconds: 4));
   } on TimeoutException {
-    debugPrint('[MAIN] Supabase.initialize Timeout (> 4s) – Limit-Modus.');
+    debugPrint('[MAIN] Supabase.initialize Timeout (> 4s), Limit-Modus.');
   } catch (e) {
     debugPrint('[MAIN] Supabase.initialize fehlgeschlagen: $e');
   }

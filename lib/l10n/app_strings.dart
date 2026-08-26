@@ -73,6 +73,30 @@ const Map<String, Map<String, String>> _strings = {
     'auth.passkey': 'Mit Passkey anmelden',
     'auth.passkeyCreate': 'Passkey erstellen',
     'auth.captcha': 'Sicherheitscheck',
+    'auth.registerTitle': 'Konto erstellen',
+    'auth.welcomeBack': 'Willkommen zurück',
+    'auth.birthDate': 'Geburtsdatum',
+    'auth.birthDateHint': 'TT. MM. JJJJ',
+    'auth.birthDatePick': 'Bitte auswählen',
+    'auth.birthDateMissing': 'Bitte wähle dein Geburtsdatum.',
+    'auth.gender': 'Geschlecht',
+    'gender.male': 'Männlich',
+    'gender.maleTrans': 'Männlich (F to M)',
+    'gender.female': 'Weiblich',
+    'gender.femaleTrans': 'Weiblich (M to F)',
+    'gender.diverse': 'Divers',
+    'gender.other': 'Eigenes / Anderes',
+    'auth.passwordHintStrong': 'Mindestens 8 Zeichen, mit Groß- und '
+        'Kleinbuchstaben, einer Zahl und einem Sonderzeichen',
+    'auth.showPassword': 'Passwort anzeigen',
+    'auth.hidePassword': 'Passwort verbergen',
+    'auth.captchaRegister': 'Bitte schließe den Sicherheitscheck ab, um '
+        'dich zu registrieren.',
+    'auth.captchaLogin': 'Bitte schließe den Sicherheitscheck ab, um dich '
+        'anzumelden.',
+    'captcha.retry': 'Erneut versuchen',
+    'language.german': 'Deutsch',
+    'language.english': 'Englisch',
     // Navigation
     'nav.home': 'Aktuelles',
     'nav.discover': 'Entdecken',
@@ -117,6 +141,22 @@ const Map<String, Map<String, String>> _strings = {
     'common.continue': 'Weiter',
     'common.back': 'Zurück',
     'common.loading': 'Lädt…',
+    // Fehler (Auth)
+    'error.invalidCredentials': 'Email oder Passwort ist falsch.',
+    'error.notConfirmed': 'Bitte bestätige zuerst deine Emailadresse.',
+    'error.alreadyRegistered': 'Diese Emailadresse ist bereits registriert.',
+    'error.rateLimited': 'Zu viele Anfragen in kurzer Zeit. Bitte warte '
+        'einen Moment und versuche es erneut.',
+    'error.weakPassword': 'Das Passwort ist zu schwach. Bitte wähle ein '
+        'längeres Passwort mit Groß-/Kleinbuchstaben, Zahlen und '
+        'Sonderzeichen.',
+    'error.captchaRejected': 'Der Sicherheitscheck wurde vom Server '
+        'abgelehnt. Bitte versuche es erneut.',
+    'error.signupFailed': 'Registrierung auf dem Server fehlgeschlagen. '
+        'Bitte versuche es später erneut.',
+    'error.loginFailed': 'Anmeldung fehlgeschlagen. Bitte versuche es '
+        'erneut.',
+    'error.generic': 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
   },
   'en': {
     'auth.login': 'Log in',
@@ -134,6 +174,28 @@ const Map<String, Map<String, String>> _strings = {
     'auth.passkey': 'Sign in with Passkey',
     'auth.passkeyCreate': 'Create Passkey',
     'auth.captcha': 'Security check',
+    'auth.registerTitle': 'Create account',
+    'auth.welcomeBack': 'Welcome back',
+    'auth.birthDate': 'Date of birth',
+    'auth.birthDateHint': 'DD MM YYYY',
+    'auth.birthDatePick': 'Please select',
+    'auth.birthDateMissing': 'Please choose your date of birth.',
+    'auth.gender': 'Gender',
+    'gender.male': 'Male',
+    'gender.maleTrans': 'Male (F to M)',
+    'gender.female': 'Female',
+    'gender.femaleTrans': 'Female (M to F)',
+    'gender.diverse': 'Diverse',
+    'gender.other': 'Own / Other',
+    'auth.passwordHintStrong': 'At least 8 characters, with upper and lower '
+        'case letters, a number and a special character',
+    'auth.showPassword': 'Show password',
+    'auth.hidePassword': 'Hide password',
+    'auth.captchaRegister': 'Please complete the security check to sign up.',
+    'auth.captchaLogin': 'Please complete the security check to log in.',
+    'captcha.retry': 'Try again',
+    'language.german': 'German',
+    'language.english': 'English',
     'nav.home': 'Home',
     'nav.discover': 'Discover',
     'nav.interests': 'Interests',
@@ -173,5 +235,19 @@ const Map<String, Map<String, String>> _strings = {
     'common.continue': 'Continue',
     'common.back': 'Back',
     'common.loading': 'Loading…',
+    // Fehler (Auth)
+    'error.invalidCredentials': 'Email or password is wrong.',
+    'error.notConfirmed': 'Please confirm your email address first.',
+    'error.alreadyRegistered': 'This email address is already registered.',
+    'error.rateLimited': 'Too many requests in a short time. Please wait a '
+        'moment and try again.',
+    'error.weakPassword': 'The password is too weak. Please choose a longer '
+        'one with upper/lower case letters, numbers and special characters.',
+    'error.captchaRejected': 'The security check was rejected by the server. '
+        'Please try again.',
+    'error.signupFailed': 'Sign-up failed on the server. Please try again '
+        'later.',
+    'error.loginFailed': 'Log-in failed. Please try again.',
+    'error.generic': 'Something went wrong. Please try again.',
   },
 };

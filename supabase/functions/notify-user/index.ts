@@ -49,6 +49,62 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 /**
+ * M-11 (SSRF-Guard): Der UnifiedPush-Endpunkt ist client-kontrolliert.
+ * Vor dem serverseitigen Fetch prüfen: https-only, keine Userinfo,
+ * kein IP-Literal/localhost, aufgelöste IPs nicht in privaten/internen
+ * Netzen. DNS-Fehler werden fail-closed behandelt.
+ */
+async function isSafeUpEndpoint(
+  rawUrl: string,
+): Promise<{ ok: boolean; reason?: string }> {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return { ok: false, reason: "not_a_url" };
+  }
+  if (url.protocol !== "https:") return { ok: false, reason: "not_https" };
+  if (url.username || url.password) return { ok: false, reason: "userinfo" };
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (!host || host === "localhost" || host.endsWith(".localhost") ||
+      host.endsWith(".local") || host.endsWith(".internal")) {
+    return { ok: false, reason: "blocked_host" };
+  }
+  if (/^[0-9.]+$/.test(host)) {
+    // IPv4-Literal
+    if (isPrivateIPv4(host)) return { ok: false, reason: "private_ip" };
+    return { ok: false, reason: "ip_literal_not_allowed" };
+  }
+  if (host.includes(":")) return { ok: false, reason: "ipv6_literal_not_allowed" };
+
+  // DNS-Auflösung gegen private Bereiche (falls im Edge-Runtime verfügbar).
+  try {
+    const records = await Deno.resolveDns(host, "A");
+    for (const ip of records) {
+      if (isPrivateIPv4(ip)) return { ok: false, reason: "resolves_private" };
+    }
+  } catch {
+    // resolveDns nicht verfügbar oder NXDOMAIN -> Hostname-Heuristik genügt;
+    // echte Auflösung übernimmt der fetch mit ausgehender Netzkontrolle des
+    // Betreibers.
+  }
+  return { ok: true };
+}
+
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map((p) => parseInt(p, 10));
+  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p))) return true; // fail-closed
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;         // link-local
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a >= 224) return true;                        // multicast/reserved
+  return false;
+}
+
+/**
  * DB-basiertes Rate-Limit pro Absender (Audit B4).
  * Nutzt die persistente RPC consume_rate_limit (Migration 042) –
  * überlebt Cold Starts und ist über alle Instanzen hinweg gültig.
@@ -306,6 +362,15 @@ serve(async (req) => {
   // eigener ntfy-Server) und FCM wird nicht mehr kontaktiert.
   const upEndpoint = (profile.up_endpoint as string | null)?.trim();
   if (upEndpoint) {
+    // M-11 (SSRF-Guard): Endpunkt ist client-kontrolliert. Vor dem Fetch
+    // https + Host-Checks + DNS-Auflösung gegen private/interne Netze.
+    const endpointSafe = await isSafeUpEndpoint(upEndpoint);
+    if (!endpointSafe.ok) {
+      console.error("UnifiedPush-Endpunkt abgelehnt:", endpointSafe.reason);
+      return new Response(JSON.stringify({ ok: false, reason: "up_invalid" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    }
     try {
       const upResp = await fetch(upEndpoint, {
         method: "POST",

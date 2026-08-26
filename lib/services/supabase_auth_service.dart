@@ -44,6 +44,8 @@ class SupabaseAuthService implements AppAuthService {
 
     // Serverseitige Validierung NICHT abwarten (Startzeit!).
     unawaited(_validateSession());
+    // Safety-Numbers (Signal-Fingerprint) benötigen die eigene User-ID.
+    _encryption.localUserId = user.id;
     return true;
   }
 
@@ -66,7 +68,9 @@ class SupabaseAuthService implements AppAuthService {
       // Nutzer existiert serverseitig nicht mehr oder Session ist
       // invalidiert: lokale Session und Tokens verwerfen, damit der
       // Nutzer sauber auf Login/Registrierung landet.
-      debugPrint('[SupabaseAuthService] Session serverseitig ungültig: $e');
+      if (kDebugMode) {
+        debugPrint('[SupabaseAuthService] Session serverseitig ungültig: $e');
+      }
       await _clearLocalSession();
     } catch (e) {
       // Unbekannter Fehler – Session behalten (offline-tolerant).
@@ -113,6 +117,10 @@ class SupabaseAuthService implements AppAuthService {
   }) async {
     await _encryption.initialized;
 
+    // Audit H-5 (Betreiber-Entscheidung): Das Invite-Code-System wurde in
+    // Migration 057 vollständig entfernt - Registrierung ist offen
+    // (geschützt durch CAPTCHA im Dashboard + serverseitige Rate-Limits).
+
     // 0) Plattform-Sperre (Migration 045): Gesperrte E-Mail-Adressen
     //    dürfen sich nicht (neu) registrieren. Der serverseitige
     //    handle_new_user-Trigger erzwingt das zusätzlich (RAISE 'email_banned').
@@ -158,7 +166,7 @@ class SupabaseAuthService implements AppAuthService {
         },
       );
       if (kDebugMode) {
-        debugPrint('[SupabaseAuthService] signUp() abgeschlossen: user=${authResponse.user?.id}');
+        debugPrint('[SupabaseAuthService] signUp() abgeschlossen.');
       }
 
       user = authResponse.user ?? (throw AppException('Registrierung fehlgeschlagen. Bitte versuche es erneut.'));
@@ -181,12 +189,8 @@ class SupabaseAuthService implements AppAuthService {
       rethrow;
     }
 
-    // 3) Invite-Code: Wurde bereits serverseitig durch handle_new_user
-    //    eingelöst (Migration 040 – der Trigger liest 'invite_code' aus
-    //    den Metadaten und markiert den Code atomar zum SignUp-Zeitpunkt).
-    //    Ein clientseitiges Nachziehen ist nicht mehr nötig; die RPC
-    //    mark_invite_code_used setzt zudem auth.uid() == p_user_id voraus
-    //    (Audit H1) und würde ohne Session fehlschlagen.
+    // Safety-Numbers (Signal-Fingerprint) benötigen die eigene User-ID.
+    _encryption.localUserId = user.id;
 
     // 4) Profil-Erstellung:
     //    Der serverseitige handle_new_user-Trigger (SECURITY DEFINER) hat
@@ -265,9 +269,11 @@ class SupabaseAuthService implements AppAuthService {
         userId: authResponse.user!.id,
       );
     }
+    // Safety-Numbers (Signal-Fingerprint) benötigen die eigene User-ID.
+    _encryption.localUserId = authResponse.user!.id;
 
     if (kDebugMode) {
-      debugPrint('[SupabaseAuthService] login erfolgreich: userId=${authResponse.user?.id}');
+      debugPrint('[SupabaseAuthService] login erfolgreich.');
     }
   }
 
@@ -308,18 +314,34 @@ class SupabaseAuthService implements AppAuthService {
   /// Löscht den Nutzer vollständig über die serverseitige Edge Function
   /// 'delete-account' (DSGVO Art. 17). Der Auth-User selbst wird mit dem
   /// service_role-Key gelöscht; der Client besitzt diesen Key nie.
+  ///
+  /// Audit M-12: Ein FEHLSCHLAG der Löschung wird nicht mehr verschluckt -
+  /// vorher glaubte der Nutzer, sein Account sei gelöscht, während alle
+  /// Server-Daten erhalten blieben. Bei Fehler wirft diese Methode und
+  /// der Aufrufer ([AuthNotifier]) unterlässt den lokalen Reset.
   @override
   Future<void> deleteAccount() async {
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
-        await _supabase.functions.invoke('delete-account');
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[SupabaseAuthService] Account-Löschung fehlgeschlagen: $e');
+        final response = await _supabase.functions
+            .invoke('delete-account')
+            .timeout(const Duration(seconds: 20));
+        final data = response.data;
+        if (response.status != 200 ||
+            (data is Map && data['deleted'] != true)) {
+          throw AppException(
+            'Die Löschung konnte auf dem Server nicht abgeschlossen '
+            'werden. Bitte prüfe deine Verbindung und versuche es erneut.',
+          );
         }
-        // Trotzdem lokal ausloggen, damit der Nutzer nicht in einer
-        // halb-gelöschten Session hängen bleibt.
+      } on AppException {
+        rethrow;
+      } catch (e) {
+        throw AppException(
+          'Die Löschung konnte nicht an den Server übermittelt werden. '
+          'Dein Account wurde NICHT gelöscht - bitte versuche es erneut.',
+        );
       }
     }
     try {

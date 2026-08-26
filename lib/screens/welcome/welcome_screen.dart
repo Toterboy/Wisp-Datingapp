@@ -55,7 +55,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   static const _pages = [
     _PageData(
       title: 'Willkommen bei Blind Date',
-      body: 'Hier lernst du Menschen wirklich kennen – bevor du ihr Foto '
+      body: 'Hier lernst du Menschen wirklich kennen, bevor du ihr Foto '
           'siehst. Denn am Anfang zählt die Persönlichkeit, nicht das Aussehen.',
     ),
     _PageData(

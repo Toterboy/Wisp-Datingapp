@@ -14,31 +14,41 @@ import 'package:wisp/models/signal_key_models.dart';
 /// bleibt erhalten. Ohne diese Persistenz wären Sessions nach jedem Neustart
 /// unbrauchbar — eine zentrale Anforderung für E2E-Verschlüsselung.
 ///
-/// Identity- und PreKey-Daten bleiben unverändert im bestehenden
-/// [EncryptionService._identityBox] bzw. werden bei jedem Start neu
-/// generiert (PreKeys sind One-Time-Keys und müssen frisch sein).
-///
-/// Der Store extended [InMemorySignalProtocolStore] und überschreibt alle
-/// schreibenden Methoden, um die Änderungen synchron in Hive zu spiegeln.
+/// Audit H-7 (E-2/E-4-Fixes):
+/// - Identity-Trust wird PERSISTIERT (Box 'signal_identity_trust'): Die
+///   Trust-Map des InMemory-Stores war bisher flüchtig - nach jedem
+///   Neustart wurde JEDE Identität akzeptiert (TOFU-Reset), was einem
+///   serverseitigen Bundle-Swap (MITM) das Tor öffnete. Jetzt übersteht
+///   der Vertrauensstatus Neustarts und ein Key-Wechsel wirft eine
+///   [UntrustedIdentityException] statt still akzeptiert zu werden.
+/// - PreKeys/SignedPreKey liegen in eigenen verschlüsselten Boxen
+///   ([EncryptionService]) und überleben Neustarts ebenfalls.
 class HiveSignalProtocolStore extends InMemorySignalProtocolStore {
   HiveSignalProtocolStore(
     super.identityKeyPair,
     super.localRegistrationId,
-    this._sessionBox,
-  );
+    this._sessionBox, [
+    Box<SignalIdentityKeyStoreAdapter>? identityTrustBox,
+  ]) : _identityTrustBox = identityTrustBox;
 
   final Box<SignalSessionRecordAdapter> _sessionBox;
+
+  /// Persistenter Identity-Trust (Audit H-7/E-4). NULL = Legacy-Verhalten
+  /// (In-Memory), z. B. wenn die Box nicht geöffnet werden konnte.
+  final Box<SignalIdentityKeyStoreAdapter>? _identityTrustBox;
 
   /// Lädt alle aus Hive persistierten Sessions in den Store.
   static Future<HiveSignalProtocolStore> open({
     required IdentityKeyPair identityKeyPair,
     required int localRegistrationId,
     required Box<SignalSessionRecordAdapter> sessionBox,
+    Box<SignalIdentityKeyStoreAdapter>? identityTrustBox,
   }) async {
     final store = HiveSignalProtocolStore(
       identityKeyPair,
       localRegistrationId,
       sessionBox,
+      identityTrustBox,
     );
 
     // Bestehende Sessions aus Hive laden.
@@ -61,6 +71,99 @@ class HiveSignalProtocolStore extends InMemorySignalProtocolStore {
     }
 
     return store;
+  }
+
+  // ==========================================================================
+  // Persistenter Identity-Trust (Audit H-7 / E-4)
+  // ==========================================================================
+
+  static String _trustId(SignalProtocolAddress address) =>
+      '${address.getName()}:${address.getDeviceId()}';
+
+  bool _bytesEqual(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) {
+      diff |= a[i] ^ b[i];
+    }
+    return diff == 0;
+  }
+
+  @override
+  Future<bool> isTrustedIdentity(
+    SignalProtocolAddress address,
+    IdentityKey? identityKey,
+    Direction direction,
+  ) async {
+    if (identityKey == null) return false;
+    final box = _identityTrustBox;
+    if (box == null) {
+      // Fallback ohne Persistenz (sollte nicht vorkommen): TOFU im RAM.
+      return true;
+    }
+    final stored = box.get(_trustId(address));
+    if (stored == null) return true; // Erster Kontakt (TOFU)
+    try {
+      final trusted = IdentityKey.fromBytes(base64Decode(stored.trustedKeyJson), 0);
+      return _bytesEqual(trusted.serialize(), identityKey.serialize());
+    } catch (_) {
+      return false; // Beschädigter Eintrag -> fail-closed
+    }
+  }
+
+  @override
+  Future<bool> saveIdentity(
+    SignalProtocolAddress address,
+    IdentityKey? identityKey,
+  ) async {
+    final box = _identityTrustBox;
+    if (identityKey == null || box == null) {
+      return await super.saveIdentity(address, identityKey);
+    }
+    final id = _trustId(address);
+    final serialized = base64Encode(identityKey.serialize());
+    final existing = box.get(id);
+    if (existing != null && existing.trustedKeyJson == serialized) {
+      return false; // Unverändert
+    }
+    await box.put(
+      id,
+      SignalIdentityKeyStoreAdapter(
+        trustedKeyJson: serialized,
+        recipientId: address.getName(),
+      ),
+    );
+    return existing != null; // true = Key hat sich geändert
+  }
+
+  @override
+  Future<IdentityKey?> getIdentity(SignalProtocolAddress address) async {
+    final box = _identityTrustBox;
+    if (box == null) return super.getIdentity(address);
+    final stored = box.get(_trustId(address));
+    if (stored == null) return null;
+    try {
+      return IdentityKey.fromBytes(base64Decode(stored.trustedKeyJson), 0);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Entfernt den persistenten Trust für einen Peer (nur nach expliziter
+  /// Nutzer-Bestätigung "Sicherheitsnummer hat sich geändert" verwenden).
+  Future<void> forgetIdentity(String peerName) async {
+    final box = _identityTrustBox;
+    if (box == null) return;
+    final keysToDelete = <dynamic>[];
+    for (final key in box.keys) {
+      final entry = box.get(key);
+      if (entry != null && entry.recipientId == peerName) {
+        keysToDelete.add(key);
+      }
+    }
+    for (final key in keysToDelete) {
+      await box.delete(key);
+    }
   }
 
   @override

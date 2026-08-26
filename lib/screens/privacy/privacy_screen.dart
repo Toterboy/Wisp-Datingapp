@@ -43,7 +43,7 @@ class PrivacyScreen extends ConsumerWidget {
       'preferences': prefs.toJson(),
       'mood': ref.read(moodProvider)?.value,
       'note': 'Chat-Verläufe sind Ende-zu-Ende verschlüsselt und verbleiben '
-          'auf deinen Geräten — sie werden von keinem Server verarbeitet '
+          'auf deinen Geräten. Sie werden von keinem Server verarbeitet '
           'und können daher nicht exportiert werden.',
       'processors': [
         {'name': 'Supabase Inc.', 'purpose': 'Hosting, Datenbank, Auth'},
@@ -227,7 +227,7 @@ class PrivacyScreen extends ConsumerWidget {
               style: TextStyle(color: Colors.red),
             ),
             subtitle: const Text(
-                'DSGVO Art. 17 – Recht auf Löschung. Alle Daten werden entfernt.'),
+                'DSGVO Art. 17: Recht auf Löschung. Alle Daten werden entfernt.'),
             onTap: () => _deleteAccount(context, ref),
           ),
         ],

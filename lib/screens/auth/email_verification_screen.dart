@@ -205,8 +205,8 @@ final creds = ref.read(pendingVerificationCredentialsProvider);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'Bitte melde dich jetzt mit E-Mail und Passwort an – '
-                'deine E-Mail-Adresse ist bereits bestätigt.'),
+                'Bitte melde dich jetzt mit E-Mail und Passwort an. '
+                'Deine E-Mail-Adresse ist bereits bestätigt.'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -395,7 +395,7 @@ try {
                       ? null
                       : _manualContinue,
               icon: const Icon(Icons.arrow_forward),
-              label: const Text('Ich habe die Mail bestätigt – Weiter'),
+              label: const Text('Ich habe die Mail bestätigt: Weiter'),
             ),
             const SizedBox(height: 8),
             const SizedBox(height: 8),

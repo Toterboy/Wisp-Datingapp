@@ -4,7 +4,6 @@ import 'dart:developer';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:wisp/providers/profile_provider.dart';
@@ -15,12 +14,16 @@ import 'package:wisp/services/auth_service.dart';
 import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/mfa_service.dart';
+import 'package:wisp/services/prekey_service.dart';
+import 'package:wisp/services/secure_location_storage.dart';
 import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/services/supabase_auth_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/services/verification_service.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/demo_mode.dart';
+import 'package:wisp/utils/temp_cleanup.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Verwaltet den Auth-Status. Unterstützt drei Modi:
@@ -135,6 +138,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // lassen (getToken kann auf Geräten ohne Google-Dienste hängen).
       unawaited(_syncFcmToken());
 
+      // Audit H-7/E-3: Eigenes PreKey-Bundle veröffentlichen, falls noch
+      // keines existiert (sonst schlägt jeder E2E-Session-Aufbau durch
+      // Dritte fehl). Hintergrund, blockiert den Sync nicht.
+      unawaited(
+        _ref.read(preKeyServiceProvider).ensureOwnBundlePublished(),
+      );
+
       // MFA-Status UNABHÄNGIG vom Profil-Fetch laden (eigener try-Block):
       // Schlägt der Profil-Fetch per Timeout fehl, darf die App trotzdem
       // wissen, ob 2FA aktiv ist - sonst zeigt sie nach einem Update fälsch-
@@ -189,6 +199,25 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
               personalityTestCompleted:
                   flags['personality_test_completed'] == true,
             );
+
+        // Selbstheilung (Fix "Einrichtung erscheint erneut"): Lokale
+        // "erledigt"-Flags, die dem Server fehlen (z. B. weil das Speichern
+        // bei der Einrichtung still fehlschlug), werden hier nachgezogen.
+        // So erscheint die Einrichtung nach erneutem Login nicht wieder.
+        final s = _ref.read(settingsProvider);
+        if ((s.oneTimeSettingsCompleted &&
+                flags['one_time_settings_completed'] != true) ||
+            (s.communityGuidelinesAccepted &&
+                flags['community_guidelines_accepted'] != true)) {
+          try {
+            await database.updateOwnProfile({
+              'one_time_settings_completed': s.oneTimeSettingsCompleted,
+              'community_guidelines_accepted': s.communityGuidelinesAccepted,
+            });
+          } catch (e) {
+            debugPrint('[AuthNotifier] Setup-Flags-Nachzug fehlgeschlagen: $e');
+          }
+        }
       }
     } catch (e) {
       debugPrint('[AuthNotifier] Server-Sync fehlgeschlagen: $e');
@@ -214,7 +243,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       await SupabaseDatabaseService(SupabaseService.client)
           .updateOwnProfile({'fcm_token': token});
     } catch (e) {
-      debugPrint('[AuthNotifier] FCM-Token-Sync fehlgeschlagen: $e');
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] FCM-Token-Sync fehlgeschlagen: $e');
+      }
     }
   }
 
@@ -233,21 +264,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     }
     state = const AsyncValue.loading();
     try {
-      // Standort für Fake-Account-Erkennung erfassen.
-      double? lat, lng;
-      try {
-        final pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
-        lat = pos.latitude;
-        lng = pos.longitude;
-      } catch (_) {
-        // Standort nicht verfügbar – Registrierung trotzdem fortfahren.
-        debugPrint('[AuthNotifier] Standort konnte nicht erfasst werden.');
-      }
+      // Audit N-2: Der frühere GPS-Fix bei der Registrierung wurde entfernt
+      // - die Werte wurden nie übertragen (tote Permission-Nutzung). Die
+      // Fake-Account-Erkennung läuft serverseitig über den
+      // process-location-check Flow bei Profil-Erstellung.
 
       final profile = await _auth.register(
         name: name,
@@ -255,11 +275,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
         password: password,
         gender: gender,
         birthDate: birthDate,
-        latitude: lat,
-        longitude: lng,
         captchaToken: captchaToken,
       );
-      debugPrint('[AuthNotifier] register() erfolgreich: userId=${profile.id}');
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] register() erfolgreich.');
+      }
       // E-Mail für den Bestätigungs-Screen sichern. Bei aktivierter
       // E-Mail-Bestätigung liefert signUp KEINE Session (currentUser == null),
       // daher muss die Adresse aus dem Registrierungs-Formular kommen -
@@ -308,8 +328,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       state = const AsyncValue.data(true);
       unawaited(_syncFromServer());
     } catch (e, st) {
-      debugPrint('[AuthNotifier] login() FEHLER: $e');
-      debugPrint('[AuthNotifier] StackTrace: $st');
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] login() FEHLER: $e');
+      }
       state = AsyncValue.error(e, st);
       rethrow; // Fehler an den Aufrufer durchreichen
     }
@@ -349,11 +370,49 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     state = const AsyncValue.data(true);
   }
 
+  /// Löscht den Account serverseitig UND lokal vollständig.
+  ///
+  /// Audit M-12: Ein Server-Fehler wird NICHT mehr verschluckt - der
+  /// lokale Reset erfolgt nur nach ERFOLGREICHER Löschung, damit der
+  /// Nutzer nie glaubt, gelöscht zu sein, während die Daten weiter
+  /// existieren. Der Fehler wird an den Aufrufer (UI) durchgereicht.
+  ///
+  /// Audit H-8: Nach erfolgreicher Löschung werden zusätzlich ALLE lokalen
+  /// Reste entfernt: Signal-Keys/Sessions/Peer-Trust ([EncryptionService.
+  /// clearAllData]), GPS-Verifizierungsstandort ([SecureLocationStorage]),
+  /// Verifikations-Videos + Dateien ([VerificationService]),
+  /// entschlüsselte Voice-Note-Temp-Dateien und das FCM-Geräte-Token
+  /// (Audit N-20).
   Future<void> deleteAccount() async {
+    // 1) Serverseitige Löschung FIRST - schlägt sie fehl, bleibt alles
+    //    wie es ist und der Nutzer sieht den Fehler.
     await _auth.deleteAccount();
-    // Lokale Daten vollständig löschen: Nach einer Account-Löschung dürfen
-    // keine Alt-Daten (Profil, Einstellungen, Präferenzen) in einen neuen
-    // Account übergehen – auch DSGVO-relevant (Art. 17).
+
+    // 2) Lokale Daten vollständig löschen (DSGVO Art. 17).
+    try {
+      if (!AppConstants.fdroidBuild) {
+        await FirebaseMessaging.instance.deleteToken();
+      }
+    } catch (_) {
+      // Best-effort: Token kann bereits ungültig sein.
+    }
+    try {
+      await _ref.read(encryptionServiceProvider).clearAllData();
+    } catch (e) {
+      debugPrint('[AuthNotifier] Encryption-Cleanup fehlgeschlagen: $e');
+    }
+    try {
+      await SecureLocationStorage.instance.clear();
+    } catch (e) {
+      debugPrint('[AuthNotifier] Standort-Cleanup fehlgeschlagen: $e');
+    }
+    try {
+      await _ref.read(verificationServiceProvider).deleteAllLocalData();
+    } catch (e) {
+      debugPrint('[AuthNotifier] Video-Cleanup fehlgeschlagen: $e');
+    }
+    unawaited(cleanupDecryptedTempFiles());
+
     _ref.read(pendingVerificationEmailProvider.notifier).state = null;
     _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
     _ref.read(mfaStatusProvider.notifier).state = const MfaStatus.initial();

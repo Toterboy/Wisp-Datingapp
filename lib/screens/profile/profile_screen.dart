@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -269,7 +270,10 @@ class ProfileScreen extends ConsumerWidget {
     AppSettings settings,
   ) {
     final myAge = profile.age ?? 16;
-    debugPrint('[PROFILE_SCREEN] profile.age=${profile.age}, birthDate=${profile.birthDate}, myAge=$myAge');
+    // Audit M-18: Geburtsdatum ist PII - nur im Debug-Build loggen.
+    if (kDebugMode) {
+      debugPrint('[PROFILE_SCREEN] profile.age=${profile.age}, birthDate=${profile.birthDate}, myAge=$myAge');
+    }
     final isPhotosVisible = AgeSafetyRules.arePhotosVisible(
       targetAge: myAge,
       viewerAge: myAge, // Selbst-Vorschau: gleiches Alter

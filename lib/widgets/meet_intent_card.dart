@@ -110,7 +110,7 @@ class _MeetIntentCardState extends ConsumerState<MeetIntentCard> {
       icon: Icons.coffee,
       color: Theme.of(context).colorScheme.primary,
       title: 'Lust auf ein echtes Treffen?',
-      body: 'Ihr schreibt euch schon eine Weile – wie wär\'s mit einem '
+      body: 'Ihr schreibt euch schon eine Weile. Wie wär\'s mit einem '
           'Kaffee oder einem Spaziergang? Trefft euch an einem öffentlichen '
           'Ort.',
       actions: [

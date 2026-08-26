@@ -44,6 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
   Gender _gender = Gender.diverse;
   DateTime? _birthDate;
   // Login-Modus als Default: Beim Erststart führt der Router zuerst über die
@@ -128,8 +129,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (age == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Bitte wähle dein Geburtsdatum.'),
+              SnackBar(
+                content: Text(L10n.t(context, 'auth.birthDateMissing')),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -148,11 +149,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           if (captchaToken == null) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Bitte schließe den Sicherheitscheck ab, um dich zu '
-                    'registrieren.',
-                  ),
+                SnackBar(
+                  content: Text(L10n.t(context, 'auth.captchaRegister')),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -180,11 +178,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           if (captchaToken == null) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Bitte schließe den Sicherheitscheck ab, um dich '
-                    'anzumelden.',
-                  ),
+                SnackBar(
+                  content: Text(L10n.t(context, 'auth.captchaLogin')),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -201,12 +196,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       final result = ref.read(authProvider);
       if (result.hasError) {
-        debugPrint('[LoginScreen] Auth-Provider hat Fehler: ${result.error}');
-        debugPrint('[LoginScreen] Fehler-Typ: ${result.error.runtimeType}');
+        if (kDebugMode) {
+          debugPrint('[LoginScreen] Auth-Provider hat Fehler: ${result.error}');
+        }
         if (mounted) {
           final message = result.error is AppException
               ? (result.error as AppException).message
-              : 'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
+              : L10n.t(context, 'error.generic');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(message),
@@ -246,45 +242,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           // Supabase-Fehlertexte nicht direkt anzeigen, sondern übersetzen.
           final lower = e.message.toLowerCase();
           if (lower.contains('invalid login credentials')) {
-            message = 'Email oder Passwort ist falsch.';
+            message = L10n.t(context, 'error.invalidCredentials');
           } else if (lower.contains('not confirmed')) {
-            message = 'Bitte bestätige zuerst deine Emailadresse.';
+            message = L10n.t(context, 'error.notConfirmed');
           } else if (lower.contains('user already registered')) {
-            message = 'Diese Emailadresse ist bereits registriert.';
+            message = L10n.t(context, 'error.alreadyRegistered');
           } else if (lower.contains('too many') || lower.contains('rate')) {
-            message =
-                'Zu viele Anfragen in kurzer Zeit. Bitte warte einen Moment '
-                'und versuche es erneut.';
+            message = L10n.t(context, 'error.rateLimited');
           } else if (lower.contains('weak password')) {
             // zxcvbn-Komplexitäts-Prüfung (Password Strength Policy im
             // Dashboard): Länge allein reicht nicht.
-            message = 'Das Passwort ist zu schwach. Bitte wähle ein längeres '
-                'Passwort mit Groß-/Kleinbuchstaben, Zahlen und '
-                'Sonderzeichen.';
+            message = L10n.t(context, 'error.weakPassword');
           } else if (lower.contains('password should')) {
             // Server-Meldung durchreichen (z. B. "Password should be at
             // least 12 characters") – die Mindestlänge steht im Dashboard.
             message = e.message;
           } else if (lower.contains('captcha')) {
-            message = 'Der Sicherheitscheck wurde vom Server abgelehnt. '
-                'Bitte versuche es erneut.';
+            message = L10n.t(context, 'error.captchaRejected');
           } else if (lower.contains('database error') ||
               lower.contains('saving new user')) {
-            message = 'Registrierung auf dem Server fehlgeschlagen. '
-                'Bitte versuche es später erneut.';
+            message = L10n.t(context, 'error.signupFailed');
           } else {
             // Generischer Fallback. Im Debug-Modus wird die Original-
             // Server-Meldung direkt mit angezeigt, damit die Ursache
             // ohne Konsole sichtbar wird (Produktiv-Builds bleiben
             // generisch).
             message = kDebugMode
-                ? 'Anmeldung fehlgeschlagen (Server: ${e.message})'
-                : 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
+                ? '${L10n.t(context, 'error.loginFailed')} (Server: ${e.message})'
+                : L10n.t(context, 'error.loginFailed');
           }
         } else {
           message = kDebugMode
-              ? 'Etwas ist schiefgelaufen (${e.runtimeType}: $e)'
-              : 'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
+              ? '${L10n.t(context, 'error.generic')} (${e.runtimeType}: $e)'
+              : L10n.t(context, 'error.generic');
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -369,18 +359,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Bewusst KEINE AppBar (Rückmeldung UX): Die "Einloggen"-Überschrift
+    // war redundant zur "Willkommen zurück"-Headline und hat den Inhalt
+    // unnötig nach unten gedrückt. Herz, Headline und Sprach-Button
+    // rücken dadurch höher.
     return Scaffold(
-      appBar: _isRegister
-          ? null
-          : AppBar(
-              title: Text(L10n.t(context, 'auth.login')),
-              actions: const [
-                Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: LanguageSwitch(compact: true),
-                ),
-              ],
-            ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -393,119 +376,136 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Align(
-                    alignment: Alignment.centerRight,
-                    child: LanguageSwitch(compact: true),
-                  ),
-                  const SizedBox(height: 12),
                   Icon(Icons.favorite, size: 64, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 12),
-                  Text(
-                    _isRegister ? 'Konto erstellen' : 'Willkommen zurück',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
+                  // Überschrift mit Sprach-Button auf derselben Höhe
+                  // (rechtsbündig). Der Stack hält die Überschrift exakt
+                  // zentriert; Clip.none erlaubt dem 48-px-Buttons, die
+                  // schmalere Zeilenhöhe der Überschrift zu überragen.
+                  Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Text(
+                        _isRegister
+                            ? L10n.t(context, 'auth.registerTitle')
+                            : L10n.t(context, 'auth.welcomeBack'),
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        textAlign: TextAlign.center,
+                      ),
+                      const Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: LanguageSwitch(compact: true),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   if (_isRegister) ...[
                      _field(
-                       showError: _submitAttempted,
-                       child: TextFormField(
-                         controller: _nameCtrl,
-                         keyboardType: TextInputType.text,
-                         textCapitalization: TextCapitalization.words,
-                         decoration: const InputDecoration(labelText: 'Name'),
-                         validator: Validators.name,
-                       ),
-                     ),
-                     _field(
-                       showError: _submitAttempted,
-                       validate: () => Validators.birthDate(_birthDate),
-                       child: InkWell(
-                         onTap: _pickBirthDate,
-                         child: InputDecorator(
-                           decoration: InputDecoration(
-                             labelText: 'Geburtsdatum',
-                             hintText: 'TT. MM. JJJJ',
-                             errorText: _submitAttempted
-                                 ? Validators.birthDate(_birthDate)
-                                 : null,
-                           ),
-                           child: Text(
-                             _birthDate == null
-                                 ? 'Bitte auswählen'
-                                 : '${_birthDate!.day}.${_birthDate!.month}.'
-                                     '${_birthDate!.year}',
-                           ),
-                         ),
-                       ),
-                     ),
-                     _field(
-                       showError: _submitAttempted,
-                       child: TextFormField(
-                         controller: _emailCtrl,
-                         keyboardType: TextInputType.text,
-                         decoration:
-                             const InputDecoration(labelText: 'Email'),
-                         validator: Validators.email,
-                       ),
-                     ),
+                        showError: _submitAttempted,
+                        child: TextFormField(
+                          controller: _nameCtrl,
+                          keyboardType: TextInputType.text,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(labelText: 'Name'),
+                          validator: Validators.name,
+                        ),
+                      ),
+                      _field(
+                        showError: _submitAttempted,
+                        validate: () => Validators.birthDate(_birthDate),
+                        child: InkWell(
+                          onTap: _pickBirthDate,
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: L10n.t(context, 'auth.birthDate'),
+                              hintText: L10n.t(context, 'auth.birthDateHint'),
+                              errorText: _submitAttempted
+                                  ? Validators.birthDate(_birthDate)
+                                  : null,
+                            ),
+                            child: Text(
+                              _birthDate == null
+                                  ? L10n.t(context, 'auth.birthDatePick')
+                                  : '${_birthDate!.day}.${_birthDate!.month}.'
+                                      '${_birthDate!.year}',
+                            ),
+                          ),
+                        ),
+                      ),
                       _field(
                         showError: _submitAttempted,
                         child: TextFormField(
-                          controller: _passwordCtrl,
+                          controller: _emailCtrl,
                           keyboardType: TextInputType.text,
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.done,
-                          onFieldSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
-                            labelText: 'Passwort',
-                            helperText: 'Mindestens 8 Zeichen, mit Groß- und '
-                                'Kleinbuchstaben, einer Zahl und einem '
-                                'Sonderzeichen',
+                              labelText: L10n.t(context, 'auth.email')),
+                          validator: Validators.email,
+                        ),
+                      ),
+                       _field(
+                         showError: _submitAttempted,
+                         child: TextFormField(
+                           controller: _passwordCtrl,
+                           keyboardType: TextInputType.text,
+                           obscureText: _obscurePassword,
+                           textInputAction: TextInputAction.done,
+                           onFieldSubmitted: (_) => _submit(),
+                           decoration: InputDecoration(
+                            labelText: L10n.t(context, 'auth.password'),
+                            helperText: L10n.t(
+                                context, 'auth.passwordHintStrong'),
                             suffixIcon: IconButton(
                               icon: Icon(_obscurePassword
                                   ? Icons.visibility_off
                                   : Icons.visibility),
                               tooltip: _obscurePassword
-                                  ? 'Passwort anzeigen'
-                                  : 'Passwort verbergen',
+                                  ? L10n.t(context, 'auth.showPassword')
+                                  : L10n.t(context, 'auth.hidePassword'),
                               onPressed: () =>
                                   setState(() => _obscurePassword = !_obscurePassword),
                             ),
                           ),
-                          validator: Validators.registrationPassword,
-                        ),
-                      ),
-                       _field(
-                         child: DropdownButtonFormField<Gender>(
-                          initialValue: _gender,
-                          decoration: const InputDecoration(
-                              labelText: 'Geschlecht'),
-                          items: const [
-                            DropdownMenuItem(
-                                value: Gender.male,
-                                child: Text('Männlich')),
-                            DropdownMenuItem(
-                                value: Gender.maleTrans,
-                                child: Text('Männlich (F to M)')),
-                            DropdownMenuItem(
-                                value: Gender.female,
-                                child: Text('Weiblich')),
-                            DropdownMenuItem(
-                                value: Gender.femaleTrans,
-                                child: Text('Weiblich (M to F)')),
-                            DropdownMenuItem(
-                                value: Gender.diverse,
-                                child: Text('Divers')),
-                            DropdownMenuItem(
-                                value: Gender.other,
-                                child: Text('Eigenes / Anderes')),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) setState(() => _gender = v);
-                          },
-                        ),
+                           validator: Validators.registrationPassword,
+                         ),
                        ),
+                        _field(
+                          child: DropdownButtonFormField<Gender>(
+                           initialValue: _gender,
+                           // Abgerundetes Auswahlmenü (konsistent mit
+                           // popupMenuTheme/Cards, 16 px).
+                           borderRadius: BorderRadius.circular(16),
+                           decoration: InputDecoration(
+                              labelText: L10n.t(context, 'auth.gender')),
+                           items: [
+                             DropdownMenuItem(
+                                 value: Gender.male,
+                                 child: Text(L10n.t(context, 'gender.male'))),
+                             DropdownMenuItem(
+                                 value: Gender.maleTrans,
+                                 child: Text(L10n.t(context, 'gender.maleTrans'))),
+                             DropdownMenuItem(
+                                 value: Gender.female,
+                                 child: Text(L10n.t(context, 'gender.female'))),
+                             DropdownMenuItem(
+                                 value: Gender.femaleTrans,
+                                 child: Text(L10n.t(context, 'gender.femaleTrans'))),
+                             DropdownMenuItem(
+                                 value: Gender.diverse,
+                                 child: Text(L10n.t(context, 'gender.diverse'))),
+                             DropdownMenuItem(
+                                 value: Gender.other,
+                                 child: Text(L10n.t(context, 'gender.other'))),
+                           ],
+                           onChanged: (v) {
+                             if (v != null) setState(() => _gender = v);
+                           },
+                         ),
+                        ),
                     ] else ...[
                      _field(
                        showError: _submitAttempted,
@@ -525,17 +525,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           obscureText: _obscurePassword,
                           textInputAction: TextInputAction.done,
                           onFieldSubmitted: (_) => _submit(),
-                          decoration: InputDecoration(
-                            labelText: L10n.t(context, 'auth.password'),
-                            helperText:
-                                L10n.t(context, 'auth.passwordHint'),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility),
-                              tooltip: _obscurePassword
-                                  ? 'Passwort anzeigen'
-                                  : 'Passwort verbergen',
+                           decoration: InputDecoration(
+                             labelText: L10n.t(context, 'auth.password'),
+                             helperText:
+                                 L10n.t(context, 'auth.passwordHint'),
+                             suffixIcon: IconButton(
+                               icon: Icon(_obscurePassword
+                                   ? Icons.visibility_off
+                                   : Icons.visibility),
+                               tooltip: _obscurePassword
+                                   ? L10n.t(context, 'auth.showPassword')
+                                   : L10n.t(context, 'auth.hidePassword'),
                               onPressed: () =>
                                   setState(() => _obscurePassword = !_obscurePassword),
                             ),

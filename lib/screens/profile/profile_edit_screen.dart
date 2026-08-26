@@ -20,6 +20,7 @@ import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/utils/constants.dart';
+import 'package:wisp/utils/geo_names.dart';
 import 'package:wisp/utils/validators.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/gender_preference_selector.dart';
@@ -56,6 +57,18 @@ const kSupportedCountries = <String>[
 
 /// Profil bearbeiten: Name, Geburtsdatum, Geschlecht, Präferenzen, Bio,
 /// Beziehungsart, Standort, Entfernungsfilter, Interessen und die
+/// True, solange "Profil bearbeiten" ungespeicherte Änderungen enthält.
+/// Die Bottom-Navigation prüft das vor einem Tab-Wechsel und fragt nach
+/// Speichern/Verwerfen (Feedback: Änderungen sollten nicht still verloren
+/// gehen).
+final profileEditDirtyProvider = StateProvider<bool>((ref) => false);
+
+/// Ziel-Route, zu der nach einem erfolgreichen Speichern navigiert werden
+/// soll (von der Navigation gesetzt, vom Edit-Screen verarbeitet).
+final profileEditNavigateAfterSaveProvider = StateProvider<String?>(
+  (ref) => null,
+);
+
 /// Vorstellung für "Find your Match" (Text + Audio).
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
@@ -74,8 +87,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   /// Stadt beim Oeffnen des Screens (fuer Change-Detection beim Speichern).
   String? _loadedCity;
 
+  /// Stadt-Wert, mit dem die Felder vorbelegt wurden (Quelle:
+  /// prefs.location ?? profile.city) - Dirty-Vergleichsreferenz.
+  String? _prefillCity;
+
   /// true, waehrend _save() laeuft (Spinner im Speichern-Button).
   bool _saving = false;
+
+  /// true, nachdem ein Speichern-Versuch an Validierung gescheitert ist
+  /// (stellt den Hinweis am Speichern-Button dar).
+  bool _showValidationError = false;
 
   late Gender _gender;
   late RelationshipType _relationshipType;
@@ -117,6 +138,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     // Gemerkter Ausgangswert: GPS-Gegenpruefung beim Speichern nur bei
     // geaenderter Stadt ausfuehren (Performance).
     _loadedCity = p.city;
+    // Dirty-Referenz: exakt der Wert, mit dem das Stadt-Feld belegt wurde.
+    _prefillCity = _cityCtrl.text;
 
     // Initial signed URL für aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
@@ -244,8 +267,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         return;
       }
 
-      final locationText = '${position.latitude.toStringAsFixed(3)}, '
-          '${position.longitude.toStringAsFixed(3)}';
+      // Audit N-1 / UX: Im "Stadt"-Feld steht ein ORTSNAME (Plattform-
+      // Reverse-Geocoder), nie ein Koordinaten-Paar. Fallback: grobe
+      // Regionsangabe. Exakte Werte gehen ausschließlich in die dafür
+      // vorgesehenen Server-Spalten (dort serverseitig auf ~1 km gerundet).
+      final locationText = await describePlace(
+        position.latitude,
+        position.longitude,
+      );
+      if (!mounted) return;
       _cityCtrl.text = locationText;
 
       // Profil mit den neuen Koordinaten aktualisieren.
@@ -340,17 +370,86 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     }
   }
 
+  /// Prüft, ob das Formular vom gespeicherten Profil abweicht
+  /// (Grundlage für den ungespeicherte-Änderungen-Schutz).
+  bool _isDirty() {
+    final p = ref.read(profileProvider);
+    final prefs = ref.read(userPreferencesProvider);
+    final city = _cityCtrl.text.trim();
+    return _nameCtrl.text.trim() != p.name ||
+        _bioCtrl.text.trim() != p.bio ||
+        city != (_prefillCity ?? '').trim() ||
+        _stateCtrl.text.trim() != (p.state ?? '').trim() ||
+        _countryValue != (p.country.isEmpty ? 'Deutschland' : p.country) ||
+        _gender != (Gender.fromValue(p.gender) ?? Gender.diverse) ||
+        _relationshipType != (prefs.relationshipType ?? RelationshipType.open) ||
+        _introTextValue.trim() != p.introText ||
+        _introAudioPath != p.introAudioPath ||
+        _smoking != p.smoking ||
+        _alcohol != p.alcohol ||
+        _drugs != p.drugs;
+  }
+
+  /// Fragt nach, was mit ungespeicherten Änderungen passieren soll.
+  /// Rückgabe: 'save' | 'discard' | 'cancel' | null (Dialog abgebrochen).
+  Future<String?> _confirmUnsavedChanges() {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ungespeicherte Änderungen'),
+        content: const Text(
+          'Deine Profil-Änderungen wurden noch nicht gespeichert. '
+          'Was möchtest du tun?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('cancel'),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('discard'),
+            child: const Text('Verwerfen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop('save'),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _save() async {
-    if (_saving) return;
+    await _saveInternal();
+  }
+
+  /// Speichert das Profil. [redirectTo] erlaubt eine Ziel-Route nach dem
+  /// erfolgreichen Speichern (Tab-Wechsel-Flow). Rückgabe: true bei Erfolg.
+  Future<bool> _saveInternal({String? redirectTo}) async {
+    if (_saving) return false;
     setState(() => _saving = true);
     try {
-      if (!_formKey.currentState!.validate()) return;
+      if (!_formKey.currentState!.validate()) {
+        // Feedback (Nutzerwunsch): Der Hinweis erscheint direkt am
+        // Speichern-Button, damit off-screen-Fehler nicht übersehen werden.
+        setState(() => _showValidationError = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Es fehlen noch Angaben oder einige Felder sind fehlerhaft '
+              '(rot markiert).',
+            ),
+          ),
+        );
+        return false;
+      }
       final age = Validators.ageFromBirthDate(_birthDate);
       if (age == null) {
+        setState(() => _showValidationError = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Bitte wähle dein Geburtsdatum')),
         );
-        return;
+        return false;
       }
 
     final location = _cityCtrl.text.trim().isEmpty
@@ -410,17 +509,23 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       }());
     }
 
-    if (!mounted) return;
+    if (!mounted) return true;
+    // Dirty-Referenzen nachführen: alles ist jetzt gespeichert.
+    setState(() => _showValidationError = false);
+    _prefillCity = location;
+    _loadedCity = location;
+    ref.read(profileEditDirtyProvider.notifier).state = false;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Profil gespeichert')),
     );
-    if (mounted) {
-      if (Navigator.of(context).canPop()) {
-        context.pop();
-      } else {
-        context.go(AppRoutes.profile);
-      }
+    if (redirectTo != null) {
+      context.go(redirectTo);
+    } else if (Navigator.of(context).canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.profile);
     }
+    return true;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -457,7 +562,47 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
 
-    return Scaffold(
+    // Dirty-Zustand an die Navigation melden (post-frame, damit während
+    // des Builds kein Provider geschrieben wird).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final dirty = _isDirty();
+      if (ref.read(profileEditDirtyProvider) != dirty) {
+        ref.read(profileEditDirtyProvider.notifier).state = dirty;
+      }
+    });
+
+    // Tab-Wechsel mit "Speichern": Navigation setzt die Ziel-Route, hier
+    // wird gespeichert und danach navigiert (bei Fehler bleibt die App
+    // im Formular und zeigt den Fehlerhinweis).
+    ref.listen<String?>(profileEditNavigateAfterSaveProvider, (prev, next) {
+      if (next == null) return;
+      ref.read(profileEditNavigateAfterSaveProvider.notifier).state = null;
+      Future.microtask(() => _saveInternal(redirectTo: next));
+    });
+
+    return PopScope(
+      canPop: !_isDirty(),
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final choice = await _confirmUnsavedChanges();
+        if (!mounted || choice == null || choice == 'cancel') return;
+        if (choice == 'save') {
+          await _save();
+          // _saveInternal poppt bei Erfolg selbst.
+        } else {
+          // Verwerfen: Dirty-Marker lösen und trotzdem verlassen.
+          ref.read(profileEditDirtyProvider.notifier).state = false;
+          if (context.mounted) {
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.profile);
+            }
+          }
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Profil bearbeiten'),
         leading: IconButton(
@@ -829,7 +974,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         'Wie stehst du zu ...? Diese Angaben beeinflussen, '
-                        'wen du bei "Find your Match" siehst – es werden nur '
+                        'wen du bei "Find your Match" siehst. Es werden nur '
                         'Personen gezeigt, die maximal so viel konsumieren wie du.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
@@ -920,6 +1065,20 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              // Nutzerwunsch: Direkter Hinweis am Speichern-Button, wenn
+              // beim letzten Versuch Validierungsfehler vorlagen (rot
+              // markierte Felder sind sonst leicht außer Sicht).
+              if (_showValidationError) ...[
+                Text(
+                  'Es fehlen noch Angaben oder einige Felder sind fehlerhaft '
+                  '(rot markiert). Bitte prüfe das Formular.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                ),
+                const SizedBox(height: 12),
+              ],
               PrimaryButton(
                 label: 'Speichern',
                 loading: _saving,
@@ -928,6 +1087,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

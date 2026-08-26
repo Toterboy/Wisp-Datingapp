@@ -153,7 +153,14 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
   }
 
   Future<void> _skip() async {
-    await ref.read(settingsProvider.notifier).setMfaSetupDismissed(true);
+    // Fix: Ein Fehler beim Persistieren (z. B. Server-Sync) darf die
+    // Navigation NICHT blockieren - sonst bleibt der Nutzer hier hängen
+    // ("Später erinnern" ohne Wirkung).
+    try {
+      await ref.read(settingsProvider.notifier).setMfaSetupDismissed(true);
+    } catch (_) {
+      // Best-effort: Der Dismiss-Flag wird beim nächsten Erfolg nachgezogen.
+    }
     if (mounted) _continueFlow();
   }
 
@@ -216,7 +223,7 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
         const Text(
           'Mit einer Authenticator-App (z. B. Google Authenticator, Aegis '
           'oder 2FAS) erstellst du bei jedem Login einen einmaligen Code. '
-          'Nur mit diesem Code kann sich jemand in dein Konto einloggen – '
+          'Nur mit diesem Code kann sich jemand in dein Konto einloggen. '
           'auch wenn dein Passwort gestohlen wurde.',
           textAlign: TextAlign.center,
         ),
@@ -342,7 +349,7 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
         FilledButton.icon(
           onPressed: _toConfirm,
           icon: const Icon(Icons.arrow_forward),
-          label: const Text('Weiter – Code eingeben'),
+          label: const Text('Weiter: Code eingeben'),
         ),
         const SizedBox(height: 12),
         Text(

@@ -88,17 +88,24 @@ class CertPinning {
     ],
   };
 
-  /// Host → erwarteter Issuer (Rotation-Fallback, Kleinbuchstaben-Vergleich).
+  /// Host → erwartete Issuer-Bestandteile (Rotation-Fallback).
   ///
   /// Dart's badCertificateCallback liefert nur das Leaf-Zertifikat –
   /// Intermediate-/Root-Pins sind daher praktisch nie prüfbar. Der
   /// Rotation-Fallback akzeptiert bei Leaf-Pin-Mismatch nur Zertifikate,
-  /// die vom gepinnten Issuer für den korrekten Host im Gültigkeitszeitraum
-  /// ausgestellt wurden. Das überlebt Leaf-Rotationen (~90 Tage) ohne
-  /// App-Update und blockiert trotzdem Self-Signed-/Fremd-CA-MITM.
-  static const Map<String, String> _pinnedIssuerByHost = {
-    _defaultHost: 'google trust services', // Leaf-Issuer: CN=WE1 (GTS)
-    'router.huggingface.co': 'amazon', // Leaf-Issuer: Amazon RSA 2048 M01
+  /// die vom gepinnten INTERMEDIATE (exakter CN!) für den korrekten Host
+  /// im Gültigkeitszeitraum ausgestellt wurden.
+  ///
+  /// Audit M-9: Bisher genügte ein Substring-Match auf die CA-ORGANISATION
+  /// ("google trust services" / "amazon") - das re-widmete praktisch jede
+  /// von dieser CA ausgestellte Zertifikat. Jetzt müssen CN des konkreten
+  /// Intermediates UND Organisation übereinstimmen; ein anderes Zertifikat
+  /// derselben CA-Org mit anderem Intermediate wird abgelehnt.
+  static const Map<String, List<String>> _pinnedIssuerByHost = {
+    // Leaf-Issuer: CN=WE1 / O=Google Trust Services (beides muss passen).
+    _defaultHost: <String>['cn=we1', 'o=google trust services'],
+    // Leaf-Issuer: CN=Amazon RSA 2048 M01 / O=Amazon.
+    'router.huggingface.co': <String>['cn=amazon rsa 2048 m01', 'o=amazon'],
   };
 
   /// Für Tests: die aktuell konfigurierten DER-Hashes des Standard-Hosts.
@@ -129,8 +136,8 @@ class CertPinning {
       final client = HttpClient();
       client.badCertificateCallback = (cert, certHost, port) {
         if (kDebugMode) {
-          debugPrint('[CERT_PINNING] Keine Pins für $certHost:$port konfiguriert '
-              '— System-Validierung fehlgeschlagen, Verbindung abgelehnt.');
+          debugPrint('[CERT_PINNING] Keine Pins für $certHost:$port konfiguriert, '
+              'System-Validierung fehlgeschlagen, Verbindung abgelehnt.');
         }
         return false;
       };
@@ -146,24 +153,28 @@ class CertPinning {
       }
 
       // Rotation-Fallback: Leaf-Pin passt nicht (z. B. Zertifikat wurde
-      // rotiert). Akzeptiere NUR wenn Issuer, Host und Gültigkeitszeitraum
-      // zur erwarteten Kette passen – sonst MITM → ablehnen.
+      // rotiert). Akzeptiere NUR wenn das konkrete gepinnte Intermediate
+      // (CN), Host und Gültigkeitszeitraum passen – sonst MITM → ablehnen.
       if (_issuerFallbackMatches(targetHost, cert, certHost)) {
-        debugPrint('[CERT_PINNING] Pin-Mismatch für $certHost:$port, aber '
-            'Issuer-Fallback (erwartete CA) passend — vermutlich Leaf-'
-            'Rotation. Verbindung akzeptiert. Pin-Zentrale aktualisieren!');
+        if (kDebugMode) {
+          debugPrint('[CERT_PINNING] Pin-Mismatch, aber Intermediate-'
+              'Fallback passend, vermutlich Leaf-Rotation. '
+              'Pin-Zentrale aktualisieren!');
+        }
         return true;
       }
 
-      debugPrint('[CERT_PINNING] ACHTUNG: Zertifikat-Pin-Mismatch für '
-          '$certHost:$port – möglicher MITM-Angriff! Verbindung abgelehnt.');
+      if (kDebugMode) {
+          debugPrint('[CERT_PINNING] ACHTUNG: Zertifikat-Pin-Mismatch für '
+            '$certHost:$port, möglicher MITM-Angriff! Verbindung abgelehnt.');
+      }
       return false;
     };
     return client;
   }
 
   /// Prüft den Rotation-Fallback: Zertifikat muss
-  /// 1. vom erwarteten Issuer (z. B. Google Trust Services / Amazon),
+  /// 1. vom erwarteten Intermediate (exakter CN + Organisation, Audit M-9),
   /// 2. für den Ziel-Host und
   /// 3. innerhalb seines Gültigkeitszeitraums ausgestellt sein.
   static bool _issuerFallbackMatches(
@@ -171,12 +182,15 @@ class CertPinning {
     X509Certificate cert,
     String certHost,
   ) {
-    final expectedIssuer = _pinnedIssuerByHost[targetHost];
-    if (expectedIssuer == null) return false;
+    final expectedComponents = _pinnedIssuerByHost[targetHost];
+    if (expectedComponents == null) return false;
 
     final hostOk = certHost.toLowerCase() == targetHost.toLowerCase();
-    final issuerOk =
-        cert.issuer.toLowerCase().contains(expectedIssuer.toLowerCase());
+    // Whitespace normalisieren, Kleinbuchstaben; ALLE Komponenten müssen
+    // enthalten sein (CN des konkreten Intermediates + Organisation).
+    final issuerNormalized =
+        cert.issuer.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final issuerOk = expectedComponents.every(issuerNormalized.contains);
     final now = DateTime.now();
     final validityOk =
         cert.startValidity.isBefore(now) && cert.endValidity.isAfter(now);

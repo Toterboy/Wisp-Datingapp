@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/screens/profile/profile_edit_screen.dart'
+    show profileEditDirtyProvider, profileEditNavigateAfterSaveProvider;
 
 /// Hält den aktuell aktiven Tab der Bottom-Navigation.
 ///
@@ -73,6 +75,58 @@ class MainNavigation extends ConsumerWidget {
     return 0;
   }
 
+  /// Tab-Wechsel mit Schutz für ungespeicherte Profil-Änderungen
+  /// (Nutzerwunsch): Wird "Profil bearbeiten" mit Änderungen verlassen,
+  /// fragt die Navigation nach Speichern / Verwerfen / Abbrechen.
+  Future<void> _goToTab(
+    BuildContext context,
+    WidgetRef ref,
+    int i,
+  ) async {
+    final location = GoRouterState.of(context).matchedLocation;
+    final dirty =
+        location == AppRoutes.profileEdit && ref.read(profileEditDirtyProvider);
+    if (dirty) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Ungespeicherte Änderungen'),
+          content: const Text(
+            'Deine Profil-Änderungen wurden noch nicht gespeichert. '
+            'Was möchtest du tun?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('cancel'),
+              child: const Text('Abbrechen'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('discard'),
+              child: const Text('Verwerfen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop('save'),
+              child: const Text('Speichern'),
+            ),
+          ],
+        ),
+      );
+      if (choice == null || choice == 'cancel') return;
+      if (choice == 'discard') {
+        ref.read(profileEditDirtyProvider.notifier).state = false;
+      } else {
+        // Speichern: Der Edit-Screen speichert und navigiert danach selbst
+        // zur Ziel-Route (bei Validierungsfehlern bleibt er im Formular).
+        ref.read(profileEditNavigateAfterSaveProvider.notifier).state =
+            _tabs[i].route;
+        return;
+      }
+    }
+    if (!context.mounted) return;
+    ref.read(currentNavIndexProvider.notifier).state = i;
+    context.go(_tabs[i].route);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
@@ -93,10 +147,7 @@ class MainNavigation extends ConsumerWidget {
 
     final navBar = NavigationBar(
       selectedIndex: index,
-      onDestinationSelected: (i) {
-        ref.read(currentNavIndexProvider.notifier).state = i;
-        context.go(_tabs[i].route);
-      },
+      onDestinationSelected: (i) => _goToTab(context, ref, i),
       destinations: _tabs
           .map(
             (t) => NavigationDestination(
@@ -113,10 +164,7 @@ class MainNavigation extends ConsumerWidget {
               children: [
                 NavigationRail(
                   selectedIndex: index,
-                  onDestinationSelected: (i) {
-                    ref.read(currentNavIndexProvider.notifier).state = i;
-                    context.go(_tabs[i].route);
-                  },
+                  onDestinationSelected: (i) => _goToTab(context, ref, i),
                   labelType: NavigationRailLabelType.all,
                   destinations: _tabs
                       .map(

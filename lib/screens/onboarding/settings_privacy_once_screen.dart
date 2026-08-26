@@ -25,6 +25,7 @@ import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
+import 'package:wisp/utils/geo_names.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/gender_preference_selector.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
@@ -158,7 +159,7 @@ class _SettingsPrivacyOnceScreenState
       if (!IntroEditor.isValid(
           text: _introText, audioPath: _introAudioPath)) {
         _showStepHint(
-          'Deine Vorstellung braucht Text UND Audio – andere sollen dich '
+          'Deine Vorstellung braucht Text UND Audio. Andere sollen dich '
           'kennenlernen, bevor sie dein Foto sehen.',
         );
         return;
@@ -338,9 +339,23 @@ class _SettingsPrivacyOnceScreenState
     }
     await _saveHabitudes();
     await settingsNotifier.completeOneTimeSettings();
-    // Setup-Stand zusätzlich serverseitig sichern, damit die Einrichtung
-    // nach Neuinstallation/neuem Login nicht erneut erscheint.
-    unawaited(_persistSetupFlagsToServer());
+    // Setup-Stand serverseitig sichern, damit die Einrichtung nach
+    // Neuinstallation/neuem Login nicht erneut erscheint. Fehlschlag wird
+    // ANGEZEIGT (bisher: stiller debugPrint, weshalb die Einrichtung
+    // bei der nächsten Anmeldung wieder kam, obwohl sie "fertig" war).
+    final flagsSaved = await _persistSetupFlagsToServer();
+    if (mounted && !flagsSaved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Hinweis: Der Einrichtungs-Stand konnte nicht auf dem Server '
+            'gesichert werden. Die Einrichtung erscheint beim nächsten '
+            'Login möglicherweise erneut.',
+          ),
+          duration: Duration(seconds: 6),
+        ),
+      );
+    }
     if (mounted) context.go(AppRoutes.home);
   }
 
@@ -364,7 +379,7 @@ class _SettingsPrivacyOnceScreenState
         content: const Text(
           'Sichere dein Konto jetzt mit einem Passkey oder der '
           'Zwei-Faktor-Authentisierung. Ohne zweiten Faktor kann jeder '
-          'mit deinem Passwort dein Konto übernehmen – bei einer '
+          'mit deinem Passwort dein Konto übernehmen. Bei einer '
           'Dating-App besonders heikel.',
         ),
         actions: [
@@ -395,17 +410,21 @@ class _SettingsPrivacyOnceScreenState
     }
   }
 
-  /// Schreibt die Setup-Flags best-effort in die profiles-Tabelle.
-  Future<void> _persistSetupFlagsToServer() async {
-    if (!SupabaseService.isInitialized) return;
+  /// Schreibt die Setup-Flags in die profiles-Tabelle.
+  /// Rückgabe: true bei Erfolg (false = fehlgeschlagen, Aufrufer zeigt
+  /// einen Hinweis).
+  Future<bool> _persistSetupFlagsToServer() async {
+    if (!SupabaseService.isInitialized) return true;
     try {
       final settings = ref.read(settingsProvider);
       await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
         'one_time_settings_completed': settings.oneTimeSettingsCompleted,
         'community_guidelines_accepted': settings.communityGuidelinesAccepted,
       });
+      return true;
     } catch (e) {
       debugPrint('[SettingsPrivacyOnce] Server-Flags fehlgeschlagen: $e');
+      return false;
     }
   }
 
@@ -466,8 +485,15 @@ class _SettingsPrivacyOnceScreenState
         return;
       }
 
-      final locationText = '${position.latitude.toStringAsFixed(3)}, '
-          '${position.longitude.toStringAsFixed(3)}';
+      // Audit N-1 / UX: Im "Stadt"-Feld steht ein ORTSNAME (Plattform-
+      // Reverse-Geocoder), nie ein Koordinaten-Paar. Fallback: grobe
+      // Regionsangabe. Exakte Werte gehen nur in die dafür vorgesehenen
+      // Server-Spalten.
+      final locationText = await describePlace(
+        position.latitude,
+        position.longitude,
+      );
+      if (!mounted) return;
       _locationCtrl.text = locationText;
 
       // Koordinaten lokal UND serverseitig persistieren - sonst koennen
@@ -595,10 +621,13 @@ class _SettingsPrivacyOnceScreenState
                 ),
               ),
               Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  clipBehavior: Clip.hardEdge,
-                  physics: const ClampingScrollPhysics(),
+        child: PageView(
+          controller: _pageController,
+          // Nutzerwunsch: Swipen DEAKTIVIERT. Die Buttons führen die
+          // pro Schritt erforderlichen Aktionen (Validierung, Speichern)
+          // aus - Wer swipe-te, übersprang sie, wodurch Angaben nicht ins
+          // Profil übernommen wurden.
+          physics: const NeverScrollableScrollPhysics(),
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   children: [
                     // Page 1: Privatsphäre & Theme
@@ -1030,7 +1059,7 @@ class _SettingsPrivacyOnceScreenState
                     _Page(
                       title: 'Deine Vorstellung',
                       subtitle:
-                          'Erzähl von dir – als Text und gesprochen. Beides '
+                          'Erzähl von dir, als Text und gesprochen. Beides '
                           'wird anderen gezeigt, bevor sie dein Foto sehen. '
                           'Du kannst diesen Schritt auch überspringen.',
                       child: IntroEditor(
@@ -1087,7 +1116,7 @@ class _SettingsPrivacyOnceScreenState
                     _Page(
                       title: 'Passkey einrichten (dringend empfohlen)',
                       subtitle:
-                          'Melde dich künftig ohne Passwort an – per '
+                          'Melde dich künftig ohne Passwort an, per '
                           'Fingerabdruck oder Gesicht. Optional, du kannst '
                           'diesen Schritt überspringen.',
                       child: Column(
@@ -1098,7 +1127,7 @@ class _SettingsPrivacyOnceScreenState
                           const Text(
                             'Ein Passkey ist die sicherste und bequemste '
                             'Anmeldeart: Kein Passwort, das du merken oder '
-                            'vergessen kannst – und schwerer zu stehlen als '
+                            'vergessen kannst, und schwerer zu stehlen als '
                             'ein Passwort.',
                           ),
                           const SizedBox(height: 24),

@@ -43,7 +43,7 @@ class HomeScreen extends ConsumerWidget {
       ..sort((a, b) => b.matchedAt.compareTo(a.matchedAt));
     final messagePreviews = recentMatchesWithMessages.take(5).toList();
 
-    final name = profile.name.isNotEmpty ? profile.name : 'schönen Menschen';
+    final name = profile.name.isNotEmpty ? profile.name : 'du';
 
     return Scaffold(
       appBar: AppBar(

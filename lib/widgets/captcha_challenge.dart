@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// CAPTCHA-Challenge für Registrierung & Login (Bot-Schutz).
@@ -39,7 +40,7 @@ Future<String?> showCaptchaChallenge(BuildContext context) async {
 
   if (kIsWeb) {
     if (kDebugMode) {
-      debugPrint('[CAPTCHA] Web-Build: WebView-CAPTCHA nicht unterstützt – '
+      debugPrint('[CAPTCHA] Web-Build: WebView-CAPTCHA nicht unterstützt, '
           'Flows laufen ohne Token. Für Web später HtmlElementView nutzen.');
     }
     return null;
@@ -129,7 +130,7 @@ class _CaptchaChallengeDialogState extends State<_CaptchaChallengeDialog> {
     return PopScope(
       canPop: false,
       child: AlertDialog(
-        title: const Text('Sicherheitscheck'),
+        title: Text(L10n.t(context, 'auth.captcha')),
         content: SizedBox(
           // Cloudflare-Turnstile (managed) ist ~300x65; die interaktive
           // Challenge braucht etwas mehr Platz. Kompakt starten, WebView
@@ -151,7 +152,7 @@ class _CaptchaChallengeDialogState extends State<_CaptchaChallengeDialog> {
                 TextButton.icon(
                   onPressed: _retry,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Erneut versuchen'),
+                  label: Text(L10n.t(context, 'captcha.retry')),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -164,7 +165,7 @@ class _CaptchaChallengeDialogState extends State<_CaptchaChallengeDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('Abbrechen'),
+            child: Text(L10n.t(context, 'common.cancel')),
           ),
         ],
       ),

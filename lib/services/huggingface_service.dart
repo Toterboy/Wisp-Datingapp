@@ -33,7 +33,7 @@ class HuggingFaceService {
       })> checkImage(Uint8List imageBytes) async {
     if (!AppConstants.nsfwModerationEnabled) {
       if (kDebugMode) {
-        debugPrint('[HF] NSFW-Moderation deaktiviert (Feature-Flag) — '
+        debugPrint('[HF] NSFW-Moderation deaktiviert (Feature-Flag). '
             'Bild wird ohne Prüfung durchgelassen.');
       }
       return (
@@ -50,7 +50,7 @@ class HuggingFaceService {
     if (kDebugMode) {
       debugPrint(
         '[HF] NSFW-Moderation aktiv, aber Edge-Function-Implementierung '
-        'fehlt — Bild → pending_review.',
+        'fehlt, Bild → pending_review.',
       );
     }
     return (

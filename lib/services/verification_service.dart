@@ -197,17 +197,23 @@ class VerificationService {
         await _box.deleteAll(expired);
       }
 
-      // 2) Verwaiste Dateien im Temp-Verzeichnis.
-      final dir = await getTemporaryDirectory();
-      await for (final entity in dir.list()) {
-        if (entity is! File) continue;
-        final name = entity.uri.pathSegments.last;
-        if (!name.startsWith('verification_') || !name.endsWith('.mp4')) {
-          continue;
-        }
-        final stat = await entity.stat();
-        if (stat.modified.isBefore(cutoff)) {
-          await entity.delete();
+      // 2) Verwaiste Dateien in App-Support (M-17) und Legacy-Temp.
+      for (final dirPath in [
+        (await getApplicationSupportDirectory()).path,
+        (await getTemporaryDirectory()).path, // Legacy-Ablage
+      ]) {
+        final dir = Directory(dirPath);
+        if (!await dir.exists()) continue;
+        await for (final entity in dir.list()) {
+          if (entity is! File) continue;
+          final name = entity.uri.pathSegments.last;
+          if (!name.startsWith('verification_') || !name.endsWith('.mp4')) {
+            continue;
+          }
+          final stat = await entity.stat();
+          if (stat.modified.isBefore(cutoff)) {
+            await entity.delete();
+          }
         }
       }
     } catch (e) {
@@ -260,6 +266,11 @@ class VerificationService {
   /// Startet die Video-Aufnahme mit der Frontkamera.
   ///
   /// Gibt den Pfad zur aufgenommenen Datei zurück.
+  ///
+  /// Audit M-17: Die Datei liegt im app-privaten Anwendungs-Support-
+  /// Verzeichnis statt im System-Temp-Ordner (der von Backup-/Cleaner-Tools
+  /// und Forensik leichter lesbar ist). Das Video zeigt Gesicht + Stimme
+  /// und ist damit biometrie-nahe PII.
   Future<String?> recordVerificationVideo({
     required CameraController cameraController,
     required VerificationChallengeType challengeType,
@@ -270,8 +281,9 @@ class VerificationService {
       throw StateError('Kamera nicht initialisiert');
     }
 
-    final dir = await getTemporaryDirectory();
-    final filePath = '${dir.path}/verification_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final dir = await getApplicationSupportDirectory();
+    final filePath =
+        '${dir.path}/verification_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
     try {
       await cameraController.startVideoRecording();
@@ -344,6 +356,42 @@ class VerificationService {
     return video?.isVerified == true;
   }
 
+  /// Audit M-17 / H-8: Entfernt ALLE lokalen Verifikations-Reste
+  /// (Box-Einträge + Videodateien in App-Support- UND Legacy-Temp-Ordner).
+  /// Wird bei Logout-Aufräumen und Account-Löschung aufgerufen.
+  Future<void> deleteAllLocalData() async {
+    try {
+      for (final key in _box.keys.toList()) {
+        final video = _box.get(key);
+        if (video != null) {
+          final file = File(video.filePath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        }
+      }
+      await _box.clear();
+
+      // Datei-Sweep in beiden Verzeichnissen (inkl. verwaister Dateien).
+      final dirs = <Directory>[
+        Directory((await getApplicationSupportDirectory()).path),
+        Directory((await getTemporaryDirectory()).path), // Legacy-Reste
+      ];
+      for (final dir in dirs) {
+        if (!await dir.exists()) continue;
+        await for (final entity in dir.list()) {
+          if (entity is! File) continue;
+          final name = entity.uri.pathSegments.last;
+          if (name.startsWith('verification_') && name.endsWith('.mp4')) {
+            await entity.delete();
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[VerificationService] deleteAllLocalData fehlgeschlagen: $e');
+    }
+  }
+
   /// Reicht das aufgezeichnete Verifizierungs-Video SERVERSEITIG ein.
   ///
   /// Ablauf (Migration 052):
@@ -380,7 +428,14 @@ class VerificationService {
 
       if (response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
-        return data['status'] == 'pending';
+        final accepted = data['status'] == 'pending';
+        if (accepted) {
+          // Audit M-17: Nach erfolgreicher Einreichung liegt das Video
+          // serverseitig im privaten Bucket - die lokale Kopie (Gesicht +
+          // Stimme) wird sofort entfernt.
+          await deleteVideo(video.filePath);
+        }
+        return accepted;
       }
       return false;
     } catch (e) {

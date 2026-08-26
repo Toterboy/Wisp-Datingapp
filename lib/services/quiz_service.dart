@@ -114,7 +114,22 @@ class QuizService {
   }
 
   /// Mappt eine Zeile der profiles-Tabelle (snake_case) auf UserProfile.
+  ///
+  /// Audit M-3: Der Server liefert ab Freischaltstufe 2 kein exaktes
+  /// birth_date mehr, sondern nur noch das Alter (`age`) - das Geburtsjahr
+  /// wird daraus angenähert (wie in [UserProfile.fromPublicView]).
+  /// `is_location_suspicious` wird serverseitig nicht mehr ausgeliefert.
   UserProfile _fullProfileFromRow(Map<String, dynamic> row) {
+    DateTime? birthDate;
+    final rawBirth = row['birth_date'];
+    if (rawBirth != null) {
+      birthDate = DateTime.tryParse(rawBirth as String);
+    } else {
+      final age = row['age'] as int?;
+      if (age != null) {
+        birthDate = DateTime(DateTime.now().year - age, 1, 1);
+      }
+    }
     return UserProfile(
       id: row['user_id'] as String,
       name: row['name'] as String,
@@ -124,14 +139,11 @@ class QuizService {
           .toList(),
       city: row['city'] as String? ?? '',
       gender: row['gender'] as String?,
-      birthDate: row['birth_date'] == null
-          ? null
-          : DateTime.tryParse(row['birth_date'] as String),
+      birthDate: birthDate,
       personalityType: row['personality_type'] as String?,
       introText: row['intro_text'] as String? ?? '',
       introAudioPath: row['intro_audio_path'] as String?,
       isVerified: row['is_verified'] as bool? ?? false,
-      isLocationSuspicious: row['is_location_suspicious'] as bool? ?? false,
     );
   }
 }

@@ -1,10 +1,25 @@
 flutter_native_splash:
   color: "#ffffff"
   color_dark: "#121212"
-  # Das korrekte, vollständige Logo – quadratisch mit abgerundeten Ecken,
-  # lila/pink Farbverlauf, Herz, "Wisp"-Schriftzug. Keine hex-Varianten!
-  image: "assets/images/wisp_icon_base.png"
-  image_dark: "assets/images/wisp_icon_base.png"
+  # Die Splash-Bilder werden von tool/generate_splash_images.dart erzeugt
+  # (Logo verkleinert + auf transparenter Leinwand zentriert):
+  #   dart run tool/generate_splash_images.dart
+  #   dart run flutter_native_splash:create
+  #
+  # WARUM: flutter_native_splash rendert das Bild in NATIVER Pixelgroesse
+  # zentriert. Das 920-px-Basislogo wirkte dadurch "reingezoomt" (Schrift
+  # teils abgeschnitten). Die generierten Varianten skalieren das Logo
+  # herunter (~47 % bzw. ~55 %), sodass es auf allen Geraeten passt.
+  image: "assets/images/wispdating_splash.png"
+  image_dark: "assets/images/wispdating_splash.png"
   android: true
   ios: false
   fullscreen: true
+  # Android 12+ zeigt den Splash systemseitig mit dem LAUNCHER-Icon,
+  # wenn hier nichts konfiguriert ist. Das System maskiert kreisfoermig
+  # (sichtbar ~768 px) - die 55-%-Variante haelt die Schrift sicher im
+  # sichtbaren Kreis.
+  android_12:
+    image: "assets/images/wispdating_splash_android12.png"
+    color: "#ffffff"
+    color_dark: "#121212"

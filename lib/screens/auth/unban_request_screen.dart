@@ -115,8 +115,8 @@ class _UnbanRequestScreenState extends ConsumerState<UnbanRequestScreen> {
                       Text(
                         'Diese E-Mail-Adresse ist auf der Plattform '
                         'gesperrt. Wenn du glaubst, dass ein Fehler '
-                        'vorliegt, sende einen Entsperrungsantrag – '
-                        'wir prüfen den Fall.',
+                        'vorliegt, sende einen Entsperrungsantrag. '
+                        'Wir prüfen den Fall.',
                         style: Theme.of(context).textTheme.bodyMedium,
                         textAlign: TextAlign.center,
                       ),

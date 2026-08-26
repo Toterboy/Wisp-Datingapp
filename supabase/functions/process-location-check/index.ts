@@ -67,6 +67,22 @@ serve(async (req) => {
 
   const userId = user.id;
 
+  // M-23: Persistentes Rate-Limit (DB) - bisher gar keins. 10 Aufrufe/
+  // Stunde reichen für legitime Standort-Checks (Profil-Edit/Onboarding)
+  // und drosseln Missbrauch des Checks selbst.
+  const { data: rateOk, error: rateError } = await supabaseAdmin.rpc(
+    "consume_rate_limit",
+    { p_key: `loccheck:${userId}`, p_max_hits: 10, p_window_seconds: 3600 },
+  );
+  if (rateError) {
+    console.warn("Rate-Limit-Prüfung fehlgeschlagen (fail-open):", rateError);
+  } else if (rateOk !== true) {
+    return new Response(
+      JSON.stringify({ error: "rate_limited" }),
+      { status: 429, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   try {
     const body = (await req.json()) as ProcessLocationCheckRequest;
     const { newLatitude, newLongitude } = body;

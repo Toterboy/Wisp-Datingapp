@@ -139,6 +139,10 @@ class SupabaseStorageService {
     await _client.storage.from(_bucket).uploadBinary(
           path,
           Uint8List.fromList(data),
+          // upsert: Erneutes Hochladen (z. B. zweite Aufnahme in der
+          // Einrichtung) ueberschreibt das alte Audio - ohne upsert
+          // scheitert es mit StorageException 409 "Duplicate".
+          fileOptions: const FileOptions(upsert: true),
         );
 
     return path;

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Abstraktion des lokalen, sicheren Speichers.
@@ -12,6 +14,61 @@ abstract class LocalStorage {
   Future<void> saveBool(String key, bool value);
   Future<bool?> getBool(String key);
   Future<void> remove(String key);
+}
+
+/// Audit M-16: [LocalStorage]-Implementierung auf Basis von
+/// [FlutterSecureStorage] (Keystore/Keychain).
+///
+/// Für sensible Präferenzen (Gender-/Beziehungsvorlieben = Art.-9-Daten,
+/// Standort-Strings) ist der Klartext-[SharedPreferences] unzureichend.
+class SecurePreferencesStorage implements LocalStorage {
+  SecurePreferencesStorage();
+
+  static const _androidOptions = AndroidOptions();
+  static const _iOSOptions = IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+  );
+
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: _androidOptions,
+    iOptions: _iOSOptions,
+  );
+
+  @override
+  Future<void> saveString(String key, String value) =>
+      _storage.write(key: key, value: value);
+
+  @override
+  Future<String?> getString(String key) => _storage.read(key: key);
+
+  @override
+  Future<void> saveBool(String key, bool value) =>
+      _storage.write(key: key, value: value ? 'true' : 'false');
+
+  @override
+  Future<bool?> getBool(String key) async {
+    final raw = await _storage.read(key: key);
+    if (raw == null) return null;
+    return raw == 'true';
+  }
+
+  @override
+  Future<void> remove(String key) => _storage.delete(key: key);
+
+  /// Migriert einen vorhandenen Klartext-Wert aus SharedPreferences in den
+  /// sicheren Speicher und löscht die Klartext-Kopie.
+  Future<void> migrateStringFrom(
+    SharedPreferences prefs,
+    String key,
+  ) async {
+    if (await getString(key) != null) return; // Bereits migriert.
+    final legacy = prefs.getString(key);
+    if (legacy != null && legacy.isNotEmpty) {
+      await saveString(key, legacy);
+      await prefs.remove(key);
+      if (kDebugMode) debugPrint('[SecurePrefs] "$key" migriert.');
+    }
+  }
 }
 
 /// Standard-Implementierung auf Basis von SharedPreferences.

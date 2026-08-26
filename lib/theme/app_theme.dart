@@ -81,10 +81,12 @@ class AppTheme {
         ),
         scaffoldBackgroundColor: AppColors.backgroundLight,
         cardTheme: _cardTheme(AppColors.surfaceLight),
+        popupMenuTheme: _popupMenuTheme(AppColors.surfaceLight),
         elevatedButtonTheme: _elevatedButtonTheme,
         filledButtonTheme: _filledButtonTheme,
         outlinedButtonTheme: _outlinedButtonTheme,
-        inputDecorationTheme: _inputDecorationTheme(AppColors.surfaceLight),
+        inputDecorationTheme: _inputDecorationTheme(
+            AppColors.surfaceLight, theme.primaryColor),
         appBarTheme: const AppBarTheme(
           centerTitle: true,
           elevation: 0,
@@ -120,10 +122,12 @@ class AppTheme {
         ),
         scaffoldBackgroundColor: AppColors.backgroundDark,
         cardTheme: _cardTheme(AppColors.surfaceDark),
+        popupMenuTheme: _popupMenuTheme(AppColors.surfaceDark),
         elevatedButtonTheme: _elevatedButtonTheme,
         filledButtonTheme: _filledButtonTheme,
         outlinedButtonTheme: _outlinedButtonTheme,
-        inputDecorationTheme: _inputDecorationTheme(AppColors.surfaceDark),
+        inputDecorationTheme: _inputDecorationTheme(
+            AppColors.surfaceDark, theme.primaryColor),
         appBarTheme: const AppBarTheme(
           centerTitle: true,
           elevation: 0,
@@ -148,8 +152,17 @@ class AppTheme {
         ],
       );
 
-  static CardThemeData _cardTheme(Color surface) => CardThemeData(
+  /// Popup-Menüs (z. B. Sprachumschalter) mit demselben 16-px-Radius wie
+  /// Cards/Snackbars/Inputs - konsistent abgerundet in der ganzen App.
+  static PopupMenuThemeData _popupMenuTheme(Color surface) => PopupMenuThemeData(
         color: surface,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      );
+
+  static CardThemeData _cardTheme(Color surface) => CardThemeData(        color: surface,
         elevation: 6,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
@@ -188,7 +201,8 @@ class AppTheme {
         ),
       );
 
-  static InputDecorationTheme _inputDecorationTheme(Color surface) =>
+  static InputDecorationTheme _inputDecorationTheme(
+      Color surface, Color primary) =>
       InputDecorationTheme(
         filled: true,
         fillColor: surface,
@@ -196,16 +210,21 @@ class AppTheme {
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
+        // FIX Farbthemes: Bisher waren die Rahmen auf die Classic-Pink
+        // (AppColors.primary/primaryLight) hartcodiert - Ozean, Wald,
+        // Sonnenuntergang, Lavendel und Schiefer wurden an den Rahmen
+        // nicht uebernommen. Jetzt leiten sich beide aus der aktiven
+        // Primärfarbe ab (aktiv halbtransparent, fokussiert voll).
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: AppColors.primaryLight,
+          borderSide: BorderSide(
+            color: primary.withValues(alpha: 0.45),
             width: 1.5,
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: primary, width: 2),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
