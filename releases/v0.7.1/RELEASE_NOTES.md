@@ -1,10 +1,26 @@
-# WispDating v0.7.1 – Release Notes
+# WispDating v0.7.1-Beta – Release Notes
 
 Das Aufräum-Update zu v0.7.0: Die Sprach-Umstellung ist jetzt komplett,
 einige Ecken wurden poliert und ein wichtiger Passkey-Fehler ist
 behoben. Danke an alle Tester von v0.7.0!
 
 ## Behoben
+
+**Stadt/Ort wird nach der Einrichtung übernommen** Bei Standort-Erkennung
+und manueller Eingabe blieb der Ortsname nur im Eingabefeld - er wurde nie
+ins Profil-Feld `city` geschrieben und vom nächsten Server-Sync mit leer
+überschrieben. Jetzt wird der Ortsname lokal im Profil UND serverseitig
+persistiert.
+
+**Keine Registrierung mit vergebener E-Mail** Wer sich mit einer
+E-Mail-Adresse registrierte, die es schon gab, landete beim
+„E-Mail bestätigen" - aber es kam nie eine Mail (der Server meldet da
+keinen Fehler, damit niemand Adressen abfragen kann). Jetzt sagt die App
+direkt: bereits registriert, bitte einloggen oder Passwort zurücksetzen.
+
+**Ladekreis ab dem allerersten Moment** Beim Start war während des
+Ladens nur das stehende Logo zu sehen. Jetzt dreht sich direkt ein
+Ladekreis darunter, wie gewohnt.
 
 **Deutsch funktioniert jetzt überall** Wer die App auf Deutsch gestellt
 hatte, sah beim Anmelden einen Fehlerbildschirm. Ursache war ein fehlendes
@@ -15,7 +31,13 @@ in beiden Sprachen.
 wurde nur „nach bestem Bemühen" auf dem Server gesichert. Schlug das
 still fehl, kam die Einrichtung nach der nächsten Anmeldung wieder. Jetzt
 wirst du bei einem Fehlschlag informiert, und die App heilt den Stand beim
-nächsten Login von selbst.
+nächsten Login von selbst. Bei einer ganz neuen Registrierung erscheint
+die Einrichtung dafür garantiert genau einmal.
+
+**Standort-Erkennung ohne Einfrieren** Wer „Standort ermitteln" drückte,
+während er die Altersspanne anpasste, konnte die App einfrieren. Das ist
+behoben. Zusätzlich rutscht der linke Regler der Altersspanne nicht mehr
+von selbst zurück.
 
 **Audio-Vorstellung** Wer die Aufnahme wiederholte, bekam einen Fehler
 („Ressource existiert bereits"). Erneutes Aufnehmen überschreibt jetzt.
@@ -63,7 +85,8 @@ einer Validierung fehl, steht der Hinweis direkt am Speichern-Button.
   Profil.
 - Englisch ist jetzt auch auf dem Anmelde-Screen vollständig (inkl.
   Sicherheitscheck und allen Fehlermeldungen)
-- Das Auswahlmenü beim Geschlecht ist abgerundet, wie alles andere
+- Alle Aufklappmenüs sind abgerundet, auch in der Einrichtung
+  (Beziehungsart, Filter, Bundesland)
 - Texte wurden überarbeitet: keine Gedankenstriche mehr in Sätzen
 
 ## Für die Technik-Interessierten

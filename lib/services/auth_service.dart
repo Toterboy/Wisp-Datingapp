@@ -112,9 +112,10 @@ class AuthService implements AppAuthService {
   ///
   /// Format: `<saltHex>$<pbkdf2(salt + email + \x00 + password)>`.
   /// Audit N-5: Statt eines einzelnen SHA-256-Durchlaufs wird ein echter
-  /// KDF (PBKDF2, 50k Iterationen - Demo-Modus-Balance) verwendet; ein
-  /// extrahierter Hash ist damit offline nicht trivial brute-force-bar.
-  /// In Produktion hasht Supabase Auth (GoTrue) serverseitig.
+  /// KDF (PBKDF2, 600k Iterationen - OWASP-2023-Empfehlung, identisch zur
+  /// Backup-KDF) verwendet; ein extrahierter Hash ist damit offline nicht
+  /// trivial brute-force-bar. In Produktion hasht Supabase Auth (GoTrue)
+  /// serverseitig.
   @visibleForTesting
   static String hashCredentialsForTest(String email, String password) {
     final salt = List<int>.generate(16, (_) => _random.nextInt(256));
@@ -134,8 +135,9 @@ class AuthService implements AppAuthService {
 
   static final Random _random = Random.secure();
 
-  /// PBKDF2-Iterationen für den Demo-Modus (reduziert ggü. Backup-KDF).
-  static const int _demoKdfIterations = 50000;
+  /// PBKDF2-Iterationen für den Demo-Modus (OWASP-2023-Empfehlung,
+  /// identisch zur Backup-KDF in [BackupCrypto]).
+  static const int _demoKdfIterations = 600000;
 
   static String _hash(List<int> salt, String email, String password) {
     final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))

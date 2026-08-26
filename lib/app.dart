@@ -18,10 +18,9 @@ class App extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Nativen Splash erst entfernen, wenn der erste Frame präsentiert wird.
-    // Der Lade-Screen (initialRoute /loading) ist optisch identisch zum
-    // Splash -> nahtloser Übergang ohne Flackern. Der Splash bleibt so
-    // sichtbar, während Auth-/Settings-Checks im Hintergrund laufen.
+    // Fallback: Nativen Splash entfernen, falls das Bootstrap (main.dart)
+    // noch nicht entfernt hat. Der Übergang zum Lade-Screen (initialRoute
+    // /loading) ist optisch identisch -> nahtlos ohne Flackern.
     if (!_splashRemoveScheduled) {
       _splashRemoveScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -41,6 +41,7 @@ class EncryptionService {
   static const String _boxNamePreKeys = 'signal_prekeys';
   static const String _boxNameSignedPreKeys = 'signal_signed_prekeys';
   static const String _boxNameIdentityTrust = 'signal_identity_trust';
+  static const String _boxNameMeta = 'signal_meta';
   static const String _identityKey = 'identity';
   static const String _registrationIdKey = 'registration_id';
   static const String _preKeyCursorKey = 'prekey_cursor';
@@ -48,6 +49,12 @@ class EncryptionService {
 
   late final Box<SignalIdentityKeyPairAdapter> _identityBox;
   late final Box<SignalSessionRecordAdapter> _sessionBox;
+
+  /// Reine Skalar-Metadaten (Registrierungs-ID, PreKey-Cursor,
+  /// aktiver SignedPreKey) als Klartext-Strings. Bewusst EIGENE Box, statt
+  /// den [SignalIdentityKeyPairAdapter] (der eigentlich nur den Identity-
+  /// Key hält) für fremde Strings zweckzuentfremden.
+  late final Box<String> _metaBox;
 
   /// Peer-Trust-Store: peerId → JSON { identityKeyPublic, verified }.
   /// Grundlage der Safety-Number-Verifikation (Audit B2) – verschlüsselt
@@ -110,7 +117,9 @@ class EncryptionService {
         .openBox<SignalSignedPreKeyRecordAdapter>(_boxNameSignedPreKeys);
     _identityTrustBox = await SecureHive.instance
         .openBox<SignalIdentityKeyStoreAdapter>(_boxNameIdentityTrust);
+    _metaBox = await SecureHive.instance.openBox<String>(_boxNameMeta);
 
+    await _migrateLegacyMeta();
     await _loadOrCreateIdentity();
     _store = await HiveSignalProtocolStore.open(
       identityKeyPair: _identityKeyPair!,
@@ -127,16 +136,35 @@ class EncryptionService {
     if (!_initCompleter.isCompleted) _initCompleter.complete();
   }
 
+  /// Einmalige Migration: Skalar-Metadaten (Registrierungs-ID, PreKey-Cursor,
+  /// aktiver Signed-PreKey) lagen früher zweckentfremdet in [_identityBox]
+  /// als [SignalIdentityKeyPairAdapter]. Sie werden in die eigene [_metaBox]
+  /// verschoben, damit bestehende Installationen ihren Stand nicht verlieren.
+  Future<void> _migrateLegacyMeta() async {
+    for (final key in [
+      _registrationIdKey,
+      _preKeyCursorKey,
+      _signedPreKeyActiveKey,
+    ]) {
+      if (_metaBox.get(key) != null) continue;
+      final legacy = _identityBox.get(key);
+      if (legacy != null) {
+        await _metaBox.put(key, legacy.identityKeyPairJson);
+        await _identityBox.delete(key);
+      }
+    }
+  }
+
   /// Lädt das existierende Identitätsschlüsselpaar oder generiert ein neues.
   Future<void> _loadOrCreateIdentity() async {
     final existing = _identityBox.get(_identityKey);
-    final registration = _identityBox.get(_registrationIdKey);
+    final registration = _metaBox.get(_registrationIdKey);
     if (existing != null) {
       _identityKeyPair = IdentityKeyPair.fromSerialized(
         base64Decode(existing.identityKeyPairJson),
       );
       _registrationId = registration != null
-          ? int.tryParse(registration.identityKeyPairJson) ?? 1
+          ? int.tryParse(registration) ?? 1
           : 1;
     } else {
       _identityKeyPair = generateIdentityKeyPair();
@@ -147,15 +175,10 @@ class EncryptionService {
           identityKeyPairJson: base64Encode(_identityKeyPair!.serialize()),
         ),
       );
-      await _identityBox.put(
-        _registrationIdKey,
-        SignalIdentityKeyPairAdapter(
-          identityKeyPairJson: _registrationId.toString(),
-        ),
-      );
+      await _metaBox.put(_registrationIdKey, _registrationId.toString());
     }
     _preKeyIndex =
-        int.tryParse(_identityBox.get(_preKeyCursorKey)?.identityKeyPairJson ?? '') ?? 0;
+        int.tryParse(_metaBox.get(_preKeyCursorKey) ?? '') ?? 0;
   }
 
   /// Gibt das eigene Identitätsschlüsselpaar zurück.
@@ -222,10 +245,7 @@ class EncryptionService {
       // Cursor sofort weiterstellen (auch wenn dieser Key nicht passt),
       // damit parallele Exporte nicht denselben Key bekommen.
       _preKeyIndex = (_preKeyIndex + 1) % _preKeyCount;
-      await _identityBox.put(
-        _preKeyCursorKey,
-        SignalIdentityKeyPairAdapter(identityKeyPairJson: _preKeyIndex.toString()),
-      );
+      await _metaBox.put(_preKeyCursorKey, _preKeyIndex.toString());
       if (await store.containsPreKey(keyId)) {
         return store.loadPreKey(keyId);
       }
@@ -255,8 +275,7 @@ class EncryptionService {
   /// (Audit H-7/E-2 + E-3). Alte Signed PreKeys bleiben zur Entschlüsselung
   /// bereits etablierter Sessions im Store.
   Future<void> _loadOrRotateSignedPreKey() async {
-    final activeIdStr =
-        _identityBox.get(_signedPreKeyActiveKey)?.identityKeyPairJson;
+    final activeIdStr = _metaBox.get(_signedPreKeyActiveKey);
     final activeId = int.tryParse(activeIdStr ?? '');
 
     if (activeId != null) {
@@ -267,16 +286,14 @@ class EncryptionService {
             base64Decode(persisted.keyPairJson),
           );
           final age = DateTime.now().millisecondsSinceEpoch - persisted.timestamp;
-          if (Duration(milliseconds: age) < _signedPreKeyLifetime ||
-              !(await _store!.containsSignedPreKey(activeId))) {
+          // Noch gültig UND im Store vorhanden -> übernehmen.
+          if (Duration(milliseconds: age) < _signedPreKeyLifetime &&
+              await _store!.containsSignedPreKey(activeId)) {
             await _store!.storeSignedPreKey(activeId, record);
-            if (Duration(milliseconds: age) >= _signedPreKeyLifetime) {
-              // Abgelaufenen Key reaktivieren wäre falsch -> Rotation unten.
-            } else {
-              debugPrint('[EncryptionService] SignedPreKey $activeId geladen.');
-              return;
-            }
+            debugPrint('[EncryptionService] SignedPreKey $activeId geladen.');
+            return;
           }
+          // Abgelaufen oder nicht mehr im Store: unten neu rotieren.
         } catch (_) {
           await _signedPreKeysBox.delete(activeId.toString());
         }
@@ -296,17 +313,13 @@ class EncryptionService {
         timestamp: DateTime.now().millisecondsSinceEpoch,
       ),
     );
-    await _identityBox.put(
-      _signedPreKeyActiveKey,
-      SignalIdentityKeyPairAdapter(identityKeyPairJson: newId.toString()),
-    );
+    await _metaBox.put(_signedPreKeyActiveKey, newId.toString());
     debugPrint('[EncryptionService] SignedPreKey $newId erzeugt (Rotation).');
   }
 
   /// Holt den AKTIVEN Signed PreKey (höchste/latest ID, siehe Box-Metadaten).
   Future<SignedPreKeyRecord?> getCurrentSignedPreKey() async {
-    final activeIdStr =
-        _identityBox.get(_signedPreKeyActiveKey)?.identityKeyPairJson;
+    final activeIdStr = _metaBox.get(_signedPreKeyActiveKey);
     final activeId = int.tryParse(activeIdStr ?? '') ?? 1;
     if (await _store!.containsSignedPreKey(activeId)) {
       return _store!.loadSignedPreKey(activeId);
@@ -590,6 +603,7 @@ class EncryptionService {
     await _preKeysBox.clear();
     await _signedPreKeysBox.clear();
     await _identityTrustBox.clear();
+    await _metaBox.clear();
     _identityKeyPair = null;
     _store = null;
     _preKeyIndex = 0;
@@ -631,12 +645,7 @@ class EncryptionService {
     }
     if (backup['registrationId'] != null) {
       _registrationId = backup['registrationId'] as int;
-      await _identityBox.put(
-        _registrationIdKey,
-        SignalIdentityKeyPairAdapter(
-          identityKeyPairJson: _registrationId.toString(),
-        ),
-      );
+      await _metaBox.put(_registrationIdKey, _registrationId.toString());
     }
     await initialize(); // Neu laden
   }
@@ -648,6 +657,7 @@ class EncryptionService {
     await _preKeysBox.close();
     await _signedPreKeysBox.close();
     await _identityTrustBox.close();
+    await _metaBox.close();
   }
 }
 

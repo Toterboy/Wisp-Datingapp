@@ -43,6 +43,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
 
   StreamSubscription<AuthState>? _authStateSub;
 
+  /// Nach dem allerersten _syncFromServer Aufruf true.
+  /// Selbstheilung laeuft NUR danach – so werden lokale Restwerte
+  /// (von einem frueheren Test/Install) nicht faelschlich zum Server
+  /// gepusht und die Einrichtung bei der ersten Registrierung nicht
+  /// uebersprungen.
+  bool _initialServerSyncDone = false;
+
   /// Hält den Auth-Status synchron zu Supabase Auth.
   ///
   /// Verwirft Supabase die Session selbst (Refresh-Token invalide, Nutzer
@@ -203,19 +210,23 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
         // Selbstheilung (Fix "Einrichtung erscheint erneut"): Lokale
         // "erledigt"-Flags, die dem Server fehlen (z. B. weil das Speichern
         // bei der Einrichtung still fehlschlug), werden hier nachgezogen.
-        // So erscheint die Einrichtung nach erneutem Login nicht wieder.
-        final s = _ref.read(settingsProvider);
-        if ((s.oneTimeSettingsCompleted &&
-                flags['one_time_settings_completed'] != true) ||
-            (s.communityGuidelinesAccepted &&
-                flags['community_guidelines_accepted'] != true)) {
-          try {
-            await database.updateOwnProfile({
-              'one_time_settings_completed': s.oneTimeSettingsCompleted,
-              'community_guidelines_accepted': s.communityGuidelinesAccepted,
-            });
-          } catch (e) {
-            debugPrint('[AuthNotifier] Setup-Flags-Nachzug fehlgeschlagen: $e');
+        // NUR nach dem ersten Sync – so werden lokale Restwerte (z. B. von
+        // einem frueheren Test/Install) nicht zum Server gepusht und die
+        // Einrichtung bei der allerersten Registrierung nicht uebersprungen.
+        if (_initialServerSyncDone) {
+          final s = _ref.read(settingsProvider);
+          if ((s.oneTimeSettingsCompleted &&
+                  flags['one_time_settings_completed'] != true) ||
+              (s.communityGuidelinesAccepted &&
+                  flags['community_guidelines_accepted'] != true)) {
+            try {
+              await database.updateOwnProfile({
+                'one_time_settings_completed': s.oneTimeSettingsCompleted,
+                'community_guidelines_accepted': s.communityGuidelinesAccepted,
+              });
+             } catch (e) {
+              debugPrint('[AuthNotifier] Setup-Flags-Nachzug fehlgeschlagen: $e');
+            }
           }
         }
       }
@@ -225,6 +236,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // Router freigeben: Setup-Flags sind geladen (oder der Sync ist
       // gescheitert - dann gilt der lokale Stand).
       _ref.read(serverSyncDoneProvider.notifier).state = true;
+      // Ersten Sync abschliessen: Ab jetzt darf die Selbstheilung
+      // lokale Flags zum Server nachziehen (siehe oben).
+      _initialServerSyncDone = true;
     }
   }
 

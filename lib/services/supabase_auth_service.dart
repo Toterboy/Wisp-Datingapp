@@ -189,6 +189,32 @@ class SupabaseAuthService implements AppAuthService {
       rethrow;
     }
 
+    // Duplikat-Schutz: Supabase meldet bei bereits existierender E-Mail
+    // (bestätigungspflichtiger Anmeldeflow) KEINEN Fehler, sondern liefert
+    // zum Schutz vor E-Mail-Enumeration den BESTEHENDEN Nutzer ohne Session
+    // zurück - es geht keine Bestätigungs-Mail raus. Der Nutzer würde sonst
+    // endlos am "E-Mail bestätigen"-Screen warten. Erkannt wird der Fall an:
+    // - vorhandenem emailConfirmedAt (Account ist bereits bestätigt), oder
+    // - einem created_at, das älter als 30 Minuten ist (verwaiste, nie
+    //   bestätigte Registrierung; ein frisch angelegter Account ist
+    //   Sekunden alt).
+    if (authResponse.session == null) {
+      final alreadyConfirmed =
+          (user.emailConfirmedAt ?? '').trim().isNotEmpty;
+      final createdAt = DateTime.tryParse(user.createdAt);
+      final staleSignup = createdAt != null &&
+          DateTime.now().toUtc().difference(createdAt) >
+              const Duration(minutes: 30);
+      if (alreadyConfirmed || staleSignup) {
+        if (kDebugMode) {
+          debugPrint('[SupabaseAuthService] Registrierung blockiert: '
+              'E-Mail bereits registriert (confirmed=$alreadyConfirmed, '
+              'stale=$staleSignup).');
+        }
+        throw AppException('EMAIL_ALREADY_REGISTERED');
+      }
+    }
+
     // Safety-Numbers (Signal-Fingerprint) benötigen die eigene User-ID.
     _encryption.localUserId = user.id;
 

@@ -13,6 +13,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:wisp/app.dart';
 import 'package:wisp/providers/user_preferences_provider.dart' show sharedPrefsProvider;
+import 'package:wisp/screens/core/loading_screen.dart';
 import 'package:wisp/services/server_time_service.dart';
 import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/notification_service.dart';
@@ -23,20 +24,25 @@ import 'package:wisp/models/signal_key_models.dart';
 import 'package:wisp/models/photo_moderation_models.dart';
 import 'package:wisp/models/report_models.dart';
 import 'package:wisp/l10n/app_strings.dart';
+import 'package:wisp/theme/app_theme.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// Einstiegspunkt der App.
 ///
 /// Startup-Strategie (Fixes für ANR + zu spät ladende Willkommensscreens):
-/// - Der native Splash wird mit [FlutterNativeSplash.preserve] gehalten und
-///   erst entfernt, sobald der erste Flutter-Frame präsentiert wird
-///   (siehe [App.build]) - kein "Einfrieren" während der Initialisierung.
+/// - main() startet NUR die Bootstrap-UI ([_BootstrapApp], siehe runApp)
+///   und die schweren Dienste im Hintergrund. Die Initialisierung (Env,
+///   Supabase, SharedPreferences) läuft im Bootstrap-Widget - der Nutzer
+///   sieht sofort Logo + drehenden Ladekreis statt des statischen
+///   native-Splash-Logos. Der native Splash wird mit
+///   [FlutterNativeSplash.preserve] nur bis zum ersten Flutter-Frame
+///   gehalten.
 /// - Unabhängige Initialisierungen (Supabase + SharedPreferences) laufen
 ///   parallel statt sequenziell.
 /// - [Supabase.initialize] (Netzwerk) läuft mit Timeout, damit ein toter
 ///   Endpunkt den Start nie unbegrenzt blockiert.
 /// - Schwere, nicht kritische Dienste (Hive, Serverzeit, Notifications)
-///   starten NACH runApp im Hintergrund (unawaited).
+///   starten im Hintergrund (unawaited).
 Future<void> main() async {
   FlutterError.onError = (details) {
     FlutterError.dumpErrorToConsole(details);
@@ -79,9 +85,8 @@ Future<void> main() async {
   };
 
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  // Splash aktiv halten, bis der erste Frame der App präsentiert wird.
-  // Entfernt wird er in App.build nach dem ersten Frame (nahtloser Übergang
-  // zum Lade-Screen, der optisch identisch zum Splash ist).
+  // Splash aktiv halten, bis der erste Frame der BOOTSTRAP-UI (Lade-Screen
+  // mit drehendem Kreis) präsentiert wird - danach übernimmt Flutter.
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   // Supabase-User-ID-Getter registrieren, damit AppConstants.currentUserId
@@ -90,46 +95,69 @@ Future<void> main() async {
     () => SupabaseService.currentUser?.id,
   );
 
-  // Env laden (lokale Datei, schnell) – Grundlage für die parallelen Inits.
-  await dotenv.load(fileName: '.env');
+  // Bootstrap-UI anzeigen (Logo + drehender Kreis): Der EINZIGE runApp-
+  // Aufruf. Die Initialisierung (Env, Supabase, Prefs) läuft DANACH im
+  // Bootstrap-Widget (_initializeApp) - der Nutzer sieht sofort einen
+  // Ladekreis statt des statischen native-Splash-Logos, und sobald die
+  // Initialisierung steht, tauscht der FutureBuilder zur echten App.
+  // (Bewusst KEIN zweites runApp: das Ersetzen des Widget-Baums per
+  // runApp kann mit Frame-Scheduling/Splash-Removal interferieren und
+  // ließ die App beim Logo hängen.)
+  runApp(const _BootstrapApp());
 
-  // Parallele Initialisierung: Supabase (Netzwerk, mit Timeout) und
-  // SharedPreferences gleichzeitig statt nacheinander starten.
-  final prefsFuture = SharedPreferences.getInstance();
-  await _initializeSupabase();
-  final prefs = await prefsFuture;
-  final storage = SharedPreferencesStorage(prefs);
+  // Schwere/nicht kritische Dienste im Hintergrund starten, damit sie
+  // weder den ersten Frame noch die erste Route blockieren.
+  unawaited(_initializeServices());
+}
 
-  final savedLocaleCode = prefs.getString('app_locale') ?? 'de';
+/// Ergebnis der Start-Initialisierung (siehe [_initializeApp]).
+class _BootstrapInit {
+  const _BootstrapInit(this.storage, this.prefs, this.localeCode);
+  final SharedPreferencesStorage storage;
+  final SharedPreferences prefs;
+  final String localeCode;
+}
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        localStorageProvider.overrideWithValue(storage),
-        sharedPrefsProvider.overrideWithValue(prefs),
-        localeProvider.overrideWith((ref) => Locale(savedLocaleCode)),
-      ],
-      child: const L10nScope(child: App()),
-    ),
-  );
-
-  // Firebase (FCM-Transport für Supabase Push) NACH runApp im Hintergrund:
-  // Push ist optional und darf den App-Start niemals verzögern. Ohne Timeout
-  // kann Firebase.initializeApp() auf Geräten ohne Google-Dienste oder bei
-  // blockiertem Netz minutenlang hängen -> Splash/ANR ("App startet nicht").
-  // F-Droid-Build (--dart-define=FDROID=true): Firebase komplett aus.
-  if (!AppConstants.fdroidBuild) {
-    unawaited(_initializeFirebase());
+/// Start-Initialisierung: Env, Supabase (Netzwerk, mit Timeout) und
+/// SharedPreferences (parallel). Liefert null, wenn die Basis-Initialisierung
+/// grundsätzlich scheiterte (z. B. Prefs nicht lesbar) - die Bootstrap-UI
+/// zeigt dann einen Fehler-Screen mit Wiederholen statt endlos zu laden.
+Future<_BootstrapInit?> _initializeApp() async {
+  // Env laden (lokale Datei, schnell). Schlägt das fehl, startet die App
+  // im Limit-Modus weiter (Supabase-Init erkennt fehlende Env-Werte).
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('[MAIN] .env konnte nicht geladen werden (Limit-Modus): $e');
   }
 
-  // Migration (Keystore-Zugriff) ebenfalls erst nach dem ersten Frame:
-  // EncryptedSharedPreferences-Lesevorgänge können auf manchen Geräten
-  // träge sein und hätten sonst den ersten Frame blockiert.
-  unawaited(SecureLocationStorage.migrateFromSharedPreferences(prefs));
+  try {
+    // Parallele Initialisierung: Supabase (Netzwerk, mit Timeout) und
+    // SharedPreferences gleichzeitig statt nacheinander.
+    final prefsFuture = SharedPreferences.getInstance();
+    await _initializeSupabase();
+    final prefs = await prefsFuture;
 
-  // Schwere/nicht kritische Dienste NACH runApp im Hintergrund starten,
-  // damit sie weder den ersten Frame noch die erste Route blockieren.
-  unawaited(_initializeServices());
+    // Migration (Keystore-Zugriff) im Hintergrund: EncryptedSharedPreferences
+    // können auf manchen Geräten träge sein.
+    unawaited(SecureLocationStorage.migrateFromSharedPreferences(prefs));
+
+    // Firebase (FCM) im Hintergrund: Push ist optional und darf den Start
+    // nie verzögern; ohne Timeout kann es ohne Google-Dienste hängen.
+    // F-Droid-Build (--dart-define=FDROID=true): Firebase komplett aus.
+    if (!AppConstants.fdroidBuild) {
+      unawaited(_initializeFirebase());
+    }
+
+    return _BootstrapInit(
+      SharedPreferencesStorage(prefs),
+      prefs,
+      prefs.getString('app_locale') ?? 'de',
+    );
+  } catch (e) {
+    debugPrint('[MAIN] Initialisierung fehlgeschlagen: $e');
+    return null;
+  }
 }
 
 /// Initialisiert Firebase (FCM) im Hintergrund, mit Timeouts und vollständig
@@ -250,4 +278,117 @@ void _registerHiveAdapters() {
   Hive.registerAdapter(PhotoModerationFlagAdapter());
   Hive.registerAdapter(UserModerationRecordAdapter());
   Hive.registerAdapter(UserReportAdapter());
+}
+
+/// Wurzel-Widget beim Start: zeigt während [_initializeApp] den Lade-Screen
+/// (Logo + drehender Kreis, optisch identisch zum nativen Splash) und
+/// mountet danach die echte App (inkl. ProviderScope mit den Overrides aus
+/// der Initialisierung). Bleibt für die gesamte Laufzeit die Wurzel - nur
+/// das KIND wird getauscht (kein zweites runApp).
+class _BootstrapApp extends StatefulWidget {
+  const _BootstrapApp();
+
+  @override
+  State<_BootstrapApp> createState() => _BootstrapAppState();
+}
+
+class _BootstrapAppState extends State<_BootstrapApp> {
+  late Future<_BootstrapInit?> _initFuture = _initializeApp();
+  bool _splashRemoveScheduled = false;
+
+  void _retry() {
+    setState(() {
+      _initFuture = _initializeApp();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Nativen Splash entfernen, sobald der erste Frame (Lade-Screen)
+    // präsentiert wurde - ab hier übernimmt Flutter.
+    if (!_splashRemoveScheduled) {
+      _splashRemoveScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        FlutterNativeSplash.remove();
+      });
+    }
+
+    return FutureBuilder<_BootstrapInit?>(
+      future: _initFuture,
+      builder: (context, snapshot) {
+        // Noch nicht fertig: Lade-Screen zeigen (Logo + drehender Kreis).
+        if (snapshot.connectionState != ConnectionState.done) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            home: const LoadingScreen(),
+          );
+        }
+
+        // Basis-Initialisierung gescheitert: Fehler-Screen mit Wiederholen
+        // statt endlosem Ladekreis.
+        final init = snapshot.data;
+        if (init == null) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            home: _StartupErrorScreen(onRetry: _retry),
+          );
+        }
+
+        // Initialisierung abgeschlossen: echte App mit den Overrides
+        // (lokaler Storage, Prefs, gespeicherte Sprache) mounten.
+        return ProviderScope(
+          overrides: [
+            localStorageProvider.overrideWithValue(init.storage),
+            sharedPrefsProvider.overrideWithValue(init.prefs),
+            localeProvider.overrideWith((ref) => Locale(init.localeCode)),
+          ],
+          child: const L10nScope(child: App()),
+        );
+      },
+    );
+  }
+}
+
+/// Minimaler Fehler-Screen, falls die Basis-Initialisierung (z. B.
+/// SharedPreferences) grundsätzlich scheitert. Ohne ihn hinge die App
+/// endlos im Lade-Screen.
+class _StartupErrorScreen extends StatelessWidget {
+  const _StartupErrorScreen({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Die App konnte nicht gestartet werden.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Bitte schließe die App komplett und versuche es erneut.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(onPressed: onRetry, child: const Text('Erneut versuchen')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

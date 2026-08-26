@@ -334,8 +334,19 @@ class _SettingsPrivacyOnceScreenState
       await settingsNotifier.acceptCommunityGuidelines();
     }
     final prefsNotifier = ref.read(userPreferencesProvider.notifier);
-    if (_locationCtrl.text.trim().isNotEmpty) {
-      await prefsNotifier.setLocation(_locationCtrl.text.trim());
+    final city = _locationCtrl.text.trim();
+    if (city.isNotEmpty) {
+      await prefsNotifier.setLocation(city);
+      await ref.read(profileProvider.notifier).update(city: city);
+      if (SupabaseService.isInitialized) {
+        try {
+          await ref.read(supabaseDatabaseServiceProvider).updateOwnProfile({
+            'city': city,
+          });
+        } catch (_) {
+          // Best-Effort: Stadt-Sync darf den Abschluss nicht blockieren.
+        }
+      }
     }
     await _saveHabitudes();
     await settingsNotifier.completeOneTimeSettings();
@@ -451,6 +462,9 @@ class _SettingsPrivacyOnceScreenState
   }
 
   Future<void> _detectLocation() async {
+    // Doppelaufruf verhindern: setState wirkt erst naechsten Frame,
+    // daher ist _isDetectingLocation hier noch false.
+    if (_isDetectingLocation) return;
     setState(() {
       _isDetectingLocation = true;
       _locationError = null;
@@ -499,6 +513,7 @@ class _SettingsPrivacyOnceScreenState
       // Koordinaten lokal UND serverseitig persistieren - sonst koennen
       // Entfernungen zu anderen Nutzern nicht berechnet werden.
       await ref.read(profileProvider.notifier).update(
+            city: locationText,
             locationLat: position.latitude,
             locationLng: position.longitude,
           );
@@ -512,6 +527,14 @@ class _SettingsPrivacyOnceScreenState
                     newLatitude: position.latitude,
                     newLongitude: position.longitude,
                   ),
+            );
+            // Stadt/Ort serverseitig sichern, damit ein späterer
+            // Profil-Sync (fetchOwnProfile) den Wert nicht mit leer
+            // überschreibt.
+            unawaited(
+              ref.read(supabaseDatabaseServiceProvider).updateOwnProfile({
+                'city': locationText,
+              }),
             );
           }
         } catch (_) {
@@ -730,10 +753,11 @@ class _SettingsPrivacyOnceScreenState
                              style: Theme.of(context).textTheme.titleMedium,
                            ),
                            const SizedBox(height: 12),
-                           DropdownButtonFormField<RelationshipType>(
-                             initialValue: userPrefs.relationshipType,
-                             decoration: const InputDecoration(
-                               labelText: 'Beziehungsart',
+                            DropdownButtonFormField<RelationshipType>(
+                              initialValue: userPrefs.relationshipType,
+                              borderRadius: BorderRadius.circular(16),
+                              decoration: const InputDecoration(
+                                labelText: 'Beziehungsart',
 
                              ),
                              items: const [
@@ -770,10 +794,11 @@ class _SettingsPrivacyOnceScreenState
                              style: Theme.of(context).textTheme.titleMedium,
                            ),
                            const SizedBox(height: 12),
-                           DropdownButtonFormField<DistanceFilterMode>(
-                             initialValue: userPrefs.distanceFilterMode,
-                             decoration: const InputDecoration(
-                               labelText: 'Filter',
+                            DropdownButtonFormField<DistanceFilterMode>(
+                              initialValue: userPrefs.distanceFilterMode,
+                              borderRadius: BorderRadius.circular(16),
+                              decoration: const InputDecoration(
+                                labelText: 'Filter',
 
                              ),
                              items: DistanceFilterMode.values.map((mode) {
@@ -894,6 +919,10 @@ class _SettingsPrivacyOnceScreenState
                                   _locationValidationError = null;
                                   return;
                                 }
+                                // Wenn _detectLocation gerade laeuft, wurde der
+                                // Text programmatisch gesetzt – kein zweiter
+                                // GPS-Aufruf noetig (verhindert App-Hang).
+                                if (_isDetectingLocation) return;
                                 final locationService = ref.read(locationVerificationServiceProvider);
                                 if (await locationService.hasLocationPermission()) {
                                   final isValid = await _validateLocationText(trimmed);
@@ -925,11 +954,11 @@ class _SettingsPrivacyOnceScreenState
                              '$clampedAgeMin bis $clampedAgeMax Jahre',
                              style: Theme.of(context).textTheme.titleMedium,
                            ),
-                            RangeSlider(
-                              values: RangeValues(
-                                allowedAgeMin.toDouble(),
-                                clampedAgeMax.toDouble(),
-                              ),
+                             RangeSlider(
+                               values: RangeValues(
+                                 clampedAgeMin.toDouble(),
+                                 clampedAgeMax.toDouble(),
+                               ),
                               min: allowedAgeMin.toDouble(),
                               max: allowedAgeMax.toDouble(),
                               divisions: (allowedAgeMax - allowedAgeMin).clamp(1, 83),
@@ -1017,6 +1046,7 @@ class _SettingsPrivacyOnceScreenState
                                 (_selectedState == null || _selectedState!.isEmpty)
                                     ? null
                                     : _selectedState,
+                            borderRadius: BorderRadius.circular(16),
                             decoration: const InputDecoration(
                               labelText: 'Bundesland (optional)',
                             ),

@@ -144,7 +144,9 @@ const Map<String, Map<String, String>> _strings = {
     // Fehler (Auth)
     'error.invalidCredentials': 'Email oder Passwort ist falsch.',
     'error.notConfirmed': 'Bitte bestätige zuerst deine Emailadresse.',
-    'error.alreadyRegistered': 'Diese Emailadresse ist bereits registriert.',
+    'error.alreadyRegistered':
+        'Diese Emailadresse ist bereits registriert. Bitte melde dich '
+        'direkt an oder setze dein Passwort zurück.',
     'error.rateLimited': 'Zu viele Anfragen in kurzer Zeit. Bitte warte '
         'einen Moment und versuche es erneut.',
     'error.weakPassword': 'Das Passwort ist zu schwach. Bitte wähle ein '
@@ -238,7 +240,9 @@ const Map<String, Map<String, String>> _strings = {
     // Fehler (Auth)
     'error.invalidCredentials': 'Email or password is wrong.',
     'error.notConfirmed': 'Please confirm your email address first.',
-    'error.alreadyRegistered': 'This email address is already registered.',
+    'error.alreadyRegistered':
+        'This email address is already registered. Please log in directly '
+        'or reset your password.',
     'error.rateLimited': 'Too many requests in a short time. Please wait a '
         'moment and try again.',
     'error.weakPassword': 'The password is too weak. Please choose a longer '

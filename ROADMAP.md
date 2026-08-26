@@ -11,21 +11,33 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       E2E-Chats & -Anrufe, Video-Verifizierung (Beta), Entfernungsanzeige
 - [x] Sicherheits-Audit-Runden 1–3 inkl. Server-Härtung (RLS, Rate-Limits,
       Feld-Whitelist, JWT-Pflicht für PreKeys)
-- [x] **0.5.x** – Bild-Blur im Chat + Meldungs-Workflow (manuelle Moderation)
-- [x] **0.5.x** – Verschlüsseltes E2E-Key-Backup (passwortbasiert,
-      AES-256-GCM) mit Wiederherstellung + PreKey-Republizierung
-- [x] Accessibility-Durchlauf: ScreenReader-Labels, Text-Skalierungs-Tests
-      (bis 3.2×), GPS-Buttons als suffixIcon
-- [x] Safety Center (Hilfsangebote, In-App-Maßnahmen, Stalking-Leitfaden)
-- [x] Build-Flavors `play`/`fdroid` + Build-Doku (docs/BUILD.md, FDROID.md)
+- [x] **0.6.x** – 6 Farbschemata, verschlüsseltes E2E-Key-Backup (PBKDF2 +
+      AES-256-GCM), Safety Center, Bild-Blur im Chat + Meldungs-Workflow
+      (manuelle Moderation), UnifiedPush, Build-Flavors `play`/`fdroid`
+      (+ Build-Doku, Fastlane-Metadaten), „Funke"-Umbenennung,
+      Passkey-Diagnose, Accessibility-Durchlauf (ScreenReader-Labels,
+      Text-Skalierung bis 3.2×)
+- [x] **0.7.0** – Umsetzung des umfassenden Sicherheitsaudits: serverseitig
+      erzwungener Jugendschutz, Session im Keystore/Keychain, E2E-Reparatur
+      (PreKey-/SignedPreKey-Rotation, persistenter Identity-Trust),
+      vollständige Account-Löschung inkl. Storage-Wipe, Anti-Trilateration,
+      EXIF-Stripping, Zertifikat-Pinning, offene Registrierung
+      (Migration 063)
+- [x] **0.7.1** – Polish- & Fix-Release: Doppelte E-Mail-Registrierung
+      abgefangen, Ladekreis ab dem ersten Start, Deutsch-Crash behoben,
+      Stadt/Ort wird nach der Einrichtung übernommen, Standort-Erkennung
+      ohne Einfrieren, 2FA-„Später erinnern", App-Start-Logo, abgerundete
+      Dropdowns, englische Auth-Texte vervollständigt
 
 ## In Arbeit
 
-- [ ] F-Droid-Restpunkte (Firebase-Entkopplung, UnifiedPush, Metadaten)
+- [ ] F-Droid-Veröffentlichung (Build-Seite fertig: google-freier Flavor,
+      UnifiedPush, Fastlane-Metadaten – Einreichung steht noch aus)
 
 ## Irgendwann / Idee
 
-- [ ] i18n-Scaffolding (de/en)
+- [ ] i18n-Ausbau: de/en-Gerüst und Kernbereiche (Login/Registrierung,
+      Auth-Fehler) sind zweisprachig – verbleibende Screens nachziehen
 - [ ] Öffentliches Threat-Model & Transparenzberichte
 - [ ] On-device-Moderationsmodell statt Cloud-Prüfung
 

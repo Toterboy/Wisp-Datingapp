@@ -237,7 +237,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           context.go(AppRoutes.unbanRequest, extra: e.email);
           return;
         } else if (e is AppException) {
-          message = e.message;
+          // Duplikat-Marker aus SupabaseAuthService.register übersetzen
+          // (Supabase selbst meldet bei existierender E-Mail keinen
+          // Fehler, siehe dort).
+          message = e.message == 'EMAIL_ALREADY_REGISTERED'
+              ? L10n.t(context, 'error.alreadyRegistered')
+              : e.message;
         } else if (e is AuthException) {
           // Supabase-Fehlertexte nicht direkt anzeigen, sondern übersetzen.
           final lower = e.message.toLowerCase();
@@ -245,7 +250,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             message = L10n.t(context, 'error.invalidCredentials');
           } else if (lower.contains('not confirmed')) {
             message = L10n.t(context, 'error.notConfirmed');
-          } else if (lower.contains('user already registered')) {
+          } else if (lower.contains('user already registered') ||
+              lower.contains('already_exists') ||
+              lower.contains('may have been registered')) {
             message = L10n.t(context, 'error.alreadyRegistered');
           } else if (lower.contains('too many') || lower.contains('rate')) {
             message = L10n.t(context, 'error.rateLimited');

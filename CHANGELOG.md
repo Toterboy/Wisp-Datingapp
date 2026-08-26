@@ -15,6 +15,17 @@ Passkey-Konfiguration.
 
 ### Behoben
 
+- **Doppelte Registrierung abgefangen**: Supabase meldet bei bereits
+  registrierter E-Mail keinen Fehler ( Schutz vor E-Mail-Enumeration),
+  sondern liefert still den bestehenden Nutzer zurück - die App schickte
+  den Nutzer an den "E-Mail bestätigen"-Screen, ohne dass je eine
+  Bestätigungs-Mail kam. Jetzt erscheint direkt die Meldung "Diese
+  Emailadresse ist bereits registriert" mit Hinweis auf Login bzw.
+  Passwort-Reset
+- **Ladekreis ab dem allerersten Moment**: Während der Initialisierung
+  (bis zu 4 s) war nur das statische Splash-Logo ohne jeden Ladehinweis
+  zu sehen. Jetzt erscheint unmittelbar nach dem Start Logo + drehender
+  Ladekreis
 - **Deutsch funktioniert jetzt überall**: Die App crashte bei gesetzter
   Sprache Deutsch mit "No MaterialLocalizations found" (fehlende
   Lokalisierungs-Delegates) - Login/Registrierung waren unbenutzbar
@@ -23,7 +34,15 @@ Passkey-Konfiguration.
 - **Einrichtung erscheint nicht mehr erneut**: Der Server-Stand wurde nur
   "best-effort" gesichert (stiller Fehlschlag) - jetzt mit sichtbarem
   Hinweis UND Selbstheilung beim nächsten Login (lokale erledigt-Flags
-  werden zum Server nachgezogen)
+  werden zum Server nachgezogen). Die Selbstheilung greift erst nach dem
+  ersten Server-Sync, damit veraltete lokale Reste (z. B. von einer
+  früheren Installation) die Einrichtung bei einer NEUEN Registrierung
+  nicht überspringen
+- **Standort-Erkennung ohne Einfrieren**: "Standort ermitteln" während
+  der Altersspannen-Anpassung konnte die App zum Einfrieren bringen
+  (doppelter, gleichzeitiger GPS-Aufruf durch Text-Validierung); der
+  Start-Thumb der Altersspanne rutschte außerdem bei jedem Neuaufbau
+  auf 16 zurück
 - **Audio-Vorstellung**: Erneutes Hochladen schlug mit StorageException
   409 "Duplicate" fehl - jetzt mit Upsert
 - **App-Start-Logo**: Es wurde das runde Benachrichtigungs-Icon statt des
@@ -37,6 +56,12 @@ Passkey-Konfiguration.
   Bestandsservern (Invite-Enforcement blockierte die offene
   Registrierung mit "database error saving new user")
 - Begrüßung ohne Namen jetzt "Hallo, du!" statt "Hallo, schönen Menschen!"
+- **Stadt/Ort wird nach der Einrichtung übernommen**: Bei Standort-Erkennung
+  und manueller Eingabe blieb der Ortsname nur im Eingabefeld (und in den
+  Nutzer-Präferenzen) - er wurde nie in das Profil-Feld `city` geschrieben
+  und vom nächsten Server-Sync (fetchOwnProfile) mit leer überschrieben.
+  Jetzt wird der Ortsname lokal im Profil UND serverseitig persistiert
+  (sowie die GPS-Koordinaten weiterhin via process-location-check)
 
 ### Geändert
 
@@ -54,8 +79,16 @@ Passkey-Konfiguration.
   check-Dialog und alle Auth-Fehlermeldungen sind zweisprachig
 - Standort-Autoerkennung trägt einen ORTSNAMEN ein (Plattform-Reverse-
   Geocoder) statt Koordinaten; Fallback: grobe Region
-- Geschlecht-Auswahlmenü abgerundet (konsistent zum Rest der App)
+- Alle Aufklappmenüs abgerundet (16 px, konsistent zum Rest der App):
+  Geschlecht bei Registrierung, Beziehungsart/Filter/Bundesland in der
+  Einrichtung
 - Texte: keine Gedankenstriche mehr in Nutzersichtbaren Sätzen
+- Interne Aufräumarbeiten (Verschlüsselungs-Review): Signal-Skalar-
+  Metadaten (Registrierungs-ID, PreKey-Cursor, aktiver SignedPreKey)
+  liegen jetzt in einer eigenen verschlüsselten Box statt zweckentfremdet
+  im Identity-Adapter (inkl. Migration für Bestandsinstallationen);
+  SignedPreKey-Lade-/Rotationslogik vereinfacht (verbrauchte Keys werden
+  nicht mehr versehentlich reaktiviert)
 
 ### Sicherheit
 
@@ -63,6 +96,8 @@ Passkey-Konfiguration.
   Doppelpunkten wie von der Android-API geliefert, ergänzter web-Eintrag)
   und die apk-key-hash-Origins auf die tatsächlichen Keystores korrigiert
   (Release + Debug); Root-Domain-Datei für App-Links dokumentiert
+- Demo-Modus: Credential-Hashing auf 600.000 PBKDF2-Iterationen angehoben
+  (OWASP-2023-Empfehlung, identisch zur Backup-KDF)
 - Datenschutz-Entwurf (intern) angelegt
 
 ## [0.7.0] – 2026-08-26
