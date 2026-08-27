@@ -80,6 +80,13 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 - [ ] **Profilbild-Prüfung beim Upload** (NSFW, melde-unabhängig)
 - [ ] **i18n-Rest**: verbleibende Screens (Onboarding, Chat, Dating Hour,
       Profile etc.) zweisprachig
+- [ ] **Einstellungs-/Einrichtungs-Daten serverseitig synchronisieren**:
+      Alle lokalen Präferenzen (Farbwelt, Filter, Sichtbarkeit,
+      Benachrichtigungs-Schalter usw.) werden in der profiles-Tabelle
+      gespeichert (verschlüsselter Transport TLS, Verschlüsselung at rest
+      in Postgres, RLS schützt die Zeile) - nach Neuinstallation ist
+      damit ALLES wieder da, ganz ohne Export/Import. Sensible Inhalte
+      (Chats, E2E-Identität) bleiben davon ausgenommen
 - [ ] **Öffentliches Threat-Model & Transparenzberichte**
 
 ## Irgendwann / Idee

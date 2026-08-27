@@ -17,7 +17,6 @@ import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/mfa_service.dart';
 import 'package:wisp/services/passkey_auth.dart';
-import 'package:passkeys_doctor/passkeys_doctor.dart';
 import 'package:wisp/services/prekey_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
@@ -407,19 +406,6 @@ class SettingsScreen extends ConsumerWidget {
                         ? () => _restoreIdentityBackup(context, ref)
                         : null,
                   ),
-                  // Passkey-Diagnose: Nur im Debug-Build sichtbar
-                  // (Entwickler-Werkzeug, fuer Endnutzer irrelevant).
-                  if (kDebugMode) ...[
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.monitor_heart_outlined),
-                      title: Text(L10n.t(context, 'settings.passkeyDiagnose')),
-                      subtitle: const Text(
-                          'Prüft Domain-Verknüpfung und Gerät auf Passkey-Tauglichkeit'),
-                      contentPadding: EdgeInsets.zero,
-                      onTap: () => _runPasskeyDiagnostics(context),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -769,91 +755,3 @@ class _UnifiedPushTileState extends ConsumerState<_UnifiedPushTile> {
   }
 }
 
-/// Fuehrt die Passkeys-Doctor-Checks aus (RP-ID-Wert, assetlinks.json,
-/// Geraet) und zeigt jeden Checkpoint mit Ergebnis - so sieht der Nutzer
-/// die GENAUE Ursache, warum Passkeys fehlschlagen.
-Future<void> _runPasskeyDiagnostics(BuildContext context) async {
-  const rpId = 'auth.wispdating.de';
-  final doctor = PasskeysDoctor();
-  final checkpoints = <Checkpoint>[];
-  final completer = Completer<List<Checkpoint>>();
-  late final StreamSubscription<Result> sub;
-
-  sub = doctor.resultStream.listen((result) {
-    if (!completer.isCompleted) completer.complete(result.checkpoints);
-  });
-
-  // Dialog mit Spinner waehrend der Pruefung.
-  var done = false;
-  unawaited(showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => const AlertDialog(
-      title: Text('Passkey-Diagnose'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Pruefe Geraet und Domain-Verknuepfung...'),
-        ],
-      ),
-    ),
-  ));
-
-  try {
-    await doctor.check(rpId);
-    final result = await completer.future
-        .timeout(const Duration(seconds: 20), onTimeout: () => checkpoints);
-    checkpoints.addAll(result);
-  } catch (e) {
-    checkpoints.add(Checkpoint(
-      name: 'Diagnose-Fehler',
-      description: e.toString(),
-      type: CheckpointType.error,
-    ));
-  } finally {
-    sub.cancel();
-
-    if (context.mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
-  }
-  if (!context.mounted) return;
-
-  await showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Passkey-Diagnose'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            for (final cp in checkpoints)
-              ListTile(
-                leading: Icon(
-                  cp.type == CheckpointType.success
-                      ? Icons.check_circle
-                      : Icons.error,
-                  color: cp.type == CheckpointType.success
-                      ? Colors.green
-                      : Theme.of(ctx).colorScheme.error,
-                ),
-                title: Text(cp.name),
-                subtitle: SelectableText(cp.description),
-                isThreeLine: cp.description.length > 60,
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('OK'),
-        ),
-      ],
-    ),
-  );
-  done = done; // Vermeidet unused_warning in strengen Setups.
-}

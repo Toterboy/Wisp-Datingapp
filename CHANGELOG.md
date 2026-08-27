@@ -47,6 +47,9 @@ Passkey-Konfiguration.
   nicht (nur bei einer frischen Registrierung läuft sie natürlich)
 - **Sprach-Symbol größer**: Der farbige Kreis beim Übersetzen-Symbol auf
   Anmelde- und Registrierungs-Screen ist deutlich größer (48 px)
+- **Passkey-Diagnose entfernt**: Das Entwickler-Werkzeug ist jetzt auch
+  aus dem Debug-Build der Einstellungen raus (Code im Repository bleibt
+  für die Fehlersuche erhalten)
 - **Doppelte Registrierung abgefangen**: Supabase meldet bei bereits
   registrierter E-Mail keinen Fehler ( Schutz vor E-Mail-Enumeration),
   sondern liefert still den bestehenden Nutzer zurück - die App schickte
