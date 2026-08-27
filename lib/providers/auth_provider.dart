@@ -214,6 +214,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
         debugPrint('[AuthNotifier] Setup-Flags-Fetch fehlgeschlagen: $e');
       }
       if (flags != null) {
+        _ref.read(setupFlagsKnownProvider.notifier).state = true;
         await _ref.read(settingsProvider.notifier).syncSetupFlagsFromServer(
               oneTimeSettingsCompleted:
                   flags['one_time_settings_completed'] == true,
@@ -221,6 +222,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
                   flags['community_guidelines_accepted'] == true,
               personalityTestCompleted:
                   flags['personality_test_completed'] == true,
+              onboardingDone: flags['onboarding_done'] == true,
             );
 
         // Selbstheilung (Fix "Einrichtung erscheint erneut"): Lokale
@@ -372,6 +374,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
     _ref.read(passwordRecoveryPendingProvider.notifier).state = false;
     _ref.read(serverSyncDoneProvider.notifier).state = false;
+    _ref.read(setupFlagsKnownProvider.notifier).state = false;
     // MFA-Status zurücksetzen (keine Session -> keine Challenge/Setup).
     _ref.read(mfaStatusProvider.notifier).state = const MfaStatus.initial();
     state = const AsyncValue.data(false);
@@ -543,6 +546,15 @@ final passwordRecoveryPendingProvider = StateProvider<bool>((ref) => false);
 /// App-Neuinstallation die Einrichtung NICHT kurz aufblitzt, bevor die
 /// serverseitigen Setup-Flags geladen sind.
 final serverSyncDoneProvider = StateProvider<bool>((ref) => false);
+
+/// True, sobald der Server-Stand der Setup-Flags ERFOLGREICH geladen wurde.
+///
+/// "Niemals-Einrichtung"-Garantie: Ist der Stand NICHT bekannt (Sync
+/// insgesamt fehlgeschlagen), erzwingt der Router die Einrichtung nicht -
+/// sonst würde sie nach einer Neuinstallation bei reinen Netzproblemen
+/// erneut erscheinen. Eine frische REGISTRIERUNG (pendingVerification)
+/// ist von dieser Ausnahme ausgenommen: Dort ist die Einrichtung gewollt.
+final setupFlagsKnownProvider = StateProvider<bool>((ref) => false);
 
 /// Prüft, ob die E-Mail des aktuellen Supabase-Nutzers bestaetigt ist.
 ///

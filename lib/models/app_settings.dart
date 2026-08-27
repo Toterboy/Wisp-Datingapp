@@ -39,6 +39,15 @@ class AppSettings {
   /// Community Richtlinien akzeptiert?
   final bool communityGuidelinesAccepted;
 
+  /// Einrichtungskette mindestens EINMAL abgeschlossen (serverseitig
+  /// gespiegelt als profiles.onboarding_done, Migration 065)?
+  ///
+  /// "Niemals-Einrichtung"-Garantie: Sobald true, erzwingt der Router die
+  /// Einrichtung / den Persönlichkeitstest nie wieder - auch nicht kurz,
+  /// auch wenn Einzelpunkte übersprungen oder Einzelflag-Stände unvoll-
+  /// ständig sind. Nur-Upgrade: Wird von false auf true gesetzt, nie zurück.
+  final bool onboardingDone;
+
   /// Einführung (Willkommens-Screen) bereits gesehen?
   /// Wenn true, wird der Willkommens-Screen nicht erneut gezeigt.
   final bool introSeen;
@@ -88,6 +97,7 @@ class AppSettings {
     this.personalityTestCompleted = false,
     this.oneTimeSettingsCompleted = false,
     this.communityGuidelinesAccepted = false,
+    this.onboardingDone = false,
     this.introSeen = false,
     this.notificationsEnabled = true,
     this.notifyMatches = true,
@@ -122,6 +132,7 @@ class AppSettings {
           json['oneTimeSettingsCompleted'] as bool? ?? false,
       communityGuidelinesAccepted:
           json['communityGuidelinesAccepted'] as bool? ?? false,
+      onboardingDone: json['onboardingDone'] as bool? ?? false,
       introSeen: json['introSeen'] as bool? ?? false,
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
       notifyMatches: json['notifyMatches'] as bool? ?? true,
@@ -149,6 +160,7 @@ class AppSettings {
         'personalityTestCompleted': personalityTestCompleted,
         'oneTimeSettingsCompleted': oneTimeSettingsCompleted,
         'communityGuidelinesAccepted': communityGuidelinesAccepted,
+        'onboardingDone': onboardingDone,
         'introSeen': introSeen,
         'notificationsEnabled': notificationsEnabled,
         'notifyMatches': notifyMatches,
@@ -175,6 +187,7 @@ class AppSettings {
     bool? personalityTestCompleted,
     bool? oneTimeSettingsCompleted,
     bool? communityGuidelinesAccepted,
+    bool? onboardingDone,
     bool? introSeen,
     bool? notificationsEnabled,
     bool? notifyMatches,
@@ -203,6 +216,7 @@ class AppSettings {
           oneTimeSettingsCompleted ?? this.oneTimeSettingsCompleted,
       communityGuidelinesAccepted:
           communityGuidelinesAccepted ?? this.communityGuidelinesAccepted,
+      onboardingDone: onboardingDone ?? this.onboardingDone,
       introSeen: introSeen ?? this.introSeen,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       notifyMatches: notifyMatches ?? this.notifyMatches,

@@ -30,6 +30,16 @@ Prüfung überhaupt nicht mehr.
 
 ## Behoben
 
+**Einrichtung erscheint garantiert nie wieder** Wer die Einrichtung
+einmal abgeschlossen hat, sieht sie bei keiner Anmeldung und keiner
+Neuinstallation erneut - auch nicht kurz und auch dann nicht, wenn
+einzelne Punkte übersprungen wurden oder das Netz bei der Anmeldung
+zickt. (Technisch: neues Gesamt-Flag serverseitig; bestehende Konten
+wurden automatisch als fertig markiert.)
+
+**Sprach-Symbol größer** Der farbige Kreis um das Übersetzen-Symbol auf
+Anmelde- und Registrierungs-Screen ist jetzt deutlich größer.
+
 **Benachrichtigungs-Icon rund** In der Statusleiste erschien neben der
 Uhrzeit ein Viereck - jetzt das runde Wisp-Zeichen.
 

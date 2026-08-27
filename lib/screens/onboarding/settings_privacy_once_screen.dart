@@ -430,6 +430,10 @@ class _SettingsPrivacyOnceScreenState
     if (!SupabaseService.isInitialized) return true;
     try {
       final settings = ref.read(settingsProvider);
+      // WICHTIG: onboarding_done wird hier bewusst NICHT mitgeschickt -
+      // es ist in diesem Moment noch false (der Persönlichkeitstest als
+      // letzter Schritt setzt es) und würde sonst einen etwaigen
+      // serverseitigen true-Stand (Backfill, Migration 065) überschreiben.
       return await SupabaseDatabaseService(SupabaseService.client)
           .updateSetupFlagsAndVerify({
         'one_time_settings_completed': settings.oneTimeSettingsCompleted,

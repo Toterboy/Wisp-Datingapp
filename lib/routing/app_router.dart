@@ -361,17 +361,33 @@ GoRouter createRouter(Ref ref) {
           state.matchedLocation == AppRoutes.mfaChallenge ||
           state.matchedLocation == AppRoutes.bugReport;
 
-      if (!settings.oneTimeSettingsCompleted) {
+      // "NIEMALS-EINRICHTUNG"-GARANTIE:
+      // Die Einrichtung / der Persönlichkeitstest werden NIE wieder
+      // erzwungen, sobald onboardingDone true ist (mindestens einmal
+      // abgeschlossen, serverseitig gespiegelt als profiles.onboarding_done,
+      // Migration 065) - unabhängig von Einzelflag-Ständen und übersprungenen
+      // Punkten.
+      //
+      // Zusätzliche Absicherung gegen "Einrichtung erscheint nach
+      // Neuinstallation erneut": Ist der Server-Stand NICHT bekannt
+      // (Setup-Flags-Sync insgesamt fehlgeschlagen), wird ebenfalls NICHT
+      // erzwungen - außer bei einer frischen REGISTRIERUNG, wo die
+      // Einrichtung ja gerade zum ersten Mal laufen soll.
+      final flagsKnown = ref.read(setupFlagsKnownProvider);
+      final freshRegistration =
+          ref.read(pendingVerificationCredentialsProvider) != null;
+      final enforceSetup =
+          !settings.onboardingDone && (flagsKnown || freshRegistration);
+
+      if (enforceSetup && !settings.oneTimeSettingsCompleted) {
         if (!setupExempt) return AppRoutes.settingsPrivacyOnce;
         return null;
       }
-      if (!settings.communityGuidelinesAccepted) {
+      if (enforceSetup && !settings.communityGuidelinesAccepted) {
         if (!setupExempt) return AppRoutes.settingsPrivacyOnce;
         return null;
       }
-      // Onboarding-Schritt uebersprungen (onboardingCompleted jetzt default true).
-      // Die Infoseiten sind nach der Einrichtung nicht noetig.
-      if (!settings.personalityTestCompleted) {
+      if (enforceSetup && !settings.personalityTestCompleted) {
         if (!goingToPersonalityTest) return AppRoutes.personalityTest;
         return null;
       }

@@ -50,15 +50,15 @@ class _LanguageSwitchState extends ConsumerState<LanguageSwitch> {
         onSelected: _select,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         icon: Container(
-          width: 40,
-          height: 40,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
             color: scheme.primaryContainer,
             shape: BoxShape.circle,
           ),
           child: Icon(
             Icons.translate,
-            size: 22,
+            size: 26,
             color: scheme.onPrimaryContainer,
           ),
         ),

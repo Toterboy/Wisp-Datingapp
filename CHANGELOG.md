@@ -37,6 +37,16 @@ Passkey-Konfiguration.
 
 ### Behoben
 
+- **Einrichtung erscheint garantiert NIE wieder (auch nicht kurz)**:
+  Neues Gesamt-Flag onboarding_done (Migration 065, mit Rückstandsaufholung
+  für Bestandsnutzer): Sobald die Einrichtungskette einmal abgeschlossen
+  ist, erzwingt der Router Einstellungen & Privatsphäre und den
+  Persönlichkeitstest bei keiner Anmeldung und keiner Neuinstallation
+  wieder - unabhängig von übersprungenen Punkten. Zusätzlich: Schlägt der
+  Server-Abgleich komplett fehl, erscheint die Einrichtung ebenfalls
+  nicht (nur bei einer frischen Registrierung läuft sie natürlich)
+- **Sprach-Symbol größer**: Der farbige Kreis beim Übersetzen-Symbol auf
+  Anmelde- und Registrierungs-Screen ist deutlich größer (48 px)
 - **Doppelte Registrierung abgefangen**: Supabase meldet bei bereits
   registrierter E-Mail keinen Fehler ( Schutz vor E-Mail-Enumeration),
   sondern liefert still den bestehenden Nutzer zurück - die App schickte

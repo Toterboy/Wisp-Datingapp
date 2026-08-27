@@ -85,7 +85,9 @@ class _PersonalityTestScreenState
         );
     await ref.read(settingsProvider.notifier).completePersonalityTest();
     // Setup-Stand zusätzlich serverseitig sichern (Einrichtung erscheint
-    // nach Neuinstallation/neuem Login nicht erneut). AWARTEN statt
+    // nach Neuinstallation/neuem Login nicht erneut). onboarding_done ist
+    // das "Niemals-Einrichtung"-Flag (Migration 065) - ab jetzt erzwingt
+    // der Router die Einrichtung/Test nie wieder. AWARTEN statt
     // fire-and-forget: Schlägt das still fehl, erscheint der Test nach der
     // nächsten Neuinstallation erneut - deshalb bei Misserfolg derselbe
     // sichtbare Hinweis wie im Einstellungs-Screen.
@@ -154,6 +156,7 @@ class _PersonalityTestScreenState
       return await SupabaseDatabaseService(SupabaseService.client)
           .updateSetupFlagsAndVerify({
         'personality_test_completed': true,
+        'onboarding_done': true,
       });
     } catch (e) {
       debugPrint('[PersonalityTest] Server-Flag fehlgeschlagen: $e');

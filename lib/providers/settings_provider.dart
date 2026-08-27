@@ -90,8 +90,15 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   /// Markiert den Persönlichkeitstest als abgeschlossen.
+  ///
+  /// Setzt zusätzlich onboardingDone ("Niemals-Einrichtung"-Garantie):
+  /// Der Test ist der LETZTE Schritt der Einrichtungskette - ab jetzt
+  /// erzwingt der Router Einrichtung/Test nie wieder.
   Future<void> completePersonalityTest() async {
-    state = state.copyWith(personalityTestCompleted: true);
+    state = state.copyWith(
+      personalityTestCompleted: true,
+      onboardingDone: true,
+    );
     await _persist();
   }
 
@@ -142,6 +149,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     required bool oneTimeSettingsCompleted,
     required bool communityGuidelinesAccepted,
     required bool personalityTestCompleted,
+    required bool onboardingDone,
   }) async {
     var changed = false;
     var next = state;
@@ -157,10 +165,24 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       next = next.copyWith(personalityTestCompleted: true);
       changed = true;
     }
+    // onboardingDone ist das "Niemals-Einrichtung"-Flag (Migration 065):
+    // Nur-Upgrade - ein einmaliger Abschluss wird NIE zurückgenommen.
+    if (onboardingDone && !next.onboardingDone) {
+      next = next.copyWith(onboardingDone: true);
+      changed = true;
+    }
     if (changed) {
       state = next;
       await _persist();
     }
+  }
+
+  /// Markiert die Einrichtungskette als abgeschlossen ("Niemals-Einrichtung"-
+  /// Garantie, Migration 065). Nur-Upgrade.
+  Future<void> markOnboardingDone() async {
+    if (state.onboardingDone) return;
+    state = state.copyWith(onboardingDone: true);
+    await _persist();
   }
 
   /// Aktiviert oder deaktiviert Benachrichtigungen.

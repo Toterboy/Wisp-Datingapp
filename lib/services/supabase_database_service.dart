@@ -124,7 +124,7 @@ class SupabaseDatabaseService {
         .from('profiles')
         .select(
           'one_time_settings_completed, community_guidelines_accepted, '
-          'personality_test_completed',
+          'personality_test_completed, onboarding_done',
         )
         .eq('user_id', userId)
         .maybeSingle();
