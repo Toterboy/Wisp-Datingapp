@@ -163,6 +163,26 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 
 ---
 
+## Server-Setup (Supabase)
+
+Nach einem Update müssen vor dem Rollout die Datenbank-Migrationen
+(`supabase/migrations/`, per SQL-Editor oder `supabase db push`) und die
+Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.1:
+
+- **Migrationen:** 064 (Bild-Report-Spalten), 065 (`onboarding_done`),
+  066 (Präferenz-Sync: „Ich suche", Bundesland)
+- **Edge Functions:** `report-image` (Bild-Meldung + KI), `admin-ban`
+  (Nutzer sperren/entsperren), `notify-user` (aktualisiert: rundes
+  Statusleisten-Icon)
+- **Function-Secrets** (Dashboard → Edge Functions → Secrets):
+  - `BREVO_API_KEY` – Mails (Bild-Meldungen, Bug-Reports, Konto-Sperren)
+  - `MODERATION_EMAIL` – Empfänger der Bild-Meldungs-Mails
+  - `ADMIN_UUID` – Admin-ID für `admin-ban` (identisch zum Build-Flag)
+  - `HF_API_TOKEN` – optional, aktiviert die NSFW-KI-Vorprüfung
+  - `FIREBASE_SERVICE_ACCOUNT_JSON` – FCM-Versand (bereits vorhanden)
+
+---
+
 ## Hinweis zum Entwicklungsstand
 
 Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.7.1). Folgende Bereiche sind noch nicht final:

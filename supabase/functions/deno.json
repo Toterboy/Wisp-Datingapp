@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window", "ES2021"],
+    "strict": true
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "fmt": {
+    "lineWidth": 100
+  }
+}
