@@ -40,21 +40,22 @@ class _LanguageSwitchState extends ConsumerState<LanguageSwitch> {
     final scheme = Theme.of(context).colorScheme;
 
     if (widget.compact) {
-      // Login: Icon in Kreis aus primaryContainer (folgt Light/Dark und
-      // der aktiven Farbwelt) - so hebt sich der Button klar vom Hintergrund
-      // ab, egal welches Theme aktiv ist.
+      // Login: runder Button in Primärfarbe (gleicher Look wie der
+      // "Einloggen"-FilledButton), folgt Light/Dark und der Farbwelt.
+      // WICHTIG: `child` statt `icon` nutzen - der icon-Weg wickelt das
+      // Widget in ein IconButton, das es auf iconSize (~24 px) zwingt,
+      // wodurch der Kreis SCHRUMPFT und das Symbol übergroß wirkt.
       return PopupMenuButton<String>(
         tooltip: L10n.t(context, 'settings.language'),
         position: PopupMenuPosition.under,
         initialValue: current,
         onSelected: _select,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: Container(
-          width: 44,
-          height: 44,
+        padding: EdgeInsets.zero,
+        child: Container(
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            // Wie der "Einloggen"-Button (FilledButton): gefüllt mit der
-            // Primärfarbe des aktiven Themes - rund statt breit.
             color: scheme.primary,
             shape: BoxShape.circle,
           ),

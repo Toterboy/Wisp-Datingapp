@@ -30,9 +30,9 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-// GoTrue-Ban-Dauer für bestehende Accounts: 10 Jahre (= dauerhaft;
-// Entsperrung hebt die Sperre explizit auf).
-const GO_TRUE_BAN_DURATION = "876000h";
+// GoTrue-Ban-Dauer für bestehende Accounts: 10 Jahre (= praktisch
+// dauerhaft; die Entsperrung hebt die Sperre explizit auf).
+const GO_TRUE_BAN_DURATION = "87600h";
 
 function escapeHtml(s: string): string {
   return s
