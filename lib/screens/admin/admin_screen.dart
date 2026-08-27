@@ -663,6 +663,7 @@ class _BansTabState extends ConsumerState<_BansTab> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   String? _error;
+  bool _busy = false;
 
   @override
   void initState() {
@@ -690,30 +691,233 @@ class _BansTabState extends ConsumerState<_BansTab> {
     if (mounted) setState(() => _loading = false);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return _AsyncList(
-      loading: _loading,
-      error: _error,
-      items: _items,
-      emptyText: 'Keine Sperren vorhanden.',
-      onRetry: _load,
-      itemBuilder: (context, data) {
-        final email = data['email'] as String? ?? '?';
-        final reason = (data['reason'] as String? ?? '').trim();
-        final bannedBy = data['bannedBy'] as String? ?? '?';
-        return ListTile(
-          title: SelectableText(email),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  /// Ruft die Edge Function `admin-ban` auf (Service-Role-Aktionen).
+  Future<Map<String, dynamic>> _invoke(Map<String, dynamic> body) async {
+    final response = await SupabaseService.client.functions.invoke(
+      'admin-ban',
+      body: body,
+    );
+    final data = (response.data as Map?)?.cast<String, dynamic>() ?? {};
+    if (response.status != 200) {
+      throw StateError(
+        data['error']?.toString() ??
+            'Aktion fehlgeschlagen (Status ${response.status}).',
+      );
+    }
+    return data;
+  }
+
+  /// Formular: Nutzer sperren (E-Mail oder User-ID + Pflicht-Begründung).
+  Future<void> _showBanDialog() async {
+    final targetCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    var notifyUser = true;
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Row(
             children: [
-              if (reason.isNotEmpty) SelectableText(reason),
-              Text('${_fmtTs(data['bannedAt'])} · von $bannedBy'),
+              Icon(Icons.block, color: Colors.red),
+              SizedBox(width: 8),
+              Expanded(child: Text('Nutzer sperren')),
             ],
           ),
-          leading: const Icon(Icons.block, color: Colors.red),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: targetCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'E-Mail oder User-ID',
+                      hintText: 'z. B. aus der Meldungs-Mail kopiert',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Pflichtfeld' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: reasonCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Begründung (Pflicht)',
+                      hintText: 'Warum wird der Nutzer gesperrt?',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) => (v == null || v.trim().length < 3)
+                        ? 'Mindestens 3 Zeichen'
+                        : null,
+                  ),
+                  const SizedBox(height: 4),
+                  CheckboxListTile(
+                    value: notifyUser,
+                    onChanged: (v) => setState(() => notifyUser = v ?? true),
+                    title: const Text('Nutzer per E-Mail informieren'),
+                    subtitle: const Text(
+                        'Enthält die Begründung und den Weg zum '
+                        'Entsperrungsantrag'),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                  ),
+                  const Text(
+                    'Hinweis: Mit User-ID wird zusätzlich der bestehende '
+                    'Account sofort gesperrt (Sessions ungültig). Mit nur '
+                    'E-Mail ist die Neu-Registrierung blockiert.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () async {
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                final messenger = ScaffoldMessenger.of(ctx);
+                try {
+                  await _invoke({
+                    'action': 'ban',
+                    'emailOrUserId': targetCtrl.text.trim(),
+                    'reason': reasonCtrl.text.trim(),
+                    'notifyUser': notifyUser,
+                  });
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  await _load();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Nutzer gesperrt.'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          e is StateError ? e.message : 'Sperren fehlgeschlagen.'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Sperren'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Entsperrt eine E-Mail (banned_emails-Eintrag löschen + GoTrue-Entsperren).
+  Future<void> _unban(Map<String, dynamic> entry) async {
+    final email = entry['email'] as String? ?? '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Entsperren?'),
+        content: Text(
+            '$email kann sich wieder registrieren und anmelden. Der '
+            'Entsperrungsantrag sollte vorher geprüft worden sein.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Entsperren'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _invoke({'action': 'unban', 'emailOrUserId': email});
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$email wurde entsperrt.'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-      },
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                e is StateError ? e.message : 'Entsperren fehlgeschlagen.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: _busy ? null : _showBanDialog,
+              icon: const Icon(Icons.person_add_disabled),
+              label: const Text('Nutzer sperren'),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _AsyncList(
+            loading: _loading,
+            error: _error,
+            items: _items,
+            emptyText: 'Keine Sperren vorhanden.',
+            onRetry: _load,
+            itemBuilder: (context, data) {
+              final email = data['email'] as String? ?? '?';
+              final reason = (data['reason'] as String? ?? '').trim();
+              final bannedBy = data['bannedBy'] as String? ?? '?';
+              return ListTile(
+                title: SelectableText(email),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (reason.isNotEmpty) SelectableText(reason),
+                    Text('${_fmtTs(data['bannedAt'])} · von $bannedBy'),
+                  ],
+                ),
+                leading: const Icon(Icons.block, color: Colors.red),
+                trailing: IconButton(
+                  icon: const Icon(Icons.lock_open, color: Colors.green),
+                  tooltip: 'Entsperren',
+                  onPressed: _busy ? null : () => _unban(data),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

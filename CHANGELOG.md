@@ -15,6 +15,14 @@ Passkey-Konfiguration.
 
 ### Hinzugefügt
 
+- **Admin: Nutzer sperren/entsperren mit Begründung** (versteckter
+  Admin-Bereich): Im „Sperren"-Tab gibt es jetzt ein Formular
+  (E-Mail oder User-ID + Pflicht-Begründung). Die neue Edge Function
+  `admin-ban` (nur für die Admin-ID aufrufbar) hinterlegt die E-Mail in
+  der Sperr-Tabelle (blockiert Neu-Registrierung) und sperrt bei Angabe
+  einer User-ID zusätzlich den bestehenden Account sofort (Sessions
+  ungültig). Optional erhält der Nutzer eine E-Mail mit Begründung und
+  Hinweis auf den Entsperrungsantrag. Entsperren per Button in der Liste
 - **Bild-Meldung mit KI-Vorprüfung (NSFW, melde-basiert)**: Chat-Bilder
   werden bewusst NIE automatisch beim Senden gescannt (E2E). Erst eine
   Meldung durch den Empfänger prüft exakt dieses eine Bild automatisch

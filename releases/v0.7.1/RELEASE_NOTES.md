@@ -6,6 +6,13 @@ behoben. Danke an alle Tester von v0.7.0!
 
 ## Hinzugefügt
 
+**Moderation: Nutzer sperren mit Begründung** Im Team-Bereich gibt es
+jetzt ein Formular zum Sperren von Konten (E-Mail oder User-ID +
+verpflichtende Begründung). Mit User-ID wird der Account sofort
+gesperrt; der Betroffene kann optional per E-Mail informiert werden und
+hat weiterhin den Weg über den Entsperrungsantrag. Entsperren ist mit
+einem Klick möglich.
+
 **Bild-Meldung mit KI-Vorprüfung** Chat-Bilder werden nie automatisch
 gescannt - deine Bilder bleiben Ende-zu-Ende-verschlüsselt. Meldest du
 aber ein Bild, prüft eine KI genau dieses eine Bild sofort auf
