@@ -49,58 +49,73 @@ class SupabaseDatabaseService {
     final userId = _currentUser?.id;
     if (userId == null) return null;
 
-    final response = await _client
-        .from('profiles')
-        .select(
-          'user_id, name, gender, gender_preferences, birth_date, bio, '
-          'interests, personality_type, max_distance_km, age_range_min, '
-          'age_range_max, smoking, alcohol, drugs, is_verified, '
-          'is_location_suspicious, city, state, country, intro_text, '
-          'intro_audio_path, location_lat, location_lng, mood, created_at, '
-          'updated_at',
-        )
-        .eq('user_id', userId)
-        .maybeSingle();
+    // Retry: Ein transienter Netzfehler darf das Profil nicht leer lassen
+    // (Name, Bio usw. würden nach Neuinstallation sonst fehlen). Ein
+    // sauberes "keine Zeile" (Account serverseitig gelöscht) wird NICHT
+    // retryed, sondern direkt zurückgegeben.
+    Object? lastError;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      try {
+        final response = await _client
+            .from('profiles')
+            .select(
+              'user_id, name, gender, gender_preferences, birth_date, bio, '
+              'interests, personality_type, max_distance_km, age_range_min, '
+              'age_range_max, smoking, alcohol, drugs, is_verified, '
+              'is_location_suspicious, city, state, country, intro_text, '
+              'intro_audio_path, location_lat, location_lng, created_at, '
+              'updated_at',
+            )
+            .eq('user_id', userId)
+            .maybeSingle();
 
-    if (response == null) return null;
+        if (response == null) return null;
 
-    // REST-Antwort (snake_case) in das lokale JSON-Format (camelCase)
-    // mappen – UserProfile.fromJson erwartet das lokale Format und würde
-    // sonst (z. B. fehlendes "id") eine Exception werfen.
-    final prefs = (response['gender_preferences'] as List?)
-            ?.whereType<String>()
-            .toList() ??
-        [];
-    final allSelected = prefs.length >= kAllGenderValues.length &&
-        kAllGenderValues.every(prefs.contains);
-    final mapped = <String, dynamic>{
-      'id': response['user_id'],
-      'name': response['name'],
-      'bio': response['bio'],
-      'interests': response['interests'],
-      'gender': response['gender'],
-      'genderPreference': allSelected || prefs.isEmpty ? 'all' : prefs.first,
-      // PostgREST liefert DATE als "YYYY-MM-DD"-String – DateTime.tryParse
-      // versteht das Format.
-      'birthDate': response['birth_date'] == null
-          ? null
-          : response['birth_date'] as String,
-      'personalityType': response['personality_type'],
-      'location_lat': response['location_lat'],
-      'location_lng': response['location_lng'],
-      'is_verified': response['is_verified'],
-      'is_location_suspicious': response['is_location_suspicious'],
-      'city': response['city'] ?? '',
-      'state': response['state'],
-      'country': response['country'] ?? 'Deutschland',
-      'introText': response['intro_text'] ?? '',
-      'introAudioPath': response['intro_audio_path'],
-      'mood': response['mood'],
-      'smoking': response['smoking'],
-      'alcohol': response['alcohol'],
-      'drugs': response['drugs'],
-    };
-    return UserProfile.fromJson(mapped);
+        // REST-Antwort (snake_case) in das lokale JSON-Format (camelCase)
+        // mappen – UserProfile.fromJson erwartet das lokale Format und würde
+        // sonst (z. B. fehlendes "id") eine Exception werfen.
+        final prefs = (response['gender_preferences'] as List?)
+                ?.whereType<String>()
+                .toList() ??
+            [];
+        final allSelected = prefs.length >= kAllGenderValues.length &&
+            kAllGenderValues.every(prefs.contains);
+        final mapped = <String, dynamic>{
+          'id': response['user_id'],
+          'name': response['name'],
+          'bio': response['bio'],
+          'interests': response['interests'],
+          'gender': response['gender'],
+          'genderPreference':
+              allSelected || prefs.isEmpty ? 'all' : prefs.first,
+          // PostgREST liefert DATE als "YYYY-MM-DD"-String – DateTime.tryParse
+          // versteht das Format.
+          'birthDate': response['birth_date'] == null
+              ? null
+              : response['birth_date'] as String,
+          'personalityType': response['personality_type'],
+          'location_lat': response['location_lat'],
+          'location_lng': response['location_lng'],
+          'is_verified': response['is_verified'],
+          'is_location_suspicious': response['is_location_suspicious'],
+          'city': response['city'] ?? '',
+          'state': response['state'],
+          'country': response['country'] ?? 'Deutschland',
+          'introText': response['intro_text'] ?? '',
+          'introAudioPath': response['intro_audio_path'],
+          'smoking': response['smoking'],
+          'alcohol': response['alcohol'],
+          'drugs': response['drugs'],
+        };
+        return UserProfile.fromJson(mapped);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError ?? StateError('fetchOwnProfile fehlgeschlagen');
   }
 
   /// Aktualisiert das eigene Profil in der Supabase-Datenbank.

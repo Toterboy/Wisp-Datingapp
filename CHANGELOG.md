@@ -37,6 +37,13 @@ Passkey-Konfiguration.
 
 ### Behoben
 
+- **Profil nach Neuinstallation leer behoben (wichtig)**: Der
+  Profil-Ladevorgang fragte eine Datenbank-Spalte (mood) ab, die in den
+  Migrationen nie existiert hatte - der Abruf schlug dadurch IMMER fehl,
+  und nach einer Neuinstallation blieben Name, Bio, Geburtsdatum usw.
+  leer (auf dem alten Gerät unsichtbar, weil dort eine lokale Kopie
+  lag). Die Spalte ist aus der Abfrage entfernt; der Abruf hat jetzt
+  zusätzlich einen Wiederholungsversuch bei Netzproblemen
 - **Einrichtung erscheint garantiert NIE wieder (auch nicht kurz)**:
   Neues Gesamt-Flag onboarding_done (Migration 065, mit Rückstandsaufholung
   für Bestandsnutzer): Sobald die Einrichtungskette einmal abgeschlossen

@@ -30,6 +30,13 @@ Prüfung überhaupt nicht mehr.
 
 ## Behoben
 
+**Profil nach Neuinstallation nicht mehr leer** Bei einer Neuinstallation
+blieben Name, Bio und alle Profildaten leer - der Abgriff auf dem Server
+fragte eine Datenbank-Spalte ab, die es dort nie gab, und schlug deshalb
+immer fehl. Auf dem alten Gerät war das nicht aufgefallen, weil dort eine
+lokale Kopie lag. Das ist behoben (plus Wiederholungsversuch bei
+Netzproblemen).
+
 **Einrichtung erscheint garantiert nie wieder** Wer die Einrichtung
 einmal abgeschlossen hat, sieht sie bei keiner Anmeldung und keiner
 Neuinstallation erneut - auch nicht kurz und auch dann nicht, wenn
