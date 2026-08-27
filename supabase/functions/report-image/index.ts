@@ -26,7 +26,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 const MODERATION_EMAIL = Deno.env.get("MODERATION_EMAIL") ?? "moderation@wispdating.de";
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const HF_API_TOKEN = Deno.env.get("HF_API_TOKEN") ?? "";
-const HF_MODEL_URL = "https://router.huggingface.co/models/Falconsai/nsfw_image_detection";
+// HF Inference Router (hf-inference-Provider) mit NSFW-Klassifikator.
+const HF_MODEL_URL =
+  "https://router.huggingface.co/hf-inference/models/Falconsai/nsfw_image_detection";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
