@@ -307,7 +307,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _signInWithPasskey() async {
     setState(() => _passkeyLoading = true);
     try {
-      await PasskeyAuth.signIn();
+      // Bei aktivierter Dashboard-CAPTCHA verlangt der Server auch für
+      // den Passkey-Login ein Token (wie beim normalen Login), sonst
+      // lehnt er die Anfrage direkt ab, bevor der native Dialog
+      // erscheint. Der Passkey-Button zeigt solange den Ladekreis.
+      String? captchaToken;
+      if (AppConstants.captchaEnabled) {
+        captchaToken = await showCaptchaChallenge(context);
+        if (captchaToken == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(L10n.t(context, 'auth.captchaLogin')),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+      }
+      await PasskeyAuth.signIn(captchaToken: captchaToken);
       // Kein explizites Navigieren: Der Auth-State-Listener setzt den
       // Status auf "eingeloggt" und der Router übernimmt die Weiterleitung.
     } catch (e) {

@@ -4,7 +4,42 @@ Das Aufräum-Update zu v0.7.0: Die Sprach-Umstellung ist jetzt komplett,
 einige Ecken wurden poliert und ein wichtiger Passkey-Fehler ist
 behoben. Danke an alle Tester von v0.7.0!
 
+## Hinzugefügt
+
+**Bild-Meldung mit KI-Vorprüfung** Chat-Bilder werden nie automatisch
+gescannt - deine Bilder bleiben Ende-zu-Ende-verschlüsselt. Meldest du
+aber ein Bild, prüft eine KI genau dieses eine Bild sofort auf
+unangemessene Inhalte. Du siehst das Ergebnis direkt: Bestätigt die KI
+deine Meldung, wird unser Team automatisch mit Bild, deinem Report und
+dem KI-Ergebnis informiert. Sieht die KI kein Problem, du aber schon,
+kannst du eine manuelle Prüfung durch unser Team veranlassen.
+
+Hinweis: Diese automatische Vorprüfung ist optional konfigurierbar.
+Ist sie nicht aktiv, funktioniert die Meldung genauso - dein Bild geht
+dann direkt (mit deinem Report) zur manuellen Prüfung an unser Team.
+Ausblick: In einer künftigen Version (0.8.0) läuft die KI vollständig
+lokal in der App - dann verlässt das gemeldete Bild das Gerät vor der
+Prüfung überhaupt nicht mehr.
+
 ## Behoben
+
+**Benachrichtigungs-Icon rund** In der Statusleiste erschien neben der
+Uhrzeit ein Viereck - jetzt das runde Wisp-Zeichen.
+
+**Einrichtung nach Neuinstallation zuverlässig weg** Bisher konnten
+kurzzeitige Netzprobleme beim Login dazu führen, dass die Einrichtung
+erneut erschien, obwohl sie längst abgeschlossen war: Der Abruf des
+Server-Stands hatte ein knappes Zeitlimit ohne Wiederholung, und beim
+Speichern des Abschlusses zählte ein still fehlgeschlagener Schreibvorgang
+als Erfolg. Beides ist jetzt abgesichert (mehrere Versuche, Kontrolle
+durch Zurücklesen, sichtbarer Hinweis falls es doch nicht klappt).
+
+**Passkey-Login funktioniert wieder** Bei aktiviertem Sicherheitscheck
+(CAPTCHA) verlangt der Server auch für den Passkey-Login ein Bestätigungs-
+Token. Die App ließ diesen Schritt aus, sodass der Server die Anfrage
+ablehnte („Server hat die Passkeyanfrage abgelehnt“) – noch bevor der
+Fingerabdruck-Dialog erschien. Jetzt erscheint zuerst der gewohnte
+Sicherheitscheck, danach die Passkey-Abfrage.
 
 **Stadt/Ort wird nach der Einrichtung übernommen** Bei Standort-Erkennung
 und manueller Eingabe blieb der Ortsname nur im Eingabefeld - er wurde nie
@@ -78,6 +113,33 @@ App: Speichern, Verwerfen oder bleiben? Und schlägt das Speichern an
 einer Validierung fehl, steht der Hinweis direkt am Speichern-Button.
 
 ## Geändert
+
+**Einheitliches Applogo** Alle Logo-Varianten (App-Icon, Adaptive-Icon,
+Splash, Benachrichtigung) stammen jetzt aus einer einzigen Quelldatei.
+Hinweis: Das Applogo und dessen Implementierung sind noch in Arbeit -
+Feinschliff folgt in einem der nächsten Updates.
+
+**Sprache klarer bedienbar** In der Anmeldung hat das Übersetzungs-Symbol
+jetzt einen farbigen Kreis-Hintergrund (passt sich jedem Design an). In
+den Einstellungen ist jetzt das ganze Feld „Sprache" bedienbar und klappt
+nach unten auf.
+
+**Einstellungen aufgeräumt** „Account löschen" gibt es nur noch unter
+„Datenschutz & Account" (inkl. 2FA-Bestätigung). Die Passkey-Diagnose ist
+für Endnutzer nicht mehr sichtbar.
+
+**Datenschutz & Account** Auftragsverarbeiter aktualisiert (Brevo,
+Cloudflare, Netlify ergänzt, Hugging Face entfernt). Unter
+„Einwilligungen" führen Buttons direkt zu den Standort- und
+Benachrichtigungs-Einstellungen deines Geräts.
+
+**Einstellungen & Datenschutz jetzt komplett zweisprachig** (Deutsch/
+Englisch)
+
+**Kleinere Korrekturen** „Keine neuen Funken"-Karte schneidet bei großen
+Schriftgrößen keine Buchstaben mehr ab; der Entdecken-Hinweis sagt jetzt
+„Funke" statt „Match".
+
 
 - **Einrichtung nur noch per Button**: Swipen zwischen den Schritten ist
   deaktiviert. Die Buttons führen die nötigen Prüfungen und Speicherungen

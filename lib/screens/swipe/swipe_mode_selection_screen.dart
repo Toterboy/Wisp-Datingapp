@@ -86,7 +86,7 @@ class SwipeModeSelectionScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Fotos siehst du erst, wenn du das Kennenlern-Quiz nach '
-                    'einem Match bestehst. Bis dahin zählt, was jemand über '
+                    'einem Funke bestehst. Bis dahin zählt, was jemand über '
                     'sich erzählt.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onPrimaryContainer,

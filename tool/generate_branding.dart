@@ -3,73 +3,25 @@ import 'dart:math' as math;
 
 import 'package:image/image.dart' as img;
 
-/// Erzeugt aus dem runden WispDating-Logos
-/// (`assets/images/wispdating_logo_round.png`):
+/// Erzeugt die Android-Branding-Assets aus dem WispDating-Basis-Icon
+/// (`assets/images/wispdating_icon_base.png`, EINZIGE Logo-Quelle):
 ///
-///  1. `splash_raw.png` (day + night) in allen Android-Dichteordnern.
-///     Night: Hintergrund ~15 % abgedunkelt, weiße Schrift bleibt weiß.
-///  2. `wisp_icon_foreground.png` – Adaptive-Icon-Foreground (Safe-Zone).
-///  3. `drawable/notification_icon.png` – 96 px, weiß + Alpha (Android-
+///  1. `wisp_icon_foreground.png` – Adaptive-Icon-Foreground (Safe-Zone).
+///  2. `drawable/notification_icon.png` – 96 px, weiß + Alpha (Android-
 ///     Statusleiste): helle Elemente des Logos werden weiß, der Rest
 ///     transparent. Fällt auf eine volle Kreissilhouette zurück, wenn zu
 ///     wenige helle Pixel gefunden werden.
 ///
+/// (Der native Splash wird separat von `tool/generate_splash_images.dart`
+/// + `flutter_native_splash:create` erzeugt - ebenfalls aus dem Basis-Icon.)
+///
 /// Aufruf: dart run tool/generate_branding.dart
 void main() {
-  const roundPath = 'assets/images/wispdating_logo_round.png';
+  const roundPath = 'assets/images/wispdating_icon_base.png';
   final src = img.decodePng(File(roundPath).readAsBytesSync());
   if (src == null) throw Exception('$roundPath konnte nicht gelesen werden');
 
-  // ---- 1) Splash day + night -------------------------------------------
-  final splashDay = img.copyResize(
-    src,
-    width: 670,
-    height: 670,
-    interpolation: img.Interpolation.cubic,
-  );
-  final splashBytes = img.encodePng(splashDay);
-
-  final night = img.Image.from(splashDay);
-  for (final p in night) {
-    if (p.a == 0) continue;
-    final isNearWhite = p.r > 235 && p.g > 235 && p.b > 235;
-    if (!isNearWhite) {
-      p.setRgba(
-        (p.r * 0.85).round(),
-        (p.g * 0.85).round(),
-        (p.b * 0.85).round(),
-        p.a,
-      );
-    }
-  }
-  final splashNightBytes = img.encodePng(night);
-
-  final dayDirs = <String>[
-    'android/app/src/main/res/drawable',
-    'android/app/src/main/res/drawable-hdpi',
-    'android/app/src/main/res/drawable-mdpi',
-    'android/app/src/main/res/drawable-v21',
-    'android/app/src/main/res/drawable-xhdpi',
-    'android/app/src/main/res/drawable-xxhdpi',
-    'android/app/src/main/res/drawable-xxxhdpi',
-  ];
-  for (final dir in dayDirs) {
-    File('$dir/splash_raw.png').writeAsBytesSync(splashBytes);
-  }
-  final nightDirs = <String>[
-    'android/app/src/main/res/drawable-night',
-    'android/app/src/main/res/drawable-night-hdpi',
-    'android/app/src/main/res/drawable-night-mdpi',
-    'android/app/src/main/res/drawable-night-v21',
-    'android/app/src/main/res/drawable-night-xhdpi',
-    'android/app/src/main/res/drawable-night-xxhdpi',
-    'android/app/src/main/res/drawable-night-xxxhdpi',
-  ];
-  for (final dir in nightDirs) {
-    File('$dir/splash_raw.png').writeAsBytesSync(splashNightBytes);
-  }
-
-  // ---- 2) Adaptive-Icon-Foreground (Safe-Zone ~66 %) --------------------
+  // ---- 1) Adaptive-Icon-Foreground (Safe-Zone ~66 %) --------------------
   const fgSize = 1024;
   final fgContent = (fgSize * 0.66).round();
   final fgScaled = img.copyResize(
@@ -86,7 +38,11 @@ void main() {
   File('assets/images/wisp_icon_foreground.png')
       .writeAsBytesSync(img.encodePng(fg));
 
-  // ---- 3) Notification-Icon (weiß + Alpha, 96 px) -----------------------
+  // ---- 2) Notification-Icon (weiß + Alpha, 96 px, RUND) ------------------
+  // Android zeigt das Small Icon in der Statusleiste als Silhouette.
+  // Damit dort garantiert ein KREIS erscheint (statt eines Vierecks),
+  // wird die Silhouette nach der Helligkeits-Extraktion zusätzlich
+  // kreisförmig maskiert.
   const nSize = 96;
   final n = img.Image(width: nSize, height: nSize);
   var whitePixels = 0;
@@ -104,18 +60,24 @@ void main() {
       whitePixels++;
     }
   }
-  // Fallback: zu wenig hell -> volle Kreissilhouette.
-  if (whitePixels < 400) {
-    for (final p in n) {
-      final dx = p.x + 0.5 - nSize / 2;
-      final dy = p.y + 0.5 - nSize / 2;
-      p.setRgba(255, 255, 255, 255);
-      if (math.sqrt(dx * dx + dy * dy) > nSize / 2 - 2) p.a = 0;
+  // Kreismaske: Alles außerhalb des Inkreises transparent. Ersetzt auch
+  // den früheren „zu wenig hell"-Fallback (der ein volles Quadrat füllte
+  // -> Viereck in der Statusleiste).
+  for (final p in n) {
+    final dx = p.x + 0.5 - nSize / 2;
+    final dy = p.y + 0.5 - nSize / 2;
+    final dist = math.sqrt(dx * dx + dy * dy);
+    if (dist > nSize / 2 - 1) {
+      p.a = 0;
+    } else if (dist > nSize / 2 - 3) {
+      // Weiche Kante (2 px) zum Kreisrand.
+      final fade = ((nSize / 2 - 1 - dist) / 2).clamp(0.0, 1.0);
+      p.a = (p.a * fade).round().clamp(0, 255);
     }
   }
   File('android/app/src/main/res/drawable/notification_icon.png')
       .writeAsBytesSync(img.encodePng(n));
 
-  stdout.writeln('Branding erzeugt: Splash day/night (${dayDirs.length + nightDirs.length} '
-      'Dateien), Foreground, Notification-Icon (weiss=$whitePixels px)');
+  stdout.writeln('Branding erzeugt (Quelle: wispdating_icon_base.png): '
+      'Adaptive-Foreground, Notification-Icon (weiss=$whitePixels px)');
 }

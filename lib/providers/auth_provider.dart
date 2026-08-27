@@ -171,32 +171,48 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // Profil laden. Ein Timeout/Netzfehler wirft und behält die Session
       // (kein fälschlicher Logout) – nur ein SAUBERES "keine Zeile" bei
       // vorhandener Session bedeutet: Account wurde serverseitig gelöscht.
-      // Kurzes Timeout, damit der Router beim Start nicht lange auf dem
-      // Lade-Screen hängt.
-      final profile = await database
-          .fetchOwnProfile()
-          .timeout(const Duration(seconds: 3));
-      if (profile == null) {
-        // Nur die SESSION verwerfen - lokale Daten (Profil, Einstellungen,
-        // Praeferenzen) bleiben als Cache erhalten. Vorher wurden sie hier
-        // komplett geloescht, was bei einem falsch-negativ (z. B. RLS-
-        // Strohfeuer) den Nutzer alles neu eingeben liess. Nach erneutem
-        // Login liefert der Server das Profil ohnehin wieder.
-        debugPrint(
-          '[AuthNotifier] Profil fehlt trotz Session - Session wird '
-          'verworfen (lokale Daten bleiben erhalten).',
-        );
-        await _auth.logout();
-        _ref.read(pendingVerificationEmailProvider.notifier).state = null;
-        _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
-        state = const AsyncValue.data(false);
-        return;
+      // Eigener try-Block: Ein transienter Profil-Fehler darf den
+      // Setup-Flags-Fetch (unten) nicht überspringen - sonst erscheint die
+      // Einrichtung nach Neuinstallation erneut, obwohl der Server sie als
+      // abgeschlossen hat.
+      try {
+        final profile = await database
+            .fetchOwnProfile()
+            .timeout(const Duration(seconds: 5));
+        if (profile == null) {
+          // Nur die SESSION verwerfen - lokale Daten (Profil, Einstellungen,
+          // Praeferenzen) bleiben als Cache erhalten. Vorher wurden sie hier
+          // komplett geloescht, was bei einem falsch-negativ (z. B. RLS-
+          // Strohfeuer) den Nutzer alles neu eingeben liess. Nach erneutem
+          // Login liefert der Server das Profil ohnehin wieder.
+          debugPrint(
+            '[AuthNotifier] Profil fehlt trotz Session - Session wird '
+            'verworfen (lokale Daten bleiben erhalten).',
+          );
+          await _auth.logout();
+          _ref.read(pendingVerificationEmailProvider.notifier).state = null;
+          _ref
+              .read(pendingVerificationCredentialsProvider.notifier)
+              .state = null;
+          state = const AsyncValue.data(false);
+          return;
+        }
+        _profileNotifier.setProfile(profile);
+      } catch (e) {
+        debugPrint('[AuthNotifier] Profil-Fetch fehlgeschlagen: $e');
       }
-      _profileNotifier.setProfile(profile);
 
-      final flags = await database
-          .fetchSetupFlags()
-          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+      // Setup-Flags in EIGENEM try-Block mit Retry holen: Früher sprang ein
+      // transienter Fehler (3-s-Timeout im Mobilnetz) in den äußeren catch
+      // und die Einrichtung erschien nach Neuinstallation erneut, obwohl
+      // der Server sie als abgeschlossen hatte. Der Flags-Fetch darf auch
+      // durch einen Profil-Fehler NICHT übersprungen werden.
+      Map<String, dynamic>? flags;
+      try {
+        flags = await database.fetchSetupFlagsWithRetry();
+      } catch (e) {
+        debugPrint('[AuthNotifier] Setup-Flags-Fetch fehlgeschlagen: $e');
+      }
       if (flags != null) {
         await _ref.read(settingsProvider.notifier).syncSetupFlagsFromServer(
               oneTimeSettingsCompleted:
@@ -220,11 +236,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
               (s.communityGuidelinesAccepted &&
                   flags['community_guidelines_accepted'] != true)) {
             try {
-              await database.updateOwnProfile({
+              await database.updateSetupFlagsAndVerify({
                 'one_time_settings_completed': s.oneTimeSettingsCompleted,
                 'community_guidelines_accepted': s.communityGuidelinesAccepted,
               });
-             } catch (e) {
+            } catch (e) {
               debugPrint('[AuthNotifier] Setup-Flags-Nachzug fehlgeschlagen: $e');
             }
           }

@@ -50,7 +50,11 @@ class NotificationService {
       // Fallback: UTC bleibt aktiv.
     }
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    // Small Icon: rundes notification_icon (drawable) statt ic_launcher -
+    // das Launcher-Icon ist ein voll opakes Adaptive-Icon und erscheint
+    // in der Statusleiste als VIERECK. Die rund maskierte Silhouette
+    // (tool/generate_branding.dart) bleibt in der Statusleiste ein Kreis.
+    const androidSettings = AndroidInitializationSettings('notification_icon');
     const iosSettings = DarwinInitializationSettings(
       requestSoundPermission: true,
       requestBadgePermission: true,

@@ -3,16 +3,18 @@ import 'dart:math' as math;
 
 import 'package:image/image.dart' as img;
 
-/// Erzeugt alle Logos aus dem neuen WispDating-Basis-Icon
-/// (`assets/images/wispdating_icon_base.png`):
+/// Erzeugt das runde WispDating-Logo aus dem Basis-Icon
+/// (`assets/images/wispdating_icon_base.png`, EINZIGE Logo-Quelle):
 ///
-///  1. `wisp_icon_round.png`      – rundes App-Logo. Der Zoombasiert auf
-///     dem größten um den Mittelpunkt liegenden opaken Kreis des Artworks:
-///     keine transparenten Ecken, aber minimal möglicher Zuschnitt, damit
+///  1. `wispdating_logo_round.png`      – rundes App-Logo (Launcher,
+///     pubspec/flutter_launcher_icons). Zoom basiert auf dem größten
+///     um den Mittelpunkt liegenden opaken Kreis des Artworks: keine
+///     transparenten Ecken, aber minimal möglicher Zuschnitt, damit
 ///     der Schriftzug vollständig lesbar bleibt.
-///  2. `wisp_icon_round_dark.png` – Hintergrund ~12 % abgedunkelt.
-///  3. `wisp_icon_foreground.png` – Adaptive-Icon-Foreground (Safe-Zone).
-///  4. `splash_raw.png` in allen Android-Dichteordnern (day + night).
+///  2. `wispdating_logo_round_dark.png` – Hintergrund ~12 % abgedunkelt.
+///
+/// Splash-/Foreground-/Notification-Assets werden aus derselben Quelle
+/// von `tool/generate_branding.dart` erzeugt.
 ///
 /// Aufruf: dart run tool/generate_round_logo.dart
 void main(List<String> args) {
@@ -142,7 +144,8 @@ void main(List<String> args) {
     }
   }
 
-  File('assets/images/wisp_icon_round.png').writeAsBytesSync(img.encodePng(round));
+  File('assets/images/wispdating_logo_round.png')
+      .writeAsBytesSync(img.encodePng(round));
 
   // Dark: Hintergrund-Motive ~12 % abgedunkelt; nahe-weiße Design-Elemente
   // (Schriftzug/Herz) bleiben weiß.
@@ -159,82 +162,9 @@ void main(List<String> args) {
       );
     }
   }
-  File('assets/images/wisp_icon_round_dark.png')
+  File('assets/images/wispdating_logo_round_dark.png')
       .writeAsBytesSync(img.encodePng(dark));
 
-  // ---- 3) Adaptive-Icon-Foreground (Safe-Zone ~66 %) --------------------
-  const fgSize = 1024;
-  final fgContent = (fgSize * 0.66).round();
-  final fgScaled = img.copyResize(
-    square,
-    width: fgContent,
-    height: fgContent,
-    interpolation: img.Interpolation.cubic,
-  );
-  final fg = img.Image(width: fgSize, height: fgSize);
-  final fgOff = (fgSize - fgContent) ~/ 2;
-  for (final p in fgScaled) {
-    fg.setPixel(p.x + fgOff, p.y + fgOff, p);
-  }
-  File('assets/images/wisp_icon_foreground.png')
-      .writeAsBytesSync(img.encodePng(fg));
-
-  // ---- 4) Native Splash (day + night) -----------------------------------
-  final splashDay = img.copyResize(
-    round,
-    width: 670,
-    height: 670,
-    interpolation: img.Interpolation.cubic,
-  );
-  final splashBytes = img.encodePng(splashDay);
-
-  final splashNightSrc = img.Image.from(round);
-  for (final p in splashNightSrc) {
-    if (p.a == 0) continue;
-    final isNearWhite = p.r > 235 && p.g > 235 && p.b > 235;
-    if (!isNearWhite) {
-      p.setRgba(
-        (p.r * 0.82).round(),
-        (p.g * 0.82).round(),
-        (p.b * 0.82).round(),
-        p.a,
-      );
-    }
-  }
-  final splashNight = img.copyResize(
-    splashNightSrc,
-    width: 670,
-    height: 670,
-    interpolation: img.Interpolation.cubic,
-  );
-  final splashNightBytes = img.encodePng(splashNight);
-
-  final dayDirs = <String>[
-    'android/app/src/main/res/drawable',
-    'android/app/src/main/res/drawable-hdpi',
-    'android/app/src/main/res/drawable-mdpi',
-    'android/app/src/main/res/drawable-v21',
-    'android/app/src/main/res/drawable-xhdpi',
-    'android/app/src/main/res/drawable-xxhdpi',
-    'android/app/src/main/res/drawable-xxxhdpi',
-  ];
-  for (final dir in dayDirs) {
-    File('$dir/splash_raw.png').writeAsBytesSync(splashBytes);
-  }
-  final nightDirs = <String>[
-    'android/app/src/main/res/drawable-night',
-    'android/app/src/main/res/drawable-night-hdpi',
-    'android/app/src/main/res/drawable-night-mdpi',
-    'android/app/src/main/res/drawable-night-v21',
-    'android/app/src/main/res/drawable-night-xhdpi',
-    'android/app/src/main/res/drawable-night-xxhdpi',
-    'android/app/src/main/res/drawable-night-xxxhdpi',
-  ];
-  for (final dir in nightDirs) {
-    File('$dir/splash_raw.png').writeAsBytesSync(splashNightBytes);
-  }
-
-  stdout.writeln('Logos erzeugt: round ${round.width}px, '
-      'foreground ${fgSize}px, zoom=${zoom.toStringAsFixed(3)}, '
-      '${dayDirs.length + nightDirs.length} Splash-Dateien');
+  stdout.writeln('Rundes Logo erzeugt: ${round.width}px '
+      '(Quelle: wispdating_icon_base.png), zoom=${zoom.toStringAsFixed(3)}');
 }

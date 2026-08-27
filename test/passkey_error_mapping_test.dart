@@ -65,6 +65,16 @@ void main() {
       expect(e.message, contains('Richte zuerst einen'));
     });
 
+    test('captcha_verification_failed wird eigenstaendig erklaert', () {
+      final e = PasskeyAuth.explainError(
+        'AuthApiException(captcha_verification_failed): 400',
+        login: true,
+      );
+      expect(e.message, contains('Sicherheitscheck'));
+      // Nicht die generische Server-Ablehnungs-Meldung.
+      expect(e.message, isNot(contains('Supabase-Einstellungen')));
+    });
+
     test('unbekannter Fehler bleibt im Release generisch (kein Leak)', () {
       final e = PasskeyAuth.explainError(
         'CreatePublicKeyCredentialDomException: internals xyz=secret',

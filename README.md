@@ -25,8 +25,8 @@ WispDating ist für Android konzipiert (iOS/Web/Desktop folgen) und basiert auf 
 
 | Variante | Datei | Push |
 | --- | --- | --- |
-| Standard (empfohlen) | `WispDating-v0.6.0-play.apk` | Firebase/FCM |
-| Google-frei (F-Droid-Stil) | `WispDating-v0.6.0-fdroid.apk` | optional via UnifiedPush |
+| Standard (empfohlen) | `WispDating-v0.7.1-play.apk` | Firebase/FCM |
+| Google-frei (F-Droid-Stil) | `WispDating-v0.7.1-fdroid.apk` | optional via UnifiedPush |
 
 Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/releases). Hinweis: Beide Varianten nutzen dieselbe App-ID und können nicht parallel installiert werden.
 
@@ -125,7 +125,7 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 - **Lokale Speicherung**: Tokens und profilbezogene PII ausschließlich im Keystore/Keychain (`flutter_secure_storage`), Hive-Daten AES-verschlüsselt, Cloud-Backups deaktiviert (`allowBackup=false`)
 - **Härtete SQL-Schicht**: RLS auf allen Tabellen, SECURITY DEFINER-Funktionen mit gehärtetem `search_path`, Blockier-Prüfung bei Likes, Rate-limited Existenzabfragen
 - **Release-Signierung**: Build bricht fehl, wenn kein Keystore konfiguriert ist (kein stiller Debug-Fallback)
-- **Bild-Schutz**: eingehende Chat-Bilder standardmäßig verpixelt, Freischaltung nur nach Bestätigung; Meldungen landen in einer manuellen Moderations-Warteschlange
+- **Bild-Schutz**: eingehende Chat-Bilder standardmäßig verpixelt, Freischaltung nur nach Bestätigung. **Meldung mit KI-Vorprüfung:** Chat-Bilder werden nie automatisch gescannt - erst eine Meldung des Empfängers prüft exakt dieses eine Bild per NSFW-KI (Edge Function `report-image`). Der Meldende sieht das KI-Ergebnis sofort; bei Bestätigung (oder nach Eskalation durch den Meldenden) erhalten Bild, Report und KI-Ergebnis das Team automatisch per E-Mail
 - **Verschlüsseltes Key-Backup**: die Signal-Identität wird passwortbasiert gesichert (PBKDF2 + AES-256-GCM, frische IVs) – der Server sieht das Backup nie unverschlüsselt
 - **Pseudonymisierung**: Reporter-IDs werden gehasht (SHA-256), kein PII in lokalen Hive-Keys
 - **Serverzeit** als Single Source of Truth für die Dating Hour (Anti-Cheat gegen Manipulation der Geräteuhr); Warn-Banner im Event-Screen bei unverifizierter Serverzeit
@@ -153,7 +153,7 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 | Peer-to-Peer         | WebRTC (`flutter_webrtc`)                          |
 | Authentisierung      | Passkeys (`passkeys`), TOTP-Zweitfaktor (Supabase MFA), Firebase Cloud Messaging (nur `play`-Variante) |
 | Push (Google-frei)   | UnifiedPush (`unifiedpush`, F-Droid-Variante)      |
-| Moderation           | Hugging Face Inference (EU-Router)                 |
+| Moderation           | NSFW-Klassifikator via Hugging-Face-Inference (nur melde-basiert, Edge Function) |
 | Medien               | `image_picker`, `image_cropper`, `camera`, `video_player`, `record`, `just_audio` |
 | Scannen/QR           | `mobile_scanner`, `qr_flutter`                     |
 | Teilen               | `share_plus`                                       |
@@ -165,10 +165,11 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 
 ## Hinweis zum Entwicklungsstand
 
-Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.6.0). Folgende Bereiche sind noch nicht final:
+Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.7.1). Folgende Bereiche sind noch nicht final:
 
 - **Automatischer Gesichtsabgleich** (Profilbild vs. Verifizierungs-Video) → z. B. selbstgehostete Open-Source-Modelle wie DeepStack oder Face Recognition (selbst gehostet, datenschutzfreundlich, EU-fähig)
-- **NSFW-Foto-Moderation** – *teilweise umgesetzt*: Der Schutz läuft aktuell über den Bild-Blur im Chat plus Meldungen, die der Support manuell prüft. Die automatische Prüfung über ein Hugging-Face-Modell ist vorbereitet, aber standardmäßig deaktiviert (serverseitige Edge Function mit `HF_API_TOKEN` fehlt noch). Eine automatische Account-Sperre bei Wiederholungsverstößen ist vorgesehen, wird aktuell aber manuell ausgesprochen.
+- **NSFW-Bild-Moderation** – *melde-basiert umgesetzt*: Chat-Bilder werden nie beim Senden gescannt (E2E), sondern erst bei einer Meldung durch den Empfänger automatisch per NSFW-KI geprüft (Edge Function `report-image`, NSFW-Klassifikator; `HF_API_TOKEN` als Function-Secret konfigurierbar). Der Meldende erhält das KI-Ergebnis direkt und kann bei Widerspruch manuell eskalieren - in beiden Fällen gehen Bild, Report und KI-Ergebnis per E-Mail an das Team. **Noch offen:** automatische Profilbild-Prüfung beim Upload und automatische Account-Sperre bei Wiederholungsverstößen (derzeit manuell).
+- **Applogo & Branding** – *in Arbeit*: Alle Assets stammen aus einer einzigen Quelldatei (`wispdating_icon_base.png`); Feinschliff (Größen, Masken, Farbwelt-Abstimmung) folgt.
 - **Fake-Account-Erkennung per Standort** – *teilweise umgesetzt*: Vorhanden sind Datenmodell und Manipulationsschutz (Verifizierungs-Felder sind clientseitig nicht schreibbar), Edge Functions mit Plausibilitätsprüfung (unrealistische Positionswechsel >15 km bzw. >300 km/h werden als verdächtig markiert) und eine lokale verschlüsselte Speicherung. **Noch offen:** der serverseitige Abgleich, ob an derselben Position bereits andere Accounts existieren, die Validierung von GPS gegen das angegebene Bundesland/Land, eine Admin-Ansicht zur Prüfung markierter Accounts sowie Konsequenzen (z. B. Einschränkungen bei Verdacht).
 
 ---

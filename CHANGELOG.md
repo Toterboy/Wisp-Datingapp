@@ -13,6 +13,20 @@ Polish- und Fix-Release zu 0.7.0 (das nie veröffentlicht wurde): Sprach-
 Complettierung, Farbwelt-Rahmen, App-Start-Logo, 2FA-Navigation und
 Passkey-Konfiguration.
 
+### Hinzugefügt
+
+- **Bild-Meldung mit KI-Vorprüfung (NSFW, melde-basiert)**: Chat-Bilder
+  werden bewusst NIE automatisch beim Senden gescannt (E2E). Erst eine
+  Meldung durch den Empfänger prüft exakt dieses eine Bild automatisch
+  per NSFW-KI (neue Edge Function `report-image`, NSFW-Klassifikator,
+  Token nur als Function-Secret). Der Meldende sieht das KI-Ergebnis
+  SOFORT: Bestätigt die KI, gehen Bild, Report und KI-Ergebnis
+  automatisch per E-Mail an das Team. Widerspricht die KI, kann der
+  Meldende (falls die KI falsch liegt) eine manuelle Prüfung veranlassen -
+  auch dann gehen Bild, Report und KI-Ergebnis an das Team. Migration
+  064 erweitert photo_moderation um Reporter-/Eskalations-Spalten.
+  Der frühere (deaktivierte) Auto-Scan beim Senden wurde entfernt
+
 ### Behoben
 
 - **Doppelte Registrierung abgefangen**: Supabase meldet bei bereits
@@ -43,6 +57,11 @@ Passkey-Konfiguration.
   (doppelter, gleichzeitiger GPS-Aufruf durch Text-Validierung); der
   Start-Thumb der Altersspanne rutschte außerdem bei jedem Neuaufbau
   auf 16 zurück
+- **Benachrichtigungs-Icon in der Statusleiste rund statt Viereck**:
+  Das Small-Icon nutzte das voll opake Launcher-Icon; jetzt die rund
+  maskierte Silhouette (drawable/notification_icon.png)
+- **„Keine neuen Funken"-Karte**: Abgeschnittene Buchstaben bei großen
+  Systemschriften behoben (Kanten-Clipping der Card deaktiviert)
 - **Audio-Vorstellung**: Erneutes Hochladen schlug mit StorageException
   409 "Duplicate" fehl - jetzt mit Upsert
 - **App-Start-Logo**: Es wurde das runde Benachrichtigungs-Icon statt des
@@ -62,9 +81,51 @@ Passkey-Konfiguration.
   und vom nächsten Server-Sync (fetchOwnProfile) mit leer überschrieben.
   Jetzt wird der Ortsname lokal im Profil UND serverseitig persistiert
   (sowie die GPS-Koordinaten weiterhin via process-location-check)
+- **Passkey-Login mit aktiver CAPTCHA**: Der Server verlangt bei
+  aktivierter Dashboard-CAPTCHA auch für den Passkey-Login ein Token -
+  die App rief die Zeremonie aber ohne Token auf, und GoTrue lehnte mit
+  "Server hat die Passkey-Anfrage abgelehnt" ab (noch vor dem Biometrie-
+  Dialog). Jetzt erscheint - wie beim Passwort-Login - zuerst der
+  Sicherheitscheck; zusätzlich bekommt der Abbruch-/Ablauf-Fall eine
+  eigene, verständliche Meldung
+- **Einrichtung erscheint nach Neuinstallation nicht mehr erneut
+  (Zuverlässigkeit)**: Zwei Lücken geschlossen. (1) Beim Login nach
+  Neuinstallation wurden die serverseitigen Setup-Flags mit hartem
+  3-Sekunden-Timeout und OHNE Retry geholt - ein transienter
+  Netzfehler ließ die Einrichtung wieder erscheinen, obwohl der Server
+  sie als abgeschlossen hatte; außerdem übersprang ein Profil-Fehler
+  den Flags-Fetch komplett. Flags werden jetzt entkoppelt mit 3
+  Versuchen (8 s Timeout) geholt. (2) Beim Abspeichern des
+  Einrichtungs-Stands galt ein stiller 0-Zeilen-Update als "Erfolg";
+  jetzt wird nach dem Schreiben zurückgelesen und bei Abweichung
+  retries, und auch der Persönlichkeitstest meldet einen Fehlschlag
+  sichtbar statt fire-and-forget
 
 ### Geändert
 
+- **Applogo: EINZIGE Quelle `wispdating_icon_base.png`**: Launcher-Icons
+  (rund, Light/Dark), Adaptive-Icon-Foreground, native Splash-Bilder und
+  Notification-Icon werden jetzt ausnahmslos aus dem Basis-Icon generiert
+  (verwaiste/veraltete Logo-Assets entfernt; Welcome-Screen precachte noch
+  ein nicht mehr vorhandenes Asset). HINWEIS: Das Applogo und dessen
+  Implementierung sind noch IN ARBEIT - Feinschliff (Größen, Masken,
+  Farbwelten) folgt
+- **Einstellungen: Sprachfeld aufklappbar** - statt eines kleinen Icons
+  ist das gesamte Feld „Sprache" bedienbar und klappt nach unten auf
+  (Sprachwahl per Radio-Liste)
+- **Login: Sprach-Icon mit Kreis-Hintergrund** in `primaryContainer` -
+  hebt sich damit in jedem Theme (Light/Dark, alle Farbwelten) klar ab
+- **Einstellungen: „Account löschen" entfernt** (existiert vollständig
+  unter Datenschutz & Account; der 2FA-Step-up vor der Löschung ist
+  dorthin mitgezogen). Die Passkey-Diagnose ist jetzt ein reines
+  Debug-Werkzeug und für Endnutzer nicht mehr sichtbar
+- **Datenschutz & Account**: Auftragsverarbeiter aktualisiert - Brevo
+  (Transaktions-E-Mails), Cloudflare (CAPTCHA/TURN) und Netlify (Auth-/
+  CAPTCHA-Seite) ergänzt, Hugging Face entfernt (unbenutzt). Unter
+  „Einwilligungen" führen jetzt Buttons direkt zu den System-Einstellungen
+  (Standortfreigabe) bzw. App-Einstellungen (Push)
+- **Einstellungen & Datenschutz komplett zweisprachig** (DE/EN): Alle
+  sichtbaren Listen-Texte der beiden Screens sind übersetzt
 - **Einrichtung: Swipen deaktiviert** - nur die Buttons führen die
   pro Schritt erforderliche Validierung/Speicherung aus; vorher konnten
   per Swipe Schritte übersprungen werden, wodurch Angaben nicht ins
@@ -83,6 +144,8 @@ Passkey-Konfiguration.
   Geschlecht bei Registrierung, Beziehungsart/Filter/Bundesland in der
   Einrichtung
 - Texte: keine Gedankenstriche mehr in Nutzersichtbaren Sätzen
+- Entdecken-Hinweis: „nach einem Funke bestehst" statt „nach einem
+  Match bestehst" (Konsistenz zur Funke-Benennung)
 - Interne Aufräumarbeiten (Verschlüsselungs-Review): Signal-Skalar-
   Metadaten (Registrierungs-ID, PreKey-Cursor, aktiver SignedPreKey)
   liegen jetzt in einer eigenen verschlüsselten Box statt zweckentfremdet

@@ -20,6 +20,9 @@ project_id = "jftuigjbmmuvrckbchqo"
 [functions.process-location-check]
 verify_jwt = true
 
+[functions.report-image]
+verify_jwt = true
+
 [functions.delete-account]
 verify_jwt = true
 

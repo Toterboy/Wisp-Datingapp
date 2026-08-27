@@ -421,18 +421,20 @@ class _SettingsPrivacyOnceScreenState
     }
   }
 
-  /// Schreibt die Setup-Flags in die profiles-Tabelle.
+  /// Schreibt die Setup-Flags in die profiles-Tabelle und verifiziert das
+  /// Ergebnis per Zurücklesen (stille 0-Zeilen-Updates und transiente
+  /// Netzfehler werden dadurch erkennbar und retries).
   /// Rückgabe: true bei Erfolg (false = fehlgeschlagen, Aufrufer zeigt
   /// einen Hinweis).
   Future<bool> _persistSetupFlagsToServer() async {
     if (!SupabaseService.isInitialized) return true;
     try {
       final settings = ref.read(settingsProvider);
-      await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+      return await SupabaseDatabaseService(SupabaseService.client)
+          .updateSetupFlagsAndVerify({
         'one_time_settings_completed': settings.oneTimeSettingsCompleted,
         'community_guidelines_accepted': settings.communityGuidelinesAccepted,
       });
-      return true;
     } catch (e) {
       debugPrint('[SettingsPrivacyOnce] Server-Flags fehlgeschlagen: $e');
       return false;

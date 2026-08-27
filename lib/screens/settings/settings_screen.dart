@@ -88,10 +88,10 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Einstellungen'),
+        title: Text(L10n.t(context, 'settings.title')),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          tooltip: 'Zurück',
+          tooltip: L10n.t(context, 'common.back'),
           // P: Zurück zum aufrufenden Screen (Profil/Aktuelles). Falls die
           // Einstellungen direkt (z. B. Deep-Link) geöffnet wurden, fallback
           // auf "Aktuelles".
@@ -108,7 +108,7 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 16),
-          const _SectionTitle('Privatsphäre'),
+          _SectionTitle(L10n.t(context, 'settings.privacySection')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -116,7 +116,7 @@ class SettingsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Wer kann mein Profil sehen?',
+                    L10n.t(context, 'settings.whoCanSee'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -130,18 +130,16 @@ class SettingsScreen extends ConsumerWidget {
                       },
                     ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Deine Daten werden nur lokal auf diesem Gerät '
-                    'gespeichert. Es werden keine unnötigen Berechtigungen '
-                    'angefordert.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  Text(
+                    L10n.t(context, 'settings.localDataNote'),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
-          const _SectionTitle('Community & Sicherheit'),
+          _SectionTitle(L10n.t(context, 'settings.communitySafety')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -150,8 +148,9 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.gavel),
-                    title: const Text('Community Regeln'),
-                    subtitle: const Text('Respektvoller Umgang & Verhaltensregeln'),
+                    title: Text(L10n.t(context, 'settings.communityRules')),
+                    subtitle:
+                        Text(L10n.t(context, 'settings.communityRulesSub')),
                     trailing: const Icon(Icons.chevron_right),
                     contentPadding: EdgeInsets.zero,
                     onTap: () => context.push(AppRoutes.communityGuidelines),
@@ -160,9 +159,9 @@ class SettingsScreen extends ConsumerWidget {
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.fingerprint),
-                      title: const Text('Passkey erstellen'),
-                      subtitle: const Text(
-                        'Biometrischer Login (FaceID/TouchID) ohne Passwort',
+                      title: Text(L10n.t(context, 'settings.passkeyCreate')),
+                      subtitle: Text(
+                        L10n.t(context, 'settings.passkeyCreateSub'),
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       contentPadding: EdgeInsets.zero,
@@ -171,8 +170,9 @@ class SettingsScreen extends ConsumerWidget {
                           await PasskeyAuth.register();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Passkey wurde erstellt.'),
+                              SnackBar(
+                                content: Text(L10n.t(
+                                    context, 'settings.passkeyCreated')),
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
@@ -181,7 +181,8 @@ class SettingsScreen extends ConsumerWidget {
                           if (context.mounted) {
                             final msg = e is AppException
                                 ? e.message
-                                : 'Passkey-Erstellung fehlgeschlagen.';
+                                : L10n.t(
+                                    context, 'settings.passkeyFailed');
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(msg),
@@ -195,11 +196,11 @@ class SettingsScreen extends ConsumerWidget {
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.shield_outlined),
-                      title: const Text('Zwei-Faktor-Schutz (2FA)'),
+                      title: Text(L10n.t(context, 'settings.twoFactor')),
                       subtitle: Text(
                         ref.watch(mfaStatusProvider).hasVerifiedFactors
-                            ? 'Aktiv: Login nur mit Authenticator-Code'
-                            : 'Login zusätzlich mit Authenticator-App sichern',
+                            ? L10n.t(context, 'settings.twoFactorActive')
+                            : L10n.t(context, 'settings.twoFactorSetup'),
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       contentPadding: EdgeInsets.zero,
@@ -219,16 +220,15 @@ class SettingsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Push Benachrichtigungen',
+                    L10n.t(context, 'settings.push'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Benachrichtigungen aktivieren'),
-                    subtitle: const Text(
-                      'Nachrichten, Likes, Matches und Event Erinnerungen',
-                    ),
+                    title: Text(L10n.t(context, 'settings.pushEnable')),
+                    subtitle:
+                        Text(L10n.t(context, 'settings.pushEnableSub')),
                     value: settings.notificationsEnabled,
                     onChanged: (v) {
                       notifier.setNotificationsEnabled(v);
@@ -238,8 +238,9 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Neue Funken'),
-                    subtitle: const Text('Wenn ein Funke entsteht'),
+                    title: Text(L10n.t(context, 'settings.notifyFunken')),
+                    subtitle:
+                        Text(L10n.t(context, 'settings.notifyFunkenSub')),
                     value: settings.notifyMatches,
                     onChanged: settings.notificationsEnabled
                         ? (v) {
@@ -250,8 +251,9 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Neue Likes'),
-                    subtitle: const Text('Wenn dich jemand liked'),
+                    title: Text(L10n.t(context, 'settings.notifyLikes')),
+                    subtitle:
+                        Text(L10n.t(context, 'settings.notifyLikesSub')),
                     value: settings.notifyLikes,
                     onChanged: settings.notificationsEnabled
                         ? (v) {
@@ -262,8 +264,9 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Chat Nachrichten'),
-                    subtitle: const Text('Wenn dir jemand schreibt'),
+                    title: Text(L10n.t(context, 'settings.notifyMessages')),
+                    subtitle:
+                        Text(L10n.t(context, 'settings.notifyMessagesSub')),
                     value: settings.notifyMessages,
                     onChanged: settings.notificationsEnabled
                         ? (v) {
@@ -274,8 +277,10 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Dating Hour Erinnerung'),
-                    subtitle: const Text('10 Minuten vor Beginn, wenn du dabei bist'),
+                    title:
+                        Text(L10n.t(context, 'settings.notifyDatingHour')),
+                    subtitle: Text(
+                        L10n.t(context, 'settings.notifyDatingHourSub')),
                     value: settings.notifyDatingHour,
                     onChanged: settings.notificationsEnabled
                         ? (v) {
@@ -299,7 +304,7 @@ class SettingsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Erscheinungsbild',
+                    L10n.t(context, 'settings.appearance'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -310,7 +315,7 @@ class SettingsScreen extends ConsumerWidget {
                     groupValue: settings.useDarkMode == null
                         ? 'system'
                         : (settings.useDarkMode! ? 'dark' : 'light'),
-                    title: 'System',
+                    title: L10n.t(context, 'settings.system'),
                     onChanged: (_) => notifier.setDarkMode(null),
                   ),
                   SelectableTile<String>(
@@ -318,7 +323,7 @@ class SettingsScreen extends ConsumerWidget {
                     groupValue: settings.useDarkMode == null
                         ? 'system'
                         : (settings.useDarkMode! ? 'dark' : 'light'),
-                    title: 'Hell',
+                    title: L10n.t(context, 'settings.light'),
                     onChanged: (_) => notifier.setDarkMode(false),
                   ),
                   SelectableTile<String>(
@@ -326,11 +331,11 @@ class SettingsScreen extends ConsumerWidget {
                     groupValue: settings.useDarkMode == null
                         ? 'system'
                         : (settings.useDarkMode! ? 'dark' : 'light'),
-                    title: 'Dunkel',
+                    title: L10n.t(context, 'settings.dark'),
                     onChanged: (_) => notifier.setDarkMode(true),
                   ),
                   const SizedBox(height: 12),
-                  Text('Farbwelt',
+                  Text(L10n.t(context, 'settings.colors'),
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   ThemePicker(
@@ -353,12 +358,8 @@ class SettingsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SwitchListTile.adaptive(
-                    title: const Text('Bilder verpixelt anzeigen'),
-                    subtitle: const Text(
-                      'Schutz vor unangemessenen Inhalten: Bilder deiner '
-                      'Gegenstelle werden erst nach Bestätigung gezeigt '
-                      '(lang drücken zum Melden).',
-                    ),
+                    title: Text(L10n.t(context, 'settings.blur')),
+                    subtitle: Text(L10n.t(context, 'settings.blurSub')),
                     value: settings.blurChatImages,
                     onChanged: (v) =>
                         ref.read(settingsProvider.notifier).setBlurChatImages(v),
@@ -376,15 +377,11 @@ class SettingsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Verschlüsseltes Key-Backup',
+                  Text(L10n.t(context, 'settings.keyBackup'),
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(
-                    'Sichert die private Identität deiner '
-                    'Ende-zu-Ende-Verschlüsselung (passwortverschlüsselt, '
-                    'AES-256-GCM). Nur damit kannst du nach Gerätewechsel '
-                    'wieder verschlüsselt chatten. Verlust von Backup UND '
-                    'Passwort ist unwiederbringlich.',
+                    L10n.t(context, 'settings.keyBackupSub'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -392,9 +389,9 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   ListTile(
                     leading: const Icon(Icons.download_outlined),
-                    title: const Text('Backup erstellen'),
+                    title: Text(L10n.t(context, 'settings.backupCreate')),
                     subtitle:
-                        const Text('Erzeugt einen verschlüsselten Code'),
+                        Text(L10n.t(context, 'settings.backupCreateSub')),
                     contentPadding: EdgeInsets.zero,
                     onTap: SupabaseService.isInitialized
                         ? () => _createIdentityBackup(context, ref)
@@ -402,23 +399,27 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   ListTile(
                     leading: const Icon(Icons.restore),
-                    title: const Text('Backup wiederherstellen'),
-                    subtitle: const Text(
-                        'Überschreibt die aktuelle E2E-Identität'),
+                    title: Text(L10n.t(context, 'settings.backupRestore')),
+                    subtitle:
+                        Text(L10n.t(context, 'settings.backupRestoreSub')),
                     contentPadding: EdgeInsets.zero,
                     onTap: SupabaseService.isInitialized
                         ? () => _restoreIdentityBackup(context, ref)
                         : null,
                   ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.monitor_heart_outlined),
-                    title: const Text('Passkey-Diagnose'),
-                    subtitle: const Text(
-                        'Prüft Domain-Verknüpfung und Gerät auf Passkey-Tauglichkeit'),
-                    contentPadding: EdgeInsets.zero,
-                    onTap: () => _runPasskeyDiagnostics(context),
-                  ),
+                  // Passkey-Diagnose: Nur im Debug-Build sichtbar
+                  // (Entwickler-Werkzeug, fuer Endnutzer irrelevant).
+                  if (kDebugMode) ...[
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.monitor_heart_outlined),
+                      title: Text(L10n.t(context, 'settings.passkeyDiagnose')),
+                      subtitle: const Text(
+                          'Prüft Domain-Verknüpfung und Gerät auf Passkey-Tauglichkeit'),
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () => _runPasskeyDiagnostics(context),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -433,18 +434,18 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.health_and_safety_outlined),
-                    title: const Text('Safety Center'),
-                    subtitle: const Text(
-                        'Hilfe bei Belästigung oder Stalking, Blockieren, Melden'),
+                    title: Text(L10n.t(context, 'settings.safetyCenter')),
+                    subtitle:
+                        Text(L10n.t(context, 'settings.safetyCenterSub')),
                     trailing: const Icon(Icons.chevron_right),
                     contentPadding: EdgeInsets.zero,
                     onTap: () => context.push(AppRoutes.safetyCenter),
                   ),
                   ListTile(
                     leading: const Icon(Icons.privacy_tip),
-                    title: const Text('Datenschutz & Account'),
-                    subtitle: const Text(
-                        'Gespeicherte Daten, Einwilligungen, Account löschen'),
+                    title: Text(L10n.t(context, 'settings.privacyAccount')),
+                    subtitle: Text(
+                        L10n.t(context, 'settings.privacyAccountSub')),
                     trailing: const Icon(Icons.chevron_right),
                     contentPadding: EdgeInsets.zero,
                     onTap: () => context.push(AppRoutes.privacy),
@@ -455,73 +456,11 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           SecondaryButton(
-            label: 'Abmelden',
+            label: L10n.t(context, 'settings.logout'),
             onPressed: () async {
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) context.go(AppRoutes.login);
             },
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-onPressed: () async {
-              // Step-up (ASVS 7.5.3): Bei aktivem MFA ist vor der
-              // Konto-Löschung eine zusätzliche TOTP-Verifikation nötig –
-              // eine reine Passwort-Session (AAL1) reicht nicht.
-              final mfa = ref.read(mfaStatusProvider);
-              if (mfa.hasVerifiedFactors && mfa.currentAal != 'aal2') {
-                final code = await _promptTotpCode(context);
-                if (code == null || !context.mounted) return; // abgebrochen
-                try {
-                  await MfaService(SupabaseService.client)
-                      .verifyChallenge(code: code);
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Ungültiger oder abgelaufener Code. '
-                          'Die Löschung wurde abgebrochen.',
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                  return;
-                }
-              }
-              if (!context.mounted) return;
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Account löschen?'),
-                  content: const Text(
-                    'Dies löscht deinen Account permanent. '
-                    'Diese Aktion kann nicht rückgängig gemacht werden.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text('Abbrechen'),
-                    ),
-                    FilledButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                      child: const Text('Löschen'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true && context.mounted) {
-                // Löschen + lokale Daten bereinigen. Die Navigation
-                // übernimmt der Router automatisch (Auth-Status wird auf
-                // "ausgeloggt" gesetzt -> Welcome/Login).
-                await ref.read(authProvider.notifier).deleteAccount();
-              }
-            },
-            child: Text(
-              'Account löschen',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
           ),
           const SizedBox(height: 24),
           FutureBuilder<PackageInfo>(
@@ -559,38 +498,6 @@ class _SectionTitle extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Fragt den 6-stelligen TOTP-Code für das Step-up vor der Konto-Löschung
-/// ab. Liefert `null`, wenn der Nutzer abgebrochen hat.
-Future<String?> _promptTotpCode(BuildContext context) {
-  final controller = TextEditingController();
-  return showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Konto bestätigen'),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        keyboardType: TextInputType.number,
-        maxLength: 6,
-        decoration: const InputDecoration(
-          labelText: 'TOTP-Code (Authenticator-App)',
-          counterText: '',
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Abbrechen'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-          child: const Text('Bestätigen'),
-        ),
-      ],
-    ),
-  );
 }
 
 
@@ -849,12 +756,11 @@ class _UnifiedPushTileState extends ConsumerState<_UnifiedPushTile> {
     final enabled = _enabled ?? false;
     return SwitchListTile.adaptive(
       contentPadding: EdgeInsets.zero,
-      title: const Text('Push ohne Google (UnifiedPush)'),
+      title: Text(L10n.t(context, 'settings.unifiedPush')),
       subtitle: Text(
         enabled
-            ? 'Aktiv - Endpunkt ist hinterlegt.'
-            : 'Ben\u00f6tigt eine Distributor-App wie ntfy '
-                '(F-Droid). FCM bleibt in der Play-Variante aktiv.',
+            ? L10n.t(context, 'settings.unifiedPushOn')
+            : L10n.t(context, 'settings.unifiedPushOff'),
         style: Theme.of(context).textTheme.bodySmall,
       ),
       value: enabled,

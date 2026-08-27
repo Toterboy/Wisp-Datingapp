@@ -132,6 +132,69 @@ class SupabaseDatabaseService {
     return response == null ? null : Map<String, dynamic>.from(response);
   }
 
+  /// [fetchSetupFlags] mit Retry: Nach Neuinstallation/Login entscheidet
+  /// dieses Ergebnis, ob die Einrichtung erneut erscheint. Ein transientes
+  /// Netzwerk-Timeout (Handy-Netz, kalte TLS-Verbindung) darf die Flags
+  /// nicht still als "nicht abgeschlossen" erscheinen lassen.
+  ///
+  /// Liefert `null`, wenn alle Versuche scheitern (Aufrufer fällt auf den
+  /// lokalen Stand zurück).
+  Future<Map<String, dynamic>?> fetchSetupFlagsWithRetry({
+    int attempts = 3,
+  }) async {
+    Object? lastError;
+    for (var i = 0; i < attempts; i++) {
+      if (i > 0) {
+        await Future<void>.delayed(Duration(seconds: 1 * i));
+      }
+      try {
+        final flags = await fetchSetupFlags()
+            .timeout(const Duration(seconds: 8));
+        if (flags != null) return flags;
+        // Sauberes "keine Zeile" (Profil gelöscht): nicht retryen.
+        return null;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError ?? StateError('fetchSetupFlags fehlgeschlagen');
+  }
+
+  /// Schreibt Setup-Flags und VERIFIZIERT das Ergebnis per Zurücklesen.
+  ///
+  /// Hintergrund (Bug "Einrichtung erscheint nach Neuinstallation erneut"):
+  /// Ein PostgREST-UPDATE gilt auch bei 0 betroffenen Zeilen (z. B. RLS-
+  /// Strohfeuer, transientes Netzproblem) als erfolgreich - der Server
+  /// behält `false`, ohne dass der Client einen Fehler sieht. Erst der
+  /// Read-Back macht einen stillen Fehlschlag erkennbar. Bei Abweichung
+  /// wird bis zu [attempts] mal erneut geschrieben.
+  ///
+  /// Rückgabe: true = Flags stehen serverseitig wie gewünscht.
+  Future<bool> updateSetupFlagsAndVerify(
+    Map<String, dynamic> flags, {
+    int attempts = 3,
+  }) async {
+    for (var i = 0; i < attempts; i++) {
+      if (i > 0) {
+        await Future<void>.delayed(Duration(seconds: 1 * i));
+      }
+      try {
+        await updateOwnProfile(Map<String, dynamic>.from(flags));
+        final readBack = await fetchSetupFlags()
+            .timeout(const Duration(seconds: 8));
+        if (readBack == null) continue; // Zeile weg? Erneut versuchen.
+        var allMatch = true;
+        for (final entry in flags.entries) {
+          if (readBack[entry.key] != entry.value) allMatch = false;
+        }
+        if (allMatch) return true;
+      } catch (_) {
+        // Netz-/Serverfehler: nächster Versuch.
+      }
+    }
+    return false;
+  }
+
   /// Holt öffentliche Profile anderer Nutzer (RLS regelt die Sichtbarkeit).
   Future<List<Map<String, dynamic>>> fetchPublicProfiles({int limit = 20}) async {
     final response = await _client

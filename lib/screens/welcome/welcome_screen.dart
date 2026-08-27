@@ -46,9 +46,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Wichtig: exakt DIESELBE Datei precachen, die AppLogo auch anzeigt
-    // (assets/images/wisp_icon_round.png) – sonst erscheinen Logo und Text
-    // nicht gleichzeitig.
-    final imageProvider = const AssetImage('assets/images/wisp_icon_round.png');
+    // (assets/images/wispdating_icon_base.png) – sonst erscheinen Logo und
+    // Text nicht gleichzeitig.
+    final imageProvider =
+        const AssetImage('assets/images/wispdating_icon_base.png');
     _logoReady = precacheImage(imageProvider, context);
   }
 

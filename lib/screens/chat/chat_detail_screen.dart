@@ -18,10 +18,10 @@ import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/screens/chat/call_screen.dart';
+import 'package:wisp/services/image_report_service.dart';
 import 'package:wisp/services/report_service.dart';
 import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/p2p_chat_service.dart';
-import 'package:wisp/services/photo_moderation_service.dart';
 import 'package:wisp/services/prekey_service.dart';
 import 'package:wisp/services/quiz_service.dart';
 import 'package:wisp/services/secure_storage.dart';
@@ -406,8 +406,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
       final rawBytes = await File(picked.path).readAsBytes();
 
-      // Audit M-21: EXIF (GPS, Geräteinfos) VOR Moderation/Versand
-      // entfernen - fail-closed, wenn das Bild nicht re-encodierbar ist.
+      // Audit M-21: EXIF (GPS, Geräteinfos) VOR Versand entfernen -
+      // fail-closed, wenn das Bild nicht re-encodierbar ist.
+      //
+      // KEIN automatischer NSFW-Scan beim Senden (Betreiber-Entscheidung):
+      // Chat-Bilder bleiben unangetastet E2E. Prüfung ausschließlich
+      // melde-basiert (showImageReportDialog -> Edge Function report-image).
       final bytes = stripImageMetadata(
         Uint8List.fromList(rawBytes),
         jpegQuality: 70,
@@ -425,45 +429,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           );
         }
         return;
-      }
-
-      // NSFW-Moderation via Hugging Face API.
-      if (_myUserId != null) {
-        final moderation = ref.read(photoModerationServiceProvider);
-        final result = await moderation.checkNudityContent(
-          userId: _myUserId!,
-          imageBytes: Uint8List.fromList(bytes),
-        );
-
-        if (result.needsReview) {
-          // Timeout: Foto zurückhalten + Hintergrund-Retry (3× in 30s-Abständen).
-          if (mounted) setState(() => _uploadingImage = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Foto wird geprüft. Es wird automatisch '
-                    'gesendet, sobald die Prüfung abgeschlossen ist.'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-          _retryModerationAndSend(bytes, match, _myUserId!);
-          return;
-        }
-
-        if (!result.approved) {
-          if (mounted) setState(() => _uploadingImage = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result.reason ?? 'Foto wurde abgelehnt.'),
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          }
-          return;
-        }
       }
 
       // E2E-verschlüsselt über den DataChannel senden.
@@ -511,68 +476,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
         );
       }
-    }
-  }
-
-  /// Hintergrund-Retry für Moderation nach Timeout: 3 Versuche, 30s Abstand.
-  Future<void> _retryModerationAndSend(
-    List<int> bytes,
-    Match? match,
-    String userId,
-  ) async {
-    const maxRetries = 3;
-    const retryDelay = Duration(seconds: 30);
-
-    for (var attempt = 1; attempt <= maxRetries; attempt++) {
-      await Future<void>.delayed(retryDelay);
-      if (!mounted || match == null) return;
-
-      final moderation = ref.read(photoModerationServiceProvider);
-      final result = await moderation.checkNudityContent(
-        userId: userId,
-        imageBytes: Uint8List.fromList(bytes),
-      );
-
-      if (result.approved) {
-        // Moderation erfolgreich → senden.
-        await _p2p?.sendBinary(Uint8List.fromList(bytes), contentType: 'image/jpeg');
-        final localMsg = Message(
-          id: 'local_img_${DateTime.now().millisecondsSinceEpoch}',
-          senderId: userId,
-          receiverId: match.partner.id,
-          text: '',
-          timestamp: DateTime.now(),
-          mediaUrl: 'data:image/jpeg;base64,${base64Encode(bytes)}',
-          type: MessageType.image,
-        );
-        ref.read(chatProvider.notifier).addMessage(match.id, localMsg, ref: ref);
-        return;
-      }
-
-      if (!result.needsReview) {
-        // Echter NSFW-Fund → endgültig ablehnen.
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result.reason ?? 'Foto wurde abgelehnt.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    // Alle Retries erschöpft → Admin muss prüfen.
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Moderation nicht verfügbar. Ein Admin prüft dein '
-              'Foto. Es wird danach automatisch gesendet.'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 6),
-        ),
-      );
     }
   }
 
@@ -869,19 +772,21 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   /// Meldet ein einzelnes Bild als unangemessenen Inhalt.
   ///
-  /// Der Bildverweis + Chat-Kontext landen in der user_reports-Tabelle
-  /// (Admin-Screen „Meldungen"); die Prüfung erfolgt manuell durch den
-  /// Betreiber. Inhalte selbst bleiben E2E - übertragen wird nur die
-  /// Nachrichtenreferenz, wie bei jeder Meldung transparent im Dialog.
+  /// Chat-Bilder werden bewusst NICHT beim Senden gescannt (E2E). Erst
+  /// die Meldung durch den Empfänger löst die Prüfung aus: Die KI prüft
+  /// das Bild automatisch, der Meldende sieht das Ergebnis sofort und
+  /// kann bei Widerspruch der KI eine manuelle Team-Prüfung veranlassen
+  /// (Bild + Report + KI-Ergebnis gehen ans Team, siehe
+  /// [showImageReportDialog] und Edge Function `report-image`).
   void _reportImage(Message msg) {
     final match = _match;
     if (match == null) return;
-    showReportUserDialog(
+    showImageReportDialog(
       context: context,
       ref: ref,
+      message: msg,
       reportedUserId: match.partner.id,
       reportedUserName: match.partner.name,
-      messages: [msg],
     );
   }
 

@@ -25,12 +25,21 @@ class PasskeyAuth {
   ///
   /// Wirft bei Abbruch (Nutzer) oder Fehler (kein Passkey, Domain-Link
   /// fehlt). Der Aufrufer zeigt eine passende Meldung an.
-  static Future<void> signIn() async {
+  ///
+  /// [captchaToken]: Bei aktivierter Dashboard-CAPTCHA verlangt der Server
+  /// auch für den Passkey-Login ein Token (`/passkeys/authentication/
+  /// options` prüft `gotrue_meta_security`) – ohne Token lehnt er mit
+  /// `captcha_verification_failed` ab, bevor der native Dialog erscheint
+  /// ("Server hat die Passkey-Anfrage abgelehnt").
+  static Future<void> signIn({String? captchaToken}) async {
     if (!SupabaseService.isInitialized) {
       throw AppException('Passkey-Login ist derzeit nicht verfügbar.');
     }
     try {
-      await SupabaseService.client.auth.signInWithPasskey(_authenticator);
+      await SupabaseService.client.auth.signInWithPasskey(
+        _authenticator,
+        captchaToken: captchaToken,
+      );
     } catch (e) {
       throw _explain(e, login: true);
     }
@@ -116,6 +125,12 @@ class PasskeyAuth {
     // ("schlägt direkt fehl"): GoTrue liefert die WebAuthn-Challenge.
     // Typische Ursachen: Passkeys/WebAuthn im Supabase-Dashboard nicht
     // aktiviert oder RP-ID/Origins falsch konfiguriert.
+    if (text.toLowerCase().contains('captcha')) {
+      return AppException(
+        'Der Sicherheitscheck fehlte oder ist abgelaufen. '
+        'Bitte versuche es erneut.',
+      );
+    }
     final isAuthApiError = text.contains('AuthApiException') ||
         RegExp(r'\bstatus: 4\d\d\b').hasMatch(text) ||
         text.toLowerCase().contains('webauthn');

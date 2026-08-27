@@ -497,9 +497,14 @@ class _EmptyStateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      // Clip.none: Bei großen Systemschriften kann die zentrierte Titel-
+      // Zeile minimal über die Glyphen-Box hinausragen - ein Kanten-Clip
+      // der Card würde dann einzelne Buchstaben (z. B. das "n" in
+      // "Keine neuen Funken") abschneiden.
+      clipBehavior: Clip.none,
       color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             Icon(icon, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -508,6 +513,7 @@ class _EmptyStateCard extends StatelessWidget {
               title,
               style: Theme.of(context).textTheme.titleMedium,
               textAlign: TextAlign.center,
+              overflow: TextOverflow.visible,
             ),
             const SizedBox(height: 4),
             Text(

@@ -85,8 +85,23 @@ class _PersonalityTestScreenState
         );
     await ref.read(settingsProvider.notifier).completePersonalityTest();
     // Setup-Stand zusätzlich serverseitig sichern (Einrichtung erscheint
-    // nach Neuinstallation/neuem Login nicht erneut).
-    unawaited(_persistSetupFlagsToServer());
+    // nach Neuinstallation/neuem Login nicht erneut). AWARTEN statt
+    // fire-and-forget: Schlägt das still fehl, erscheint der Test nach der
+    // nächsten Neuinstallation erneut - deshalb bei Misserfolg derselbe
+    // sichtbare Hinweis wie im Einstellungs-Screen.
+    final flagsSaved = await _persistSetupFlagsToServer();
+    if (mounted && !flagsSaved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Hinweis: Der Einrichtungs-Stand konnte nicht auf dem Server '
+            'gesichert werden. Die Einrichtung erscheint beim nächsten '
+            'Login möglicherweise erneut.',
+          ),
+          duration: Duration(seconds: 6),
+        ),
+      );
+    }
     if (mounted) {
       // Ergebnis anzeigen
       await showDialog<void>(        context: context,
@@ -131,15 +146,18 @@ class _PersonalityTestScreenState
     }
   }
 
-  /// Schreibt die Setup-Flags best-effort in die profiles-Tabelle.
-  Future<void> _persistSetupFlagsToServer() async {
-    if (!SupabaseService.isInitialized) return;
+  /// Schreibt den Test-Flag verifiziert in die profiles-Tabelle
+  /// (siehe [SupabaseDatabaseService.updateSetupFlagsAndVerify]).
+  Future<bool> _persistSetupFlagsToServer() async {
+    if (!SupabaseService.isInitialized) return true;
     try {
-      await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+      return await SupabaseDatabaseService(SupabaseService.client)
+          .updateSetupFlagsAndVerify({
         'personality_test_completed': true,
       });
     } catch (e) {
       debugPrint('[PersonalityTest] Server-Flag fehlgeschlagen: $e');
+      return false;
     }
   }
 

@@ -116,7 +116,7 @@ const Map<String, Map<String, String>> _strings = {
     'settings.pushEnableSub':
         'Nachrichten, Likes, Funken und Event Erinnerungen',
     'settings.notifyMessages': 'Chat Nachrichten',
-    'settings.notifyLikes': 'Likes',
+    'settings.notifyLikes': 'Neue Likes',
     'settings.notifyFunken': 'Neue Funken',
     'settings.notifyFunkenSub': 'Wenn ein Funke entsteht',
     'settings.notifyDatingHour': 'Dating Hour Erinnerung',
@@ -133,6 +133,89 @@ const Map<String, Map<String, String>> _strings = {
         'Gespeicherte Daten, Einwilligungen, Account löschen',
     'settings.logout': 'Abmelden',
     'settings.deleteAccount': 'Konto löschen',
+    // Settings (Vollständigkeit)
+    'settings.privacySection': 'Privatsphäre',
+    'settings.whoCanSee': 'Wer kann mein Profil sehen?',
+    'settings.localDataNote':
+        'Deine Daten werden nur lokal auf diesem Gerät gespeichert. Es '
+        'werden keine unnötigen Berechtigungen angefordert.',
+    'settings.communitySafety': 'Community & Sicherheit',
+    'settings.communityRules': 'Community Regeln',
+    'settings.communityRulesSub': 'Respektvoller Umgang & Verhaltensregeln',
+    'settings.passkeyCreate': 'Passkey erstellen',
+    'settings.passkeyCreateSub':
+        'Biometrischer Login (FaceID/TouchID) ohne Passwort',
+    'settings.passkeyCreated': 'Passkey wurde erstellt.',
+    'settings.passkeyFailed': 'Passkey-Erstellung fehlgeschlagen.',
+    'settings.twoFactor': 'Zwei-Faktor-Schutz (2FA)',
+    'settings.twoFactorActive': 'Aktiv: Login nur mit Authenticator-Code',
+    'settings.twoFactorSetup':
+        'Login zusätzlich mit Authenticator-App sichern',
+    'settings.notifyLikesSub': 'Wenn dich jemand liked',
+    'settings.notifyMessagesSub': 'Wenn dir jemand schreibt',
+    'settings.unifiedPush': 'Push ohne Google (UnifiedPush)',
+    'settings.unifiedPushOn': 'Aktiv - Endpunkt ist hinterlegt.',
+    'settings.unifiedPushOff':
+        'Benötigt eine Distributor-App wie ntfy (F-Droid). FCM bleibt in '
+        'der Play-Variante aktiv.',
+    'settings.blurSub':
+        'Schutz vor unangemessenen Inhalten: Bilder deiner Gegenstelle '
+        'werden erst nach Bestätigung gezeigt (lang drücken zum Melden).',
+    'settings.keyBackup': 'Verschlüsseltes Key-Backup',
+    'settings.keyBackupSub':
+        'Sichert die private Identität deiner Ende-zu-Ende-Verschlüsselung '
+        '(passwortverschlüsselt, AES-256-GCM). Nur damit kannst du nach '
+        'Gerätewechsel wieder verschlüsselt chatten. Verlust von Backup '
+        'UND Passwort ist unwiederbringlich.',
+    'settings.backupCreateSub': 'Erzeugt einen verschlüsselten Code',
+    'settings.backupRestoreSub': 'Überschreibt die aktuelle E2E-Identität',
+    'settings.safetyCenter': 'Safety Center',
+    'settings.safetyCenterSub':
+        'Hilfe bei Belästigung oder Stalking, Blockieren, Melden',
+    // Datenschutz & Account
+    'privacy.title': 'Datenschutz & Account',
+    'privacy.yourData': 'Deine Daten',
+    'privacy.dataInfo':
+        'Wisp speichert Profilinformationen, Standortdaten (nur wenn du '
+        'sie freigibst), Fotos, Chats, Likes und Matches. Alle Daten '
+        'werden verschlüsselt übertragen und nur so lange gespeichert, '
+        'wie dein Account aktiv ist.',
+    'privacy.export': 'Meine Daten exportieren',
+    'privacy.exportSub': 'JSON Download aller personenbezogenen Daten',
+    'privacy.exportFailed': 'Export fehlgeschlagen',
+    'privacy.processors': 'Auftragsverarbeiter',
+    'privacy.processorsInfo':
+        'Folgende Dienstleister (Art. 28 DSGVO) verarbeiten Daten im '
+        'Auftrag. Chat-Inhalte sind Ende-zu-Ende-verschlüsselt und werden '
+        'von keinem Dienstleister verarbeitet.',
+    'privacy.processorSupabase': 'Hosting, Datenbank, Authentifizierung (EU)',
+    'privacy.processorGoogle': 'Push-Benachrichtigungen',
+    'privacy.processorBrevo': 'Transaktions-E-Mails (Bestätigung, Reset)',
+    'privacy.processorCloudflare': 'CAPTCHA (Turnstile) und TURN-Relay',
+    'privacy.processorNetlify': 'Hosting der Anmelde-/CAPTCHA-Seite',
+    'privacy.processorApple': 'App-Store-Verteilung',
+    'privacy.consent': 'Einwilligungen',
+    'privacy.location': 'Standortfreigabe',
+    'privacy.locationSub':
+        'Du kannst die Standortfreigabe in den Systemeinstellungen deines '
+        'Geräts jederzeit widerrufen.',
+    'privacy.openLocationSettings': 'Standort-Einstellungen öffnen',
+    'privacy.push': 'Push Benachrichtigungen',
+    'privacy.pushSub':
+        'Öffnet die App-Einstellungen deines Geräts, dort kannst du die '
+        'Benachrichtigungen steuern.',
+    'privacy.openAppSettings': 'App-Einstellungen öffnen',
+    'privacy.dangerZone': 'Gefahrenzone',
+    'privacy.deleteAccount': 'Account dauerhaft löschen',
+    'privacy.deleteAccountSub':
+        'DSGVO Art. 17: Recht auf Löschung. Alle Daten werden entfernt.',
+    'privacy.deleteTitle': 'Account löschen?',
+    'privacy.deleteBody':
+        'Dieser Schritt kann nicht rückgängig gemacht werden. Alle deine '
+        'Daten (Profil, Fotos, Chats, Matches, Likes) werden dauerhaft '
+        'gelöscht.',
+    'privacy.deleteConfirm': 'Endgültig löschen',
+    'privacy.deleteFailed': 'Account konnte nicht gelöscht werden',
     'common.save': 'Speichern',
     'common.cancel': 'Abbrechen',
     'common.ok': 'OK',
@@ -214,7 +297,7 @@ const Map<String, Map<String, String>> _strings = {
     'settings.pushEnable': 'Enable notifications',
     'settings.pushEnableSub': 'Messages, likes, sparks and event reminders',
     'settings.notifyMessages': 'Chat messages',
-    'settings.notifyLikes': 'Likes',
+    'settings.notifyLikes': 'New likes',
     'settings.notifyFunken': 'New sparks',
     'settings.notifyFunkenSub': 'When a spark is created',
     'settings.notifyDatingHour': 'Dating Hour reminder',
@@ -229,6 +312,88 @@ const Map<String, Map<String, String>> _strings = {
     'settings.privacyAccountSub': 'Stored data, consents, delete account',
     'settings.logout': 'Log out',
     'settings.deleteAccount': 'Delete account',
+    // Settings (Vollständigkeit)
+    'settings.privacySection': 'Privacy',
+    'settings.whoCanSee': 'Who can see my profile?',
+    'settings.localDataNote':
+        'Your data is stored only locally on this device. No unnecessary '
+        'permissions are requested.',
+    'settings.communitySafety': 'Community & safety',
+    'settings.communityRules': 'Community rules',
+    'settings.communityRulesSub': 'Respectful conduct & rules of behavior',
+    'settings.passkeyCreate': 'Create passkey',
+    'settings.passkeyCreateSub':
+        'Biometric login (FaceID/TouchID) without a password',
+    'settings.passkeyCreated': 'Passkey created.',
+    'settings.passkeyFailed': 'Passkey creation failed.',
+    'settings.twoFactor': 'Two-factor protection (2FA)',
+    'settings.twoFactorActive': 'Active: login only with authenticator code',
+    'settings.twoFactorSetup':
+        'Secure your login with an authenticator app',
+    'settings.notifyLikesSub': 'When someone likes you',
+    'settings.notifyMessagesSub': 'When someone writes to you',
+    'settings.unifiedPush': 'Push without Google (UnifiedPush)',
+    'settings.unifiedPushOn': 'Active - endpoint registered.',
+    'settings.unifiedPushOff':
+        'Requires a distributor app like ntfy (F-Droid). FCM stays active '
+        'in the Play variant.',
+    'settings.blurSub':
+        'Protection from inappropriate content: images from your match are '
+        'only shown after confirmation (long press to report).',
+    'settings.keyBackup': 'Encrypted key backup',
+    'settings.keyBackupSub':
+        'Backs up the private identity of your end-to-end encryption '
+        '(password-encrypted, AES-256-GCM). Only with it can you chat '
+        'encrypted again after switching devices. Losing both backup AND '
+        'password is irreversible.',
+    'settings.backupCreateSub': 'Generates an encrypted code',
+    'settings.backupRestoreSub': 'Overwrites the current E2E identity',
+    'settings.safetyCenter': 'Safety Center',
+    'settings.safetyCenterSub':
+        'Help with harassment or stalking, blocking, reporting',
+    // Privacy & account
+    'privacy.title': 'Privacy & account',
+    'privacy.yourData': 'Your data',
+    'privacy.dataInfo':
+        'Wisp stores profile information, location data (only if you '
+        'share it), photos, chats, likes and matches. All data is '
+        'transferred encrypted and stored only as long as your account is '
+        'active.',
+    'privacy.export': 'Export my data',
+    'privacy.exportSub': 'JSON download of all personal data',
+    'privacy.exportFailed': 'Export failed',
+    'privacy.processors': 'Processors',
+    'privacy.processorsInfo':
+        'The following service providers (Art. 28 GDPR) process data on '
+        'our behalf. Chat content is end-to-end encrypted and is not '
+        'processed by any provider.',
+    'privacy.processorSupabase': 'Hosting, database, authentication (EU)',
+    'privacy.processorGoogle': 'Push notifications',
+    'privacy.processorBrevo': 'Transactional emails (confirmation, reset)',
+    'privacy.processorCloudflare': 'CAPTCHA (Turnstile) and TURN relay',
+    'privacy.processorNetlify': 'Hosting of the auth/CAPTCHA page',
+    'privacy.processorApple': 'App Store distribution',
+    'privacy.consent': 'Consents',
+    'privacy.location': 'Location sharing',
+    'privacy.locationSub':
+        'You can revoke location sharing at any time in your device\'s '
+        'system settings.',
+    'privacy.openLocationSettings': 'Open location settings',
+    'privacy.push': 'Push notifications',
+    'privacy.pushSub':
+        'Opens your device\'s app settings, where you can control '
+        'notifications.',
+    'privacy.openAppSettings': 'Open app settings',
+    'privacy.dangerZone': 'Danger zone',
+    'privacy.deleteAccount': 'Delete account permanently',
+    'privacy.deleteAccountSub':
+        'GDPR Art. 17: Right to erasure. All data will be removed.',
+    'privacy.deleteTitle': 'Delete account?',
+    'privacy.deleteBody':
+        'This step cannot be undone. All your data (profile, photos, '
+        'chats, matches, likes) will be permanently deleted.',
+    'privacy.deleteConfirm': 'Delete permanently',
+    'privacy.deleteFailed': 'Account could not be deleted',
     'common.save': 'Save',
     'common.cancel': 'Cancel',
     'common.ok': 'OK',
