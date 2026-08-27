@@ -50,16 +50,18 @@ class _LanguageSwitchState extends ConsumerState<LanguageSwitch> {
         onSelected: _select,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         icon: Container(
-          width: 36,
-          height: 36,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: scheme.primaryContainer,
+            // Wie der "Einloggen"-Button (FilledButton): gefüllt mit der
+            // Primärfarbe des aktiven Themes - rund statt breit.
+            color: scheme.primary,
             shape: BoxShape.circle,
           ),
           child: Icon(
             Icons.translate,
-            size: 20,
-            color: scheme.onPrimaryContainer,
+            size: 22,
+            color: scheme.onPrimary,
           ),
         ),
         itemBuilder: (context) => [

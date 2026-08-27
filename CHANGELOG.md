@@ -52,8 +52,10 @@ Passkey-Konfiguration.
   wieder - unabhängig von übersprungenen Punkten. Zusätzlich: Schlägt der
   Server-Abgleich komplett fehl, erscheint die Einrichtung ebenfalls
   nicht (nur bei einer frischen Registrierung läuft sie natürlich)
-- **Sprach-Symbol größer**: Der farbige Kreis beim Übersetzen-Symbol auf
-  Anmelde- und Registrierungs-Screen ist deutlich größer (48 px)
+- **Sprach-Button wie der Anmelde-Button**: Das Übersetzen-Symbol auf
+  Anmelde- und Registrierungs-Screen sitzt jetzt auf einem runden,
+  in Primärfarbe gefüllten Button - gleicher Look wie "Einloggen",
+  nur rund statt breit
 - **Passkey-Diagnose entfernt**: Das Entwickler-Werkzeug ist jetzt auch
   aus dem Debug-Build der Einstellungen raus (Code im Repository bleibt
   für die Fehlersuche erhalten)

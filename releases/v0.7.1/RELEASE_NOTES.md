@@ -44,8 +44,9 @@ einzelne Punkte übersprungen wurden oder das Netz bei der Anmeldung
 zickt. (Technisch: neues Gesamt-Flag serverseitig; bestehende Konten
 wurden automatisch als fertig markiert.)
 
-**Sprach-Symbol größer** Der farbige Kreis um das Übersetzen-Symbol auf
-Anmelde- und Registrierungs-Screen ist jetzt deutlich größer.
+**Sprach-Button im Anmelde-Look** Das Übersetzen-Symbol auf Anmelde- und
+Registrierungs-Screen ist jetzt ein runder Button in der Hauptfarbe der
+App - gleicher Stil wie der „Einloggen"-Button, nur rund.
 
 **Benachrichtigungs-Icon rund** In der Statusleiste erschien neben der
 Uhrzeit ein Viereck - jetzt das runde Wisp-Zeichen.
