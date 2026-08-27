@@ -47,6 +47,8 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 > der Roadmap-Diskussion). **Nichts davon geht in 0.7.1** – 0.7.1 bleibt
 > ein reines Fix-/Polish-Release. Neue Funktionen = MINOR-Version (SemVer).
 
+- [ ] **Quiz-Fragen vervollständigen**: Den Fragen-Pool des Kennenlern-
+      Quiz erweitern und final abstimmen (derzeit noch unvollständig)
 - [ ] **Inaktive Funken: eigene Kategorie ganz unten** im Feed
       („Erschlossene Funken"). KEIN Countdown, KEINE Ablauf-Benachrichtigung,
       KEINE „jetzt verlängern!"-Aktion – inaktive Verbindungen rutschen

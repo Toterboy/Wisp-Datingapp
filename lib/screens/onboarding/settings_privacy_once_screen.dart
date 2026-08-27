@@ -355,6 +355,23 @@ class _SettingsPrivacyOnceScreenState
     // ANGEZEIGT (bisher: stiller debugPrint, weshalb die Einrichtung
     // bei der nächsten Anmeldung wieder kam, obwohl sie "fertig" war).
     final flagsSaved = await _persistSetupFlagsToServer();
+    // Präferenzen (Entfernung, "Ich suche", Bundesland, Ort, Altersspanne)
+    // zusätzlich serverseitig sichern ("Nichts geht verloren"-Garantie,
+    // Migration 066).
+    if (SupabaseService.isInitialized) {
+      try {
+        final s = ref.read(settingsProvider);
+        final profileState = ref.read(profileProvider).state;
+        await prefsNotifier.savePreferencesToServer(
+          ageRangeMin: s.ageRangeMin,
+          ageRangeMax: s.ageRangeMax,
+          city: city.isNotEmpty ? city : null,
+          stateStr: profileState,
+        );
+      } catch (_) {
+        // Best-Effort: Blockiert den Abschluss nicht.
+      }
+    }
     if (mounted && !flagsSaved) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

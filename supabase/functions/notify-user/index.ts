@@ -426,6 +426,13 @@ serve(async (req) => {
           message: {
             token: fcmToken,
             notification: { title, body: text },
+            android: {
+              priority: "high",
+              // WICHTIG: Ohne icon zeigt Android in der Statusleiste das
+              // App-Launcher-Icon (opakes Viereck). Das rund maskierte
+              // drawable der App sorgt für das Wisp-Zeichen.
+              notification: { icon: "notification_icon" },
+            },
           },
         }),
       },

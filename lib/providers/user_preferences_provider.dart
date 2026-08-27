@@ -1,10 +1,13 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:wisp/models/gender.dart';
 import 'package:wisp/services/local_storage.dart';
+import 'package:wisp/services/supabase_database_service.dart';
+import 'package:wisp/services/supabase_service.dart';
 
 /// Filter-Modus für die Entfernungs-Suche.
 enum DistanceFilterMode {
@@ -249,6 +252,73 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
   Future<void> setRelationshipType(RelationshipType? type) async {
     state = state.copyWith(relationshipType: type);
     await _persist();
+  }
+
+  /// Übernimmt Präferenzen aus dem Server-Profil (nach Login/Neuinstallation).
+  ///
+  /// "Nichts geht verloren"-Garantie: Entfernung, "Ich suche", Bundesland,
+  /// Ort und Geschlechts-Filter stehen serverseitig in profiles (Migration
+  /// 066) und werden hier in den lokalen Stand übernommen. Fehlende/null
+  /// Werte lassen den bisherigen lokalen Stand unangetastet.
+  Future<void> applyServerValues(Map<String, dynamic> p) async {
+    RelationshipType? relationshipType = state.relationshipType;
+    final rtRaw = p['relationship_type'] as String?;
+    if (rtRaw != null && rtRaw.isNotEmpty) {
+      for (final t in RelationshipType.values) {
+        if (t.value == rtRaw) relationshipType = t;
+      }
+    }
+    final city = (p['city'] as String? ?? '').trim();
+    state = state.copyWith(
+      maxDistanceKm:
+          (p['max_distance_km'] as num?)?.toInt() ?? state.maxDistanceKm,
+      preferredState: p['preferred_state'] as String? ?? state.preferredState,
+      relationshipType: relationshipType,
+      location: city.isNotEmpty ? city : state.location,
+      genderPreferences:
+          (p['gender_preferences'] as List?)?.whereType<String>().toList() ??
+              state.genderPreferences,
+    );
+    await _persist();
+  }
+
+  /// Pusht die Präferenzen serverseitig in profiles (Migration 066) und
+  /// verifiziert per Zurücklesen (gleiche Methode wie bei den Setup-Flags).
+  ///
+  /// [ageRangeMin]/[ageRangeMax] und [city]/[stateStr] können mitgegeben
+  /// werden, wenn der Aufrufer sie gerade geändert hat (Einrichtung/
+  /// Profil-Edit) - sie landen in denselben Server-Spalten.
+  ///
+  /// Rückgabe: true bei Erfolg (false = fehlgeschlagen, Aufrufer kann
+  /// warnen; die lokalen Werte bleiben trotzdem gespeichert).
+  Future<bool> savePreferencesToServer({
+    int? ageRangeMin,
+    int? ageRangeMax,
+    String? city,
+    String? stateStr,
+  }) async {
+    if (!SupabaseService.isInitialized) return true;
+    try {
+      final body = <String, dynamic>{
+        'max_distance_km': state.maxDistanceKm,
+        'gender_preferences': state.genderPreferences,
+        'relationship_type': state.relationshipType?.value,
+        // Bewusst IMMER schreiben (auch null = Filter "Ganz Deutschland"),
+        // sonst würde ein späterer Sync den alten Wert zurückholen.
+        'preferred_state': state.preferredState,
+      };
+      if (ageRangeMin != null) body['age_range_min'] = ageRangeMin;
+      if (ageRangeMax != null) body['age_range_max'] = ageRangeMax;
+      if (city != null && city.trim().isNotEmpty) body['city'] = city.trim();
+      if (stateStr != null && stateStr.trim().isNotEmpty) {
+        body['state'] = stateStr.trim();
+      }
+      return await SupabaseDatabaseService(SupabaseService.client)
+          .updateSetupFlagsAndVerify(body);
+    } catch (e) {
+      debugPrint('[UserPreferences] Server-Sync fehlgeschlagen: $e');
+      return false;
+    }
   }
 }
 

@@ -118,6 +118,48 @@ class SupabaseDatabaseService {
     throw lastError ?? StateError('fetchOwnProfile fehlgeschlagen');
   }
 
+  /// Lädt die serverseitig gespiegelten Präferenzen des eigenen Profils
+  /// (Entfernung, Altersspanne, Geschlechts-Filter, "Ich suche",
+  /// Bundesland, Ort). Wird nach Login/Session-Restore genutzt, damit
+  /// nach einer Neuinstallation KEINE Präferenz verloren geht.
+  Future<Map<String, dynamic>?> fetchOwnPreferences() async {
+    final userId = _currentUser?.id;
+    if (userId == null) return null;
+
+    final response = await _client
+        .from('profiles')
+        .select(
+          'max_distance_km, age_range_min, age_range_max, '
+          'gender_preferences, relationship_type, preferred_state, city',
+        )
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    return response == null ? null : Map<String, dynamic>.from(response);
+  }
+
+  /// Lädt alle serverseitig gespiegelten Präferenzen des eigenen Profils
+  /// (siehe [fetchOwnPreferences]). Wirft bei Fehler - der Aufrufer
+  /// entscheidet über Retry/Fallback.
+  Future<Map<String, dynamic>?> fetchOwnPreferencesWithRetry({
+    int attempts = 2,
+  }) async {
+    Object? lastError;
+    for (var i = 0; i < attempts; i++) {
+      if (i > 0) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      try {
+        final prefs = await fetchOwnPreferences()
+            .timeout(const Duration(seconds: 8));
+        return prefs;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError ?? StateError('fetchOwnPreferences fehlgeschlagen');
+  }
+
   /// Aktualisiert das eigene Profil in der Supabase-Datenbank.
   Future<void> updateOwnProfile(Map<String, dynamic> updates) async {
     final userId = _currentUser?.id;

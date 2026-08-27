@@ -15,6 +15,13 @@ Passkey-Konfiguration.
 
 ### Hinzugefügt
 
+- **Präferenzen überleben Neuinstallationen** (Migration 066): Entfernung,
+  Altersspanne, "Ich suche" (Beziehungsart), Bundesland-Filter, Ort und
+  Geschlechts-Filter werden jetzt zusätzlich serverseitig gespeichert
+  (verschlüsselter Transport, RLS-geschützt) und nach der Anmeldung
+  automatisch wiederhergestellt - vorher gingen sie bei einer
+  Neuinstallation verloren. Gespeichert wird beim Abschluss der
+  Einrichtung und beim Speichern im Profil-Editor
 - **Admin: Nutzer sperren/entsperren mit Begründung** (versteckter
   Admin-Bereich): Im „Sperren"-Tab gibt es jetzt ein Formular
   (E-Mail oder User-ID + Pflicht-Begründung). Die neue Edge Function
@@ -89,7 +96,10 @@ Passkey-Konfiguration.
   auf 16 zurück
 - **Benachrichtigungs-Icon in der Statusleiste rund statt Viereck**:
   Das Small-Icon nutzte das voll opake Launcher-Icon; jetzt die rund
-  maskierte Silhouette (drawable/notification_icon.png)
+  maskierte Silhouette (drawable/notification_icon.png). Zusätzlich
+  setzt der Push-Versand (notify-user) jetzt explizit dieses Icon -
+  vorher zeigte das System bei Server-Push-Nachrichten weiterhin ein
+  Viereck neben der Uhrzeit
 - **„Keine neuen Funken"-Karte**: Abgeschnittene Buchstaben bei großen
   Systemschriften behoben (Kanten-Clipping der Card deaktiviert)
 - **Audio-Vorstellung**: Erneutes Hochladen schlug mit StorageException

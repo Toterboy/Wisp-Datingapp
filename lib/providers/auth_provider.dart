@@ -197,7 +197,28 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
           state = const AsyncValue.data(false);
           return;
         }
-        _profileNotifier.setProfile(profile);
+      _profileNotifier.setProfile(profile);
+
+      // Präferenzen (Entfernung, Altersspanne, "Ich suche", Bundesland,
+      // Ort, Geschlechts-Filter) serverseitig nachziehen - "Nichts geht
+      // verloren"-Garantie bei Neuinstallation (Migration 066). Best
+      // effort: Ein Fehlschlag blockiert den Sync nicht.
+      try {
+        final prefsMap =
+            await database.fetchOwnPreferencesWithRetry();
+        if (prefsMap != null) {
+          await _ref
+              .read(userPreferencesProvider.notifier)
+              .applyServerValues(prefsMap);
+          final sMin = (prefsMap['age_range_min'] as num?)?.toInt();
+          final sMax = (prefsMap['age_range_max'] as num?)?.toInt();
+          if (sMin != null && sMax != null) {
+            await _ref.read(settingsProvider.notifier).setAgeRange(sMin, sMax);
+          }
+        }
+      } catch (e) {
+        debugPrint('[AuthNotifier] Präferenz-Sync fehlgeschlagen: $e');
+      }
       } catch (e) {
         debugPrint('[AuthNotifier] Profil-Fetch fehlgeschlagen: $e');
       }

@@ -502,9 +502,25 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             'smoking': _smoking?.toServer(),
             'alcohol': _alcohol?.toServer(),
             'drugs': _drugs?.toServer(),
+            'city': ?location,
           });
         } catch (e) {
           debugPrint('[ProfileEdit] Server-Sync fehlgeschlagen: $e');
+        }
+        // Präferenzen (Entfernung, "Ich suche", Bundesland, Altersspanne)
+        // zusätzlich serverseitig sichern ("Nichts geht verloren"-
+        // Garantie, Migration 066).
+        try {
+          final s = ref.read(settingsProvider);
+          await ref.read(userPreferencesProvider.notifier).savePreferencesToServer(
+                ageRangeMin: s.ageRangeMin,
+                ageRangeMax: s.ageRangeMax,
+                city: location,
+                stateStr:
+                    _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
+              );
+        } catch (e) {
+          debugPrint('[ProfileEdit] Präferenz-Sync fehlgeschlagen: $e');
         }
       }());
     }

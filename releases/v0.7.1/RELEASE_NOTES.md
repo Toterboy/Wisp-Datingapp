@@ -6,6 +6,11 @@ behoben. Danke an alle Tester von v0.7.0!
 
 ## Hinzugefügt
 
+**Einstellungen überleben Neuinstallationen** Entfernung, Altersspanne,
+„Ich suche", Bundesland-Filter, Ort und Geschlechts-Filter werden jetzt
+zusätzlich sicher auf dem Server gespeichert und nach der Anmeldung
+automatisch wiederhergestellt - nichts geht mehr verloren.
+
 **Moderation: Nutzer sperren mit Begründung** Im Team-Bereich gibt es
 jetzt ein Formular zum Sperren von Konten (E-Mail oder User-ID +
 verpflichtende Begründung). Mit User-ID wird der Account sofort
@@ -29,6 +34,10 @@ lokal in der App - dann verlässt das gemeldete Bild das Gerät vor der
 Prüfung überhaupt nicht mehr.
 
 ## Behoben
+
+**Viereck in der Statusleiste** Server-Push-Nachrichten zeigten neben
+der Uhrzeit weiterhin ein Viereck (das App-Launcher-Symbol). Jetzt
+erscheint dort das runde Wisp-Zeichen.
 
 **Profil nach Neuinstallation nicht mehr leer** Bei einer Neuinstallation
 blieben Name, Bio und alle Profildaten leer - der Abgriff auf dem Server
