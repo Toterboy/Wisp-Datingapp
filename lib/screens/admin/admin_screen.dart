@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,11 +15,11 @@ import 'package:wisp/utils/constants.dart';
 ///
 /// Die Admin-UUID wird via --dart-define=ADMIN_UUID=... beim Build gesetzt.
 /// Ist sie nicht konfiguriert (leerer String), gibt die Funktion IMMER false
-/// zurück — Admin-Funktionen sind dann deaktiviert (fail-safe).
+/// zurÃ¼ck â€” Admin-Funktionen sind dann deaktiviert (fail-safe).
 bool isCurrentUserAdmin() {
   final adminId = AppConstants.adminUserId;
   // Fail-safe: Wenn die Admin-UUID nicht konfiguriert ist, kann NIEMAND
-  // Admin sein — auch nicht versehentlich durch leere User-ID.
+  // Admin sein â€” auch nicht versehentlich durch leere User-ID.
   if (adminId.isEmpty) return false;
   final userId = SupabaseService.currentUser?.id;
   if (userId == null) return false;
@@ -63,7 +64,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
 
   void _enforceAdmin() {
     if (!isCurrentUserAdmin() && mounted) {
-      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      context.go(AppRoutes.home);
     }
   }
 
@@ -72,17 +73,17 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
     try {
       final result = await SupabaseService.client.rpc('is_current_user_admin');
       if (mounted && result != true) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+        context.go(AppRoutes.home);
       }
     } catch (e) {
-      // Fail-closed (Audit H6): Schlägt die serverseitige Prüfung fehl,
+      // Fail-closed (Audit H6): SchlÃ¤gt die serverseitige PrÃ¼fung fehl,
       // wird der Admin-Bereich NICHT gerendert.
       if (kDebugMode) {
         debugPrint('[AdminScreen] Server-Admin-Check fehlgeschlagen '
             '(fail-closed): $e');
       }
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+        context.go(AppRoutes.home);
       }
     } finally {
       if (mounted) setState(() => _serverAdminChecked = true);
@@ -125,7 +126,11 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Schliessen',
-              onPressed: () => Navigator.of(context).pop(),
+              // WICHTIG: context.go statt Navigator.pop - der Admin-Screen
+              // wird per GoRouter-go erreicht (kein Stack-Eintrag), ein
+              // Navigator.pop ging hinter die Root-Route und erzeugte
+              // einen Blackscreen.
+              onPressed: () => context.go(AppRoutes.home),
             ),
           ],
         ),
@@ -186,9 +191,25 @@ class _AsyncList extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: onRetry,
       child: ListView.separated(
+        padding: const EdgeInsets.all(12),
         itemCount: items.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
-        itemBuilder: (context, i) => itemBuilder(context, items[i]),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        // Card-Look konsistent zur restlichen Nutzeroberfläche.
+        itemBuilder: (context, i) => Card(
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant
+                  .withValues(alpha: 0.5),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: itemBuilder(context, items[i]),
+          ),
+        ),
       ),
     );
   }
@@ -301,7 +322,7 @@ class _UserReportsTabState extends ConsumerState<_UserReportsTab> {
                 const SizedBox(height: 8),
                 SelectableText('Gemeldeter Nutzer: $reportedId'),
                 SelectableText(
-                    'Reporter: ${reporterShort.length > 12 ? '${reporterShort.substring(0, 12)}…' : reporterShort} (gehasht)'),
+                    'Reporter: ${reporterShort.length > 12 ? '${reporterShort.substring(0, 12)}â€¦' : reporterShort} (gehasht)'),
                 Text('$messagesCount Nachricht(en) beigelegt'),
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 6),
@@ -402,7 +423,7 @@ class _BugReportsTabState extends ConsumerState<_BugReportsTab> {
                     : '(ohne Beschreibung)',
                     style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 8),
-                Text('Anhänge: $attachments · ${_fmtTs(data['createdAt'])}',
+                Text('AnhÃ¤nge: $attachments Â· ${_fmtTs(data['createdAt'])}',
                     style: theme.textTheme.bodySmall),
                 if (deviceInfo.isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -621,7 +642,7 @@ class _PhotoModerationListState extends ConsumerState<_PhotoModerationList> {
         final hashFull = entry['photo_hash'] as String? ?? '';
         // Guard: kuerzerer Hash darf keinen RangeError werfen.
         final hash = hashFull.length > 12
-            ? '${hashFull.substring(0, 12)}…'
+            ? '${hashFull.substring(0, 12)}â€¦'
             : hashFull;
         final created = entry['created_at'] as String? ?? '';
 
@@ -707,7 +728,7 @@ class _BansTabState extends ConsumerState<_BansTab> {
     return data;
   }
 
-  /// Formular: Nutzer sperren (E-Mail oder User-ID + Pflicht-Begründung).
+  /// Formular: Nutzer sperren (E-Mail oder User-ID + Pflicht-BegrÃ¼ndung).
   Future<void> _showBanDialog() async {
     final targetCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
@@ -747,7 +768,7 @@ class _BansTabState extends ConsumerState<_BansTab> {
                     controller: reasonCtrl,
                     maxLines: 3,
                     decoration: const InputDecoration(
-                      labelText: 'Begründung (Pflicht)',
+                      labelText: 'BegrÃ¼ndung (Pflicht)',
                       hintText: 'Warum wird der Nutzer gesperrt?',
                       border: OutlineInputBorder(),
                     ),
@@ -761,15 +782,15 @@ class _BansTabState extends ConsumerState<_BansTab> {
                     onChanged: (v) => setState(() => notifyUser = v ?? true),
                     title: const Text('Nutzer per E-Mail informieren'),
                     subtitle: const Text(
-                        'Enthält die Begründung und den Weg zum '
+                        'EnthÃ¤lt die BegrÃ¼ndung und den Weg zum '
                         'Entsperrungsantrag'),
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
                     dense: true,
                   ),
                   const Text(
-                    'Hinweis: Mit User-ID wird zusätzlich der bestehende '
-                    'Account sofort gesperrt (Sessions ungültig). Mit nur '
+                    'Hinweis: Mit User-ID wird zusÃ¤tzlich der bestehende '
+                    'Account sofort gesperrt (Sessions ungÃ¼ltig). Mit nur '
                     'E-Mail ist die Neu-Registrierung blockiert.',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
@@ -822,7 +843,7 @@ class _BansTabState extends ConsumerState<_BansTab> {
     );
   }
 
-  /// Entsperrt eine E-Mail (banned_emails-Eintrag löschen + GoTrue-Entsperren).
+  /// Entsperrt eine E-Mail (banned_emails-Eintrag lÃ¶schen + GoTrue-Entsperren).
   Future<void> _unban(Map<String, dynamic> entry) async {
     final email = entry['email'] as String? ?? '';
     final confirmed = await showDialog<bool>(
@@ -831,7 +852,7 @@ class _BansTabState extends ConsumerState<_BansTab> {
         title: const Text('Entsperren?'),
         content: Text(
             '$email kann sich wieder registrieren und anmelden. Der '
-            'Entsperrungsantrag sollte vorher geprüft worden sein.'),
+            'Entsperrungsantrag sollte vorher geprÃ¼ft worden sein.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -904,7 +925,7 @@ class _BansTabState extends ConsumerState<_BansTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (reason.isNotEmpty) SelectableText(reason),
-                    Text('${_fmtTs(data['bannedAt'])} · von $bannedBy'),
+                    Text('${_fmtTs(data['bannedAt'])} Â· von $bannedBy'),
                   ],
                 ),
                 leading: const Icon(Icons.block, color: Colors.red),

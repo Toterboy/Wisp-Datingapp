@@ -102,6 +102,23 @@ class DatingHourService {
     });
   }
 
+  /// Lädt die zuletzt gespeicherten Dating-Hour-Präferenzen (Migration 067).
+  ///
+  /// Diese bleiben über Events und Neuinstallationen hinweg erhalten und
+  /// vorbelegen den Präferenzen-Screen. `null`/leere Map = keine gespeicherten.
+  Future<Map<String, dynamic>?> getMyLastPreferences() async {
+    return _safeCall('getMyLastPreferences', () async {
+      final result = await SupabaseService.client.rpc(
+        'get_last_dating_hour_preferences',
+      );
+      if (result is Map<String, dynamic>) return result;
+      if (result is Map && result.isNotEmpty) {
+        return Map<String, dynamic>.from(result);
+      }
+      return null;
+    });
+  }
+
   /// Opt-out für das aktuelle/nächste Event.
   Future<void> leaveEvent(String userId) async {
     final event = await getCurrentOrNextEvent();

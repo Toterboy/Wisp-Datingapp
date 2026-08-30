@@ -13,6 +13,7 @@ import 'package:wisp/providers/auth_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/screens/privacy/privacy_screen.dart' show promptTotpCode;
 import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/mfa_service.dart';
@@ -165,6 +166,32 @@ class SettingsScreen extends ConsumerWidget {
                       trailing: const Icon(Icons.chevron_right),
                       contentPadding: EdgeInsets.zero,
                       onTap: () async {
+                        // AAL2-Step-up (GoTrue): Hat der Nutzer 2FA
+                        // aktiviert, verlangt der Server für das Anlegen
+                        // eines Passkeys eine aktuelle Zweitfaktor-
+                        // Bestätigung - ohne sie schlägt die Erstellung
+                        // mit "Server hat abgelehnt" fehl.
+                        final mfa = ref.read(mfaStatusProvider);
+                        if (mfa.hasVerifiedFactors &&
+                            mfa.currentAal != 'aal2') {
+                          final code = await promptTotpCode(context);
+                          if (code == null || !context.mounted) return;
+                          try {
+                            await MfaService(SupabaseService.client)
+                                .verifyChallenge(code: code);
+                          } catch (_) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Ungültiger oder abgelaufener Code.'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                        }
                         try {
                           await PasskeyAuth.register();
                           if (context.mounted) {

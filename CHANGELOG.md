@@ -7,6 +7,48 @@ und folgt der [Semantic Versioning Specification (SemVer)](https://semver.org/la
 Solange die Versionsnummer mit `0.` beginnt (Initial Development Phase nach SemVer §4),
 können sich Schnittstellen und Verhalten jederzeit ändern.
 
+## [0.7.2] – 2026-08-28
+
+Dating-Hour-Release: Zeit-Fix, Fairness-Regeln und Admin-Polish.
+
+### Hinzugefügt
+
+- **Dating Hour: Mindestteilnehmer** – Erst ab 20 angemeldeten Personen
+  startet das Event; darunter fällt es aus (klare Meldung im Event-Screen)
+  und die Regeln-Karte weist darauf hin
+- **Dating Hour: keine Partner-Dopplungen mehr** – Das Matching bevorzugt
+  Personen, mit denen es noch NIE eine Dating-Hour-Session gab; erst wenn
+  keine unbesuchte Kombination übrig ist, wird wiederholt (Migration 067)
+- **Dating Hour: Altersdifferenz-Hinweis** – Liegen mindestens 10 Jahre
+  zwischen beiden Chat-Partnern, erscheint ein respektvoller Hinweis-Banner
+  im Event-Chat
+- **Dating-Hour-Präferenzen bleiben erhalten** – Die zuletzt genutzten
+  Präferenzen (Alter, Geschlecht, besonderes Merkmal, Entfernung,
+  Gewohnheiten) werden global serverseitig gemerkt (Migration 067) und
+  vorbelegen den Präferenzen-Screen – auch nach Neuinstallation
+- **Mood of the Day öffentlich** – Die fehlende Server-Infrastruktur
+  (Migration 024, idempotent nachgezogen in 067) ermöglicht es nun:
+  eigener Mood setzbar und für andere sichtbar
+- **Admin-Bereich im App-Look** – Listen jetzt als Karten konsistent zur
+  restlichen Nutzeroberfläche
+
+### Behoben
+
+- **Dating Hour startet zur richtigen Zeit** – Die Startzeit war als
+  20:00 UTC gespeichert (= 21/22 Uhr deutscher Zeit). Jetzt korrekt
+  20:00 Europe/Berlin, mit automatischer Sommer-/Winterzeit-Umstellung.
+  Bestehende zukünftige Events werden korrigiert (Migration 067)
+- **Admin-Bereich: Blackscreen beim Verlassen behoben** (falscher
+  Navigator-Pop auf einer GoRouter-Route)
+- **Zurück-Geste in der Dating Hour beendet nicht mehr die App**, sondern
+  navigiert zur Haupt-Navigation (gilt für alle Dating-Hour-Screens)
+- **Formulierung korrigiert**: „Niemand außer euch beiden kann eure
+  Nachrichten lesen (Signal-Protokoll)" statt des sprachlichen Fehlers
+- **Passkey-Erstellung mit aktivierter 2FA**: Vor dem Anlegen eines
+  Passkeys erfolgt jetzt automatisch die 2FA-Bestätigung – der Server
+  verlangt sie, ohne sie schlug die Erstellung mit einer kryptischen
+  Ablehnung fehl
+
 ## [0.7.1] – 2026-08-26
 
 Polish- und Fix-Release zu 0.7.0 (das nie veröffentlicht wurde): Sprach-

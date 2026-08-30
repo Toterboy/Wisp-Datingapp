@@ -51,12 +51,14 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 - **Find your Match** – Blind-Matching „Persönlichkeit zuerst": Fotos sind erst nach einem Funke sichtbar (Blind Mode ist standardmäßig aktiv). Beim ersten Öffnen verlangt die App eine eigene Vorstellung (Text UND Audio sind Pflicht). Der gewichtete Matching-Score berücksichtigt Entfernung, gemeinsame Interessen, Persönlichkeits-Kompatibilität (MBTI-Matrix) und Alter; strikte Geschlechts- und Altersfilter.
 - **Zufallschat** – automatische Zuordnung zu einem Peer-to-Peer-Textchat basierend auf Alter-/Distanz-Einstellungen
 - **QR Code** – eigenes Profil als QR-Code teilen, fremde Codes scannen oder manuell eingeben; der angezeigte 8-stellige Code ist serverseitig auflösbar (manuelle Eingabe findet den echten Nutzer)
-- **Dating Hour (Event-Modus)** – jeden Samstag 20:00–21:00 Uhr:
+- **Dating Hour (Event-Modus)** – jeden Samstag 20:00–21:00 Uhr deutscher Zeit (Sommer-/Winterzeit automatisch berücksichtigt):
   - Beitritt jederzeit möglich (serverzeitsynchron, Manipulation der Geräteuhr wird erkannt); Aktualisieren ist rein lesend, Beitritt NUR über „Ich bin dabei" mit Bestätigungsdialog
-  - Zwei zufällig zugeordnete Personen chatten direkt E2E-verschlüsselt (ohne Profilansicht)
+  - Erst ab 20 angemeldeten Personen – darunter fällt das Event aus (Schutz vor Fake-Account-Runden)
+  - Keine Wiederholungen: Das Matching bevorzugt Personen, mit denen es noch nie eine Session gab
+  - Zwei zufällig zugeordnete Personen chatten direkt E2E-verschlüsselt (ohne Profilansicht); Hinweis-Banner bei >= 10 Jahren Altersdifferenz
   - Nach 5 Minuten: beide können einen Funke „Annehmen" oder „Ablehnen"
   - Funke nur, wenn BEIDE annehmen; freundlich formulierte Ablehnungs-Nachricht bei Absage
-  - Individuelle Präferenzen (Alter, Geschlecht, besondere Eigenschaft) vor Event-Start einstellbar (serverseitig gespeichert)
+  - Individuelle Präferenzen (Alter, Geschlecht, besondere Eigenschaft) vor Event-Start einstellbar (serverseitig gespeichert, bleiben über Events und Neuinstallationen erhalten)
 
 ### Quiz „Wie gut kennst du dein Gegenüber?"
 
@@ -170,7 +172,8 @@ Nach einem Update müssen vor dem Rollout die Datenbank-Migrationen
 Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.1:
 
 - **Migrationen:** 064 (Bild-Report-Spalten), 065 (`onboarding_done`),
-  066 (Präferenz-Sync: „Ich suche", Bundesland)
+  066 (Präferenz-Sync: „Ich suche", Bundesland), 067 (Dating-Hour-Zeiten
+  Europe/Berlin, Mindestteilnehmer, Dopplungs-Schutz, Mood-Infrastruktur)
 - **Edge Functions:** `report-image` (Bild-Meldung + KI), `admin-ban`
   (Nutzer sperren/entsperren), `notify-user` (aktualisiert: rundes
   Statusleisten-Icon)
@@ -185,7 +188,7 @@ Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.1:
 
 ## Hinweis zum Entwicklungsstand
 
-Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.7.1). Folgende Bereiche sind noch nicht final:
+Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.7.2). Folgende Bereiche sind noch nicht final:
 
 - **Automatischer Gesichtsabgleich** (Profilbild vs. Verifizierungs-Video) → z. B. selbstgehostete Open-Source-Modelle wie DeepStack oder Face Recognition (selbst gehostet, datenschutzfreundlich, EU-fähig)
 - **NSFW-Bild-Moderation** – *melde-basiert umgesetzt*: Chat-Bilder werden nie beim Senden gescannt (E2E), sondern erst bei einer Meldung durch den Empfänger automatisch per NSFW-KI geprüft (Edge Function `report-image`, NSFW-Klassifikator; `HF_API_TOKEN` als Function-Secret konfigurierbar). Der Meldende erhält das KI-Ergebnis direkt und kann bei Widerspruch manuell eskalieren - in beiden Fällen gehen Bild, Report und KI-Ergebnis per E-Mail an das Team. **Noch offen:** automatische Profilbild-Prüfung beim Upload und automatische Account-Sperre bei Wiederholungsverstößen (derzeit manuell).

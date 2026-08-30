@@ -48,6 +48,35 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
     _ageRange = RangeValues(ageMin.toDouble(), ageMax.toDouble());
     _genderPreference = genderPrefFromList(userPrefs.genderPreferences);
     _maxDistanceKm = settings.maxDistanceKm;
+    // ZULETZT GENUTZTE Dating-Hour-Präferenzen vom Server laden (Migration
+    // 067) und die Defaults überschreiben - sie bleiben so über Events und
+    // Neuinstallationen hinweg erhalten.
+    _loadLastPreferences();
+  }
+
+  Future<void> _loadLastPreferences() async {
+    try {
+      final saved = await ref.read(datingHourServiceProvider).getMyLastPreferences();
+      if (saved == null || !mounted) return;
+      final last = DatingHourPreferences.fromJson(saved);
+      setState(() {
+        if (last.ageMin >= 18) {
+          final min = last.ageMin.clamp(18, 99);
+          _ageRange = RangeValues(
+            min.toDouble(),
+            last.ageMax.clamp(min, 99).toDouble(),
+          );
+        }
+        _genderPreference = genderPrefFromList([last.genderPreference]);
+        if (last.preferredTrait.isNotEmpty) _selectedTrait = last.preferredTrait;
+        if (last.maxDistanceKm > 0) _maxDistanceKm = last.maxDistanceKm.round();
+        _smoking = HabitudeLevel.fromServer(last.smoking);
+        _alcohol = HabitudeLevel.fromServer(last.alcohol);
+        _drugs = HabitudeLevel.fromServer(last.drugs);
+      });
+    } catch (_) {
+      // Best-Effort: Ohne Server-Antwort gelten die Einrichtungs-Defaults.
+    }
   }
 
   @override

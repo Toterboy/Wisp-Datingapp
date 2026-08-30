@@ -8,7 +8,9 @@ import 'package:wisp/models/dating_hour_models.dart';
 import 'package:wisp/models/message.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
+import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/widgets/funke_overlay.dart';
 import 'package:wisp/services/dating_hour_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
@@ -45,6 +47,11 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
   bool _hasVoted = false;
   bool _showDecision = false;
 
+  /// Alter des Chat-Partners (aus public_profiles) - für den
+  /// Altersdifferenz-Hinweis (Migration: >= 10 Jahre Differenz).
+  int? _partnerAge;
+  bool _ageWarningShown = false;
+
   // E2E-P2P-Verbindung (Signal Protocol + WebRTC DataChannel).
   P2PChatService? _p2p;
   StreamSubscription<String>? _msgSub;
@@ -66,6 +73,31 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Lädt das Alter des Chat-Partners (public_profiles-View, nur das Alter)
+  /// und zeigt bei >= 10 Jahren Differenz einen Hinweis im Chat an.
+  Future<void> _loadPartnerAge(DatingHourSession session) async {
+    try {
+      final myAge = ref.read(profileProvider).age;
+      if (myAge == null) return;
+      final peerId = session.getPeerId(_currentUserId ?? AppConstants.currentUserId);
+      final rows = await SupabaseService.client
+          .from('public_profiles')
+          .select('age')
+          .eq('user_id', peerId)
+          .limit(1);
+      if (rows.isEmpty) return;
+      final partnerAge = (rows.first['age'] as num?)?.toInt();
+      if (partnerAge == null || !mounted) return;
+      setState(() => _partnerAge = partnerAge);
+      final diff = (myAge - partnerAge).abs();
+      if (diff >= 10) {
+        setState(() => _ageWarningShown = true);
+      }
+    } catch (e) {
+      debugPrint('[DatingHourChat] Partner-Alter konnte nicht geladen werden: $e');
+    }
   }
 
   /// Baut die E2E-P2P-Verbindung zum Chat-Partner auf (einmalig pro Screen).
@@ -108,6 +140,10 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
       final session = await service.getSession(widget.sessionId);
       if (mounted) {
         setState(() => _session = session);
+      }
+      // Partner-Alter laden (für den Altersdifferenz-Hinweis).
+      if (session != null) {
+        _loadPartnerAge(session);
       }
       // P2P-Verbindung zum Partner aufbauen, sobald die Session bekannt ist.
       if (session != null) {
@@ -315,6 +351,14 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
     // Partner-Gewohnheiten: aus public_profiles laden und als Chips zeigen.
     final partnerId = session?.getPeerId(_currentUserId ?? '');
 
+    // Altersdifferenz-Hinweis: >= 10 Jahre Unterschied (einmalig oben im
+    // Chat sichtbar, solange der Screen offen ist).
+    final myAge = ref.watch(profileProvider).age;
+    final showAgeGapHint = _ageWarningShown &&
+        myAge != null &&
+        _partnerAge != null &&
+        (myAge - _partnerAge!).abs() >= 10;
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -423,6 +467,39 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
             _TimerBar(
               remainingSeconds: session.remainingSeconds,
               totalSeconds: 300,
+            ),
+
+          // Altersdifferenz-Hinweis (>= 10 Jahre Unterschied).
+          if (showAgeGapHint)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 20,
+                    color: Colors.orange.shade900,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hinweis: Ihr seid $myAge und $_partnerAge Jahre alt - '
+                      'es liegen mindestens 10 Jahre zwischen euch. Bitte '
+                      'geht respektvoll miteinander um.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
           // Status-Hinweis (Match / Kein Match / Warte)

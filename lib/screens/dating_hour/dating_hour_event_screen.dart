@@ -310,7 +310,15 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
       });
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // System-Zurück/Geste: zurück zur Entdeckung statt App-Beendigung
+        // (die Route wurde per context.go erreicht - kein Stack zum poppen).
+        if (mounted) context.go(AppRoutes.swipeModeSelection);
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Dating Hour'),
         leading: IconButton(
@@ -340,6 +348,35 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
             // manipulationsanfällig (lokale Uhr) — Nutzer transparent warnen.
             if (!ServerTimeService.instance.isVerified)
               const _ServerTimeWarningBanner(),
+            // Event fällt aus: zu wenige Teilnehmer (Migration 067).
+            if (event.status == 'cancelled') ...[
+              Card(
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.event_busy,
+                          color: Theme.of(context).colorScheme.onErrorContainer),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Heute fällt die Dating Hour aus: Es haben sich '
+                          'nicht genug Personen angemeldet (mind. 20 '
+                          'Teilnehmer nötig). Nächste Woche geht es wieder '
+                          'los - teilnehmen lohnt sich!',
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             _EventStatusCard(
               event: event,
               isRunning: isRunning,
@@ -356,6 +393,7 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
             const _RulesCard(),
           ],
         ),
+      ),
       ),
     );
   }
@@ -811,7 +849,7 @@ class _EventInfoCard extends StatelessWidget {
             const _InfoRow(
               icon: Icons.lock,
       title: 'Ende zu Ende verschlüsselt',
-      subtitle: 'Eure Nachrichten lesen nur ihr, dank Signal Protocol.',
+      subtitle: 'Niemand außer euch beiden kann eure Nachrichten lesen (Signal-Protokoll).',
             ),
             const _InfoRow(
               icon: Icons.people,
@@ -899,6 +937,8 @@ class _RulesCard extends StatelessWidget {
     const _RuleItem('5', 'Bei "Ablehnen" (oder Timeout): Automatische neue Zuordnung.'),
     const _RuleItem('6', 'Während eines Chats: NUR dieser Chat erlaubt.'),
     const _RuleItem('7', 'Um 21:00 Uhr Ende, laufende Chats werden zu Ende geführt.'),
+    const _RuleItem('8', 'Erst ab 20 Teilnehmern findet die Dating Hour statt.'),
+    const _RuleItem('9', 'Die Erstellung von Fake Accounts ist strengstens untersagt.'),
           ],
         ),
       ),
