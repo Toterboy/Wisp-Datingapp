@@ -59,6 +59,15 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 
 ## Geplant für 0.7.3 (Fix- & Polish-Release)
 
+- [ ] **Dating-Hour-Zeiten: Regression aufklären & endgültig lösen** –
+      Nach Migration 067 (Startzeit Europe/Berlin) ging etwas schief, der
+      Betreiber musste die Zeiten vorübergehend wieder auf „lokal" (alte
+      Berechnung) zurückstellen. Zu klären: Was genau ist schiefgegangen
+      (starts_at-Berechnung in `ensure_next_dating_hour`, Zeitfenster-Prüfung
+      in `get_current_or_next_dating_hour`/Scheduler, bestehende Events
+      während des Updates)? Ziel: Die Berlin-Zeit-Lösung (067, DST-korrekt)
+      endgültig wieder aktivieren und die GESAMTE Kette testen –
+      Event-Erzeugung, Scheduler-Fenster, RPC-Antwort und Client-Countdown
 - [ ] **Benachrichtigungs-Symbol endgültig fixen**: Es erscheint weiterhin
       weiß/viereckig und leer – Ursache tiefenprüfen (FCM-Payload vs.
       lokale Anzeige vs. Distributor-Benachrichtigung) und in ALLEN
