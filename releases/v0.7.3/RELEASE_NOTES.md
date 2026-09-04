@@ -36,6 +36,15 @@ mehr.
 
 ## Hinzugefügt
 
+**Bild-Meldungen: Nachweis-Pflicht** Beim Senden eines Chat-Bildes wird
+nur dessen Prüfsumme (kein Bild!) serverseitig registriert. Wird ein Bild
+gemeldet, wird geprüft, ob es tatsächlich in diesem Chat geflossen ist -
+untergeschobene fremde Bilder werden abgelehnt.
+
+**Dating Hour: konsistente Zählung** Die 20-Teilnehmer-Prüfung zählt nur
+mindestens 24 Stunden alte Konten - kurzlebige Fake-Accounts können das
+Event weder starten noch die Anzeige täuschen.
+
 **Dating Hour: Teilnehmer-Fortschritt** Im Event-Screen steht jetzt „X
 von 20 Teilnehmern" mit Fortschrittsbalken - man sieht, ob das Ziel
 erreicht ist und wie viele noch fehlen (Migration 068 nötig).

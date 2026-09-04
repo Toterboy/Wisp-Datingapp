@@ -94,6 +94,16 @@ Passkey-Konfiguration.
 
 ### Hinzugefügt
 
+- **Bild-Meldungen: Nachweis-Pflicht (Lückenfix)**: Beim Senden eines
+  Chat-Bildes wird nur dessen SHA-256-Hash serverseitig registriert
+  (Migration 068, niemals das Bild). Eine Meldung wird nur akzeptiert,
+  wenn der Hash nachweist, dass dieses Bild tatsächlich zwischen den
+  beiden Chat-Partnern geflossen ist - beliebige fremde Bilder können
+  nicht mehr untergeschoben werden
+- **Dating Hour: konsistente Teilnehmer-Zählung** - Die Mindestteilnehmer-
+  Prüfung zählt wie die Anzeige nur Accounts, die mindestens 24 Stunden
+  alt sind (Migration 070): kurzlebige Fake-Accounts können das Event
+  weder "startbar" machen noch die Fortschrittsanzeige täuschen
 - **Präferenzen überleben Neuinstallationen** (Migration 066): Entfernung,
   Altersspanne, "Ich suche" (Beziehungsart), Bundesland-Filter, Ort und
   Geschlechts-Filter werden jetzt zusätzlich serverseitig gespeichert

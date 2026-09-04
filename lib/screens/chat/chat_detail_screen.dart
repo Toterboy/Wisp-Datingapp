@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show ImageFilter;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -429,6 +430,25 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           );
         }
         return;
+      }
+
+      // Bild-Hash serverseitig registrieren (Migration 068): Nur der
+      // SHA-256-Hash - niemals das Bild. Damit kann eine spätere Meldung
+      // dieses Bildes NACHGEWIESEN werden (Edge Function `report-image`
+      // lehnt Bilder ohne Registrierung ab).
+      try {
+        final imageHash = sha256.convert(bytes).toString();
+        unawaited(
+          SupabaseService.client.rpc(
+            'register_chat_image_hash',
+            params: {
+              'p_receiver_id': match.partner.id,
+              'p_photo_hash': imageHash,
+            },
+          ),
+        );
+      } catch (_) {
+        // Best effort - Senden darf daran nicht scheitern.
       }
 
       // E2E-verschlüsselt über den DataChannel senden.

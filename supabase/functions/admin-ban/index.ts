@@ -108,13 +108,14 @@ serve(async (req) => {
 
     // User-ID anhand der E-Mail nachziehen (für den GoTrue-Ban), wenn nur
     // die E-Mail angegeben wurde. profiles speichert die E-Mail nicht - der
-    // Weg läuft über die GoTrue-Admin-Liste (begrenzt auf die ersten 200
-    // Accounts pro Aufruf; für kleine Instanzen ausreichend).
+    // Weg läuft über die GoTrue-Admin-Liste, jetzt PAGINIERT (bis 5000
+    // Accounts), damit die Sperrung auch bei größeren Instanzen greift.
     if (!targetUserId && action === "ban") {
-      const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
-        page: 1, perPage: 200,
-      });
-      if (!listErr && list?.users) {
+      for (let page = 1; page <= 25 && !targetUserId; page++) {
+        const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
+          page, perPage: 200,
+        });
+        if (listErr || !list?.users || list.users.length === 0) break;
         const match = list.users.find((u) => (u.email ?? "").toLowerCase() === email);
         if (match) targetUserId = match.id;
       }

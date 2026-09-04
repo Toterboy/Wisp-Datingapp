@@ -176,6 +176,45 @@ serve(async (req) => {
     // aktuelles Ergebnis enthält).
     const ai = await scanImage(imageBase64);
 
+    // Hash über die ROHEN Bildbytes (konsistent zur Client-Registrierung:
+    // Der Sender registriert SHA-256 der Bytes beim Versand - Migration
+    // 068, Tabelle chat_image_hashes).
+    const imageBytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0));
+    const photoHashHex = Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", imageBytes)),
+    )
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Lückenfix: NACHWEIS, dass das Bild wirklich zwischen Meldendem und
+    // Gemeldetem geflossen ist (sonst könnten beliebige fremde Bilder
+    // untergeschoben werden). Die Hash-Registrierung passiert beim Senden
+    // (register_chat_image_hash, Migration 068) - nur Hashes, keine Bilder.
+    const { data: knownRows, error: knownErr } = await supabaseAdmin
+      .from("chat_image_hashes")
+      .select("id")
+      .or(
+        `and(sender_id.eq.${reporter.id},receiver_id.eq.${reportedUserId}),` +
+        `and(sender_id.eq.${reportedUserId},receiver_id.eq.${reporter.id})`,
+      )
+      .eq("photo_hash", photoHashHex)
+      .limit(1);
+    if (knownErr) {
+      console.error("chat_image_hashes lookup failed:", knownErr);
+    }
+    const knownInChat = !knownErr && (knownRows?.length ?? 0) > 0;
+    if (!knownInChat) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Dieses Bild konnte diesem Chat nicht zugeordnet werden. " +
+            "Nur tatsächlich in diesem Chat versendete/empfangene Bilder " +
+            "können gemeldet werden.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     // 2) DB-Eintrag (Service-Role; Migration 064 + 069).
     // Status: KI-Fund -> rejected (Auto-Bann-Zählung bleibt Client-/Admin-
     // Sache), Eskalation/KI nicht verfügbar -> pending_review (manuelle
@@ -199,9 +238,7 @@ serve(async (req) => {
     try {
       await supabaseAdmin.from("photo_moderation").insert({
         user_id: reportedUserId,
-        photo_hash: await crypto.subtle.digest("SHA-256", new TextEncoder().encode(imageBase64)).then(
-          (buf) => Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join(""),
-        ),
+        photo_hash: photoHashHex,
         status,
         hf_categories: ai.available ? { nsfw: ai.score } : null,
         hf_label: ai.label,
