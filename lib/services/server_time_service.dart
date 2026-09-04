@@ -227,5 +227,4 @@ class ServerTimeService with WidgetsBindingObserver {
       _startSyncTimer(const Duration(minutes: 5));
     }
   }
-  }
 }
