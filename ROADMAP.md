@@ -173,6 +173,17 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       öffnet den Chat mit situativen Fragen („Bist du noch in der Nähe von
       Halle 7?") + optionaler gegenseitiger Foto-Freischaltung nur für
       diese Session
+- [ ] **Einseitiges Anschreiben („Soft-Ping")**: Falls die andere Person
+      nicht an die App denkt oder sich selbst nicht traut, kann NUR der
+      Meldende nach der Begegnung EINMAL eine diskrete Anfrage senden
+      (vorgefertigte, freundliche Sätze + optional eine kurze eigene Zeile
+      – kein freier Text, kein Spam). Die Person erhält eine dezente
+      Benachrichtigung und kann den Funke NACHTRÄGLICH aktivieren.
+      Schutzregeln: genau 1 Versuch pro Begegnung (kein Wiederholen),
+      die Anfrage verfällt still nach 48 h, der Absender erfährt NIEMALS
+      eine Ablehnung (kein Lesestatus, kein „Nein" – Schweigen = Ende),
+      Blockier-/Melde-Schutz greift wie überall, Jugendschutz-Filter
+      serverseitig
 - [ ] **Native Berechtigungen**: Android (`AndroidManifest.xml`) und iOS
       (`Info.plist`) BLE-Konfiguration
 
