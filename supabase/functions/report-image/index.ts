@@ -160,6 +160,12 @@ serve(async (req) => {
         status: 400, headers: { "Content-Type": "application/json" },
       });
     }
+    // Selbst-Meldungen blocken (sinnlos + Mail-Kontingent-Missbrauch).
+    if (reportedUserId.toLowerCase() === reporter.id.toLowerCase()) {
+      return new Response(JSON.stringify({ error: "Selbst-Meldung nicht möglich." }), {
+        status: 400, headers: { "Content-Type": "application/json" },
+      });
+    }
     if (!escalate && reason.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Grund erforderlich." }), {
         status: 400, headers: { "Content-Type": "application/json" },
@@ -170,13 +176,26 @@ serve(async (req) => {
     // aktuelles Ergebnis enthält).
     const ai = await scanImage(imageBase64);
 
-    // 2) DB-Eintrag (Service-Role; Migration 064-Spalten).
+    // 2) DB-Eintrag (Service-Role; Migration 064 + 069).
     // Status: KI-Fund -> rejected (Auto-Bann-Zählung bleibt Client-/Admin-
     // Sache), Eskalation/KI nicht verfügbar -> pending_review (manuelle
     // Prüfung), KI harmless ohne Eskalation -> approved (Dokumentation).
+    // Pseudonymisierung (H-06): reporter_id nur als SHA-256-Hash - der
+    // Gemeldete könnte seine eigene Zeile via RLS lesen und darf die
+    // Identität des Meldenden NICHT sehen.
     const status = ai.available
       ? (ai.nsfw ? "rejected" : (escalate ? "pending_review" : "approved"))
       : "pending_review";
+    const reporterHash = Array.from(
+      new Uint8Array(
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(reporter.id),
+        ),
+      ),
+    )
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
     try {
       await supabaseAdmin.from("photo_moderation").insert({
         user_id: reportedUserId,
@@ -186,7 +205,7 @@ serve(async (req) => {
         status,
         hf_categories: ai.available ? { nsfw: ai.score } : null,
         hf_label: ai.label,
-        reporter_id: reporter.id,
+        reporter_id: reporterHash,
         report_reason: reason,
         report_details: details || null,
         escalated: escalate,
