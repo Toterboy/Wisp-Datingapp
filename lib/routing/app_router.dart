@@ -49,7 +49,7 @@ import 'package:wisp/screens/bug_report/bug_report_screen.dart';
 import 'package:wisp/screens/qr/qr_profile_screen.dart';
 import 'package:wisp/screens/qr/qr_scan_screen.dart';
 import 'package:wisp/screens/legal/community_guidelines_screen.dart';
-import 'package:wisp/widgets/back_to_home_scope.dart';
+import 'package:wisp/widgets/back_to_route_scope.dart';
 
 /// Zentrale Routen der App.
 class AppRoutes {
@@ -543,30 +543,39 @@ routes: [
         builder: (context, state) => const SafetyCenterScreen(),
       ),
       // Dating Hour (Event-Modus) - Vollbild-Routen ohne Navigator-Stack:
-      // System-Zurück/Geste führt zur Haupt-Navigation statt App-Exit.
+      // Zurück-Geste führt jeweils zur Seite davor statt App-Exit.
       GoRoute(
         path: AppRoutes.datingHourRules,
-        builder: (context, state) =>
-            const BackToHomeScope(child: DatingHourRulesScreen()),
+        builder: (context, state) => const BackToRouteScope(
+          route: AppRoutes.datingHourEvent,
+          child: DatingHourRulesScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.datingHourHowItWorks,
-        builder: (context, state) =>
-            const BackToHomeScope(child: DatingHourHowItWorksScreen()),
+        builder: (context, state) => const BackToRouteScope(
+          route: AppRoutes.datingHourEvent,
+          child: DatingHourHowItWorksScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.datingHourEvent,
-        builder: (context, state) =>
-            const BackToHomeScope(child: DatingHourEventScreen()),
+        builder: (context, state) => const BackToRouteScope(
+          route: AppRoutes.swipeModeSelection,
+          child: DatingHourEventScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.datingHourPreferences,
-        builder: (context, state) =>
-            const BackToHomeScope(child: DatingHourPreferencesScreen()),
+        builder: (context, state) => const BackToRouteScope(
+          route: AppRoutes.datingHourEvent,
+          child: DatingHourPreferencesScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.datingHourChat,
-        builder: (context, state) => BackToHomeScope(
+        builder: (context, state) => BackToRouteScope(
+          route: AppRoutes.datingHourEvent,
           child: DatingHourChatScreen(
             sessionId: state.pathParameters['sessionId']!,
           ),

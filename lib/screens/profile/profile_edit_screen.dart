@@ -19,6 +19,7 @@ import 'package:wisp/services/location_verification_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/services/supabase_storage_service.dart';
+import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/geo_names.dart';
 import 'package:wisp/utils/validators.dart';
@@ -951,6 +952,45 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                               .read(userPreferencesProvider.notifier)
                               .setMaxDistanceKm(rounded);
                         },
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              // Altersspanne (fehlte im Profil-Editor bislang komplett) -
+              // mit altersbasierter Klemmung wie in der Einrichtung.
+              Consumer(
+                builder: (context, ref, _) {
+                  final settings = ref.watch(settingsProvider);
+                  final myAge = ref.watch(profileProvider).age;
+                  final (allowedMin, allowedMax) = AgeSafetyRules.clampFilterAge(
+                    viewerAge: myAge ?? 18,
+                    filterMin: settings.ageRangeMin,
+                    filterMax: settings.ageRangeMax,
+                  );
+                  final labelMin =
+                      settings.ageRangeMin.clamp(allowedMin, allowedMax);
+                  final labelMax =
+                      settings.ageRangeMax.clamp(labelMin, allowedMax);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bevorzugte Altersspanne: $labelMin bis $labelMax Jahre',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      RangeSlider(
+                        values: RangeValues(
+                          labelMin.toDouble(),
+                          labelMax.toDouble(),
+                        ),
+                        min: allowedMin.toDouble(),
+                        max: allowedMax.toDouble(),
+                        divisions: (allowedMax - allowedMin).clamp(1, 83),
+                        onChanged: (v) => ref
+                            .read(settingsProvider.notifier)
+                            .setAgeRange(v.start.round(), v.end.round()),
                       ),
                     ],
                   );

@@ -7,6 +7,43 @@ und folgt der [Semantic Versioning Specification (SemVer)](https://semver.org/la
 Solange die Versionsnummer mit `0.` beginnt (Initial Development Phase nach SemVer §4),
 können sich Schnittstellen und Verhalten jederzeit ändern.
 
+## [0.7.3] – 2026-08-30
+
+Fix-Release: Usability und Stabilität.
+
+### Behoben
+
+- **Automatische Abmeldung nach Stunden behoben**: Der Session-Token läuft
+  nach ~1 h ab; war die App länger im Hintergrund, schlug der einzige
+  Auffrischungsversuch beim Öffnen fehl und man war ausgeloggt - obwohl
+  „Angemeldet bleiben" aktiv war. Jetzt wird beim Start mehrfach mit
+  Pausen aufgefrischt; nur bei echtem Token-Verlust bleibt man
+  ausgeloggt
+- **Passkey-Erstellen trotz 2FA**: Der 2FA-Status wurde aus einem Cache
+  gelesen, der veraltet oder nie geladen war - dadurch griff die 2FA-
+  Bestätigung vor dem Anlegen nicht und der Server lehnte ab. Jetzt wird
+  der Status frisch geladen
+- **2FA-Anzeige**: Die Einstellungs-Kachel zeigt den aktuellen 2FA-Stand
+  jetzt beim Antippen frisch vom Server (vorher konnte ein alter/leerer
+  Stand angezeigt werden)
+- **Benachrichtigungs-Symbol**: Das Statusleisten-Icon war praktisch leer
+  (nur ~300 weiße Pixel aus einer zu sparsamen Logo-Rampe). Jetzt eine
+  klare Herz-Silhouette
+- **Zurück-Geste in der Dating Hour**: führt jetzt jeweils zur Seite
+  davor (z. B. von den Präferenzen zurück zum Event) statt zur
+  Haupt-Navigation
+- **Altersspanne im Profil-Editor ergänzt** (fehlte dort komplett, mit
+  altersbasierter Klemmung wie in der Einrichtung)
+- **Ladekreis direkt nach dem Anmelde-Klick**: Nicht-abwischbarer
+  Ladekreis („Anmeldung läuft…") erscheint sofort, damit keine tote Phase
+  entsteht
+
+### Hinzugefügt
+
+- **Dating Hour: Teilnehmer-Fortschritt** (Migration 068): „X von 20
+  Teilnehmern" mit Fortschrittsbalken im Event-Screen - man sieht, ob das
+  Ziel erreicht ist und wie viele noch fehlen
+
 ## [0.7.2] – 2026-08-28
 
 Dating-Hour-Release: Zeit-Fix, Fairness-Regeln und Admin-Polish.

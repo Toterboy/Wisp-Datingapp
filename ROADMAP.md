@@ -57,7 +57,15 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 - [ ] F-Droid-Veröffentlichung (Build-Seite fertig: google-freier Flavor,
       UnifiedPush, Fastlane-Metadaten – Einreichung steht noch aus)
 
-## Geplant für 0.7.3 (Fix- & Polish-Release)
+- [x] **0.7.3** – Fix-Release: Altersspanne im Profil-Editor ergänzt,
+      Ladekreis direkt nach dem Anmelde-Klick, Dating-Hour-Zurück führt zur
+      Seite davor, Teilnehmer-Fortschritt „X von 20" im Event-Screen
+      (Migration 068), 2FA-Anzeige/Passkey (frischer MFA-Status + Step-up
+      vor der Passkey-Erstellung), Auto-Logout nach Stunden behoben
+      (Session-Refresh mit Wiederholung beim Start), Benachrichtigungs-
+      Symbol als klare Herz-Silhouette (vorher praktisch leer)
+
+## Geplant für 0.7.4
 
 - [ ] **Dating-Hour-Zeiten: Regression aufklären & endgültig lösen** –
       Nach Migration 067 (Startzeit Europe/Berlin) ging etwas schief, der
@@ -68,10 +76,6 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       während des Updates)? Ziel: Die Berlin-Zeit-Lösung (067, DST-korrekt)
       endgültig wieder aktivieren und die GESAMTE Kette testen –
       Event-Erzeugung, Scheduler-Fenster, RPC-Antwort und Client-Countdown
-- [ ] **Benachrichtigungs-Symbol endgültig fixen**: Es erscheint weiterhin
-      weiß/viereckig und leer – Ursache tiefenprüfen (FCM-Payload vs.
-      lokale Anzeige vs. Distributor-Benachrichtigung) und in ALLEN
-      Benachrichtigungs-Wegen das runde Wisp-Zeichen erzwingen
 - [ ] **Dating-Hour-Präferenzen: „Zurück" = Seite davor** – Der Zurück-Weg
       vom Präferenzen-Screen führt zur aufrufenden Seite (nicht zu
       Home/App)

@@ -170,10 +170,23 @@ class SettingsScreen extends ConsumerWidget {
                         // aktiviert, verlangt der Server für das Anlegen
                         // eines Passkeys eine aktuelle Zweitfaktor-
                         // Bestätigung - ohne sie schlägt die Erstellung
-                        // mit "Server hat abgelehnt" fehl.
-                        final mfa = ref.read(mfaStatusProvider);
+                        // mit "Server hat abgelehnt" fehl. Status FRISCH
+                        // laden: Der gecachte Provider kann veraltet bzw.
+                        // nie geladen sein ("trotz 2FA geht es nicht",
+                        // "Haken fehlt").
+                        var mfa = ref.read(mfaStatusProvider);
+                        if (SupabaseService.isInitialized) {
+                          try {
+                            mfa = await MfaService(SupabaseService.client)
+                                .loadStatus();
+                            ref.read(mfaStatusProvider.notifier).state = mfa;
+                          } catch (_) {
+                            // Fail-closed: Mit dem alten Stand weiter.
+                          }
+                        }
                         if (mfa.hasVerifiedFactors &&
                             mfa.currentAal != 'aal2') {
+                          if (!context.mounted) return;
                           final code = await promptTotpCode(context);
                           if (code == null || !context.mounted) return;
                           try {
@@ -230,7 +243,24 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       contentPadding: EdgeInsets.zero,
-                      onTap: () => context.push(AppRoutes.mfaSetup),
+                      onTap: () async {
+                        // MFA-Status FRISCH laden (nicht den gecachten
+                        // Provider vertrauen): Sonst zeigt die Kachel nach
+                        // dem Einrichten fälschlich "nicht aktiv" und der
+                        // Passkey-Precheck unten greift nicht.
+                        if (SupabaseService.isInitialized) {
+                          try {
+                            final fresh = await MfaService(SupabaseService.client)
+                                .loadStatus();
+                            ref.read(mfaStatusProvider.notifier).state = fresh;
+                          } catch (_) {
+                            // Best-Effort: alter Stand bleibt.
+                          }
+                        }
+                        if (context.mounted) {
+                          context.push(AppRoutes.mfaSetup);
+                        }
+                      },
                     ),
                   ],
                 ],

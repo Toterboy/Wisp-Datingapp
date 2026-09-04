@@ -36,15 +36,50 @@ class SupabaseAuthService implements AppAuthService {
   /// Netzwerkfehler behalten die Session (offline-tolerant).
   @override
   Future<bool> restoreSession() async {
-    final session = _supabase.auth.currentSession;
+    var session = _supabase.auth.currentSession;
     if (session == null) return false;
     final user = _supabase.auth.currentUser;
     if (user == null) return false;
     if (user.emailConfirmedAt == null) return false;
 
+    // Auto-Logout-Härtung ("nach ein paar Stunden abgemeldet"): Der
+    // Access-Token läuft nach ~1 h ab. War die App länger im Hintergrund,
+    // ist der Token beim Start abgelaufen - schlägt dann der EINZIGE
+    // Refresh-Versuch (z. B. kurzzeitig kein Netz), fliegt die Session.
+    // Deshalb: Explizites Auffrischen mit bis zu 3 Versuchen, BEVOR wir
+    // "angemeldet" melden. Schlägt es dauerhaft fehl (Token widerrufen),
+    // ist die Abmeldung korrekt.
+    final expiresAt = session.expiresAt ?? 0;
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    if (expiresAt - nowSec < 120) {
+      Object? lastError;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          await Future<void>.delayed(Duration(seconds: 2 * attempt));
+        }
+        try {
+          final refreshed = await _supabase.auth
+              .refreshSession()
+              .timeout(const Duration(seconds: 10));
+          if (refreshed.session != null) {
+            session = refreshed.session;
+            lastError = null;
+            break;
+          }
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      if (lastError != null || session == null) {
+        debugPrint('[AuthService] Session-Refresh nach Stunden '
+            'fehlgeschlagen (Abmeldung): $lastError');
+        return false;
+      }
+    }
+
     // Serverseitige Validierung NICHT abwarten (Startzeit!).
     unawaited(_validateSession());
-    // Safety-Numbers (Signal-Fingerprint) benötigen die eigene User-ID.
+    // Safety-Numbers (Signal-Fingerprint) ben�tigen die eigene User-ID.
     _encryption.localUserId = user.id;
     return true;
   }

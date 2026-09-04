@@ -377,6 +377,12 @@ class _DatingHourEventScreenState extends ConsumerState<DatingHourEventScreen> {
               ),
               const SizedBox(height: 16),
             ],
+            // Fortschritt zum Teilnehmer-Ziel: "X von 20" + was fehlt
+            // (Ziel in der DB-Logik verankert, Migration 067).
+            if (event.status != 'cancelled') ...[
+              _ParticipantProgress(eventId: event.id),
+              const SizedBox(height: 16),
+            ],
             _EventStatusCard(
               event: event,
               isRunning: isRunning,
@@ -473,6 +479,69 @@ String _formatDuration(int minutes) {
   final m = minutes % 60;
   if (m == 0) return '$h Stunden';
   return '$h Stunden $m Minuten';
+}
+
+/// Fortschritt zum Teilnehmer-Ziel (20): zeigt "X von 20 Teilnehmern" und
+/// wie viele noch fehlen, damit das Event stattfindet (Migration 067/068).
+class _ParticipantProgress extends ConsumerWidget {
+  const _ParticipantProgress({required this.eventId});
+
+  final String eventId;
+
+  static const int _target = 20;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<int>(
+      future: ref.read(datingHourServiceProvider).getParticipantCount(eventId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        final missing = (_target - count).clamp(0, _target);
+        final reached = count >= _target;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      reached ? Icons.check_circle : Icons.groups,
+                      size: 20,
+                      color: reached
+                          ? Colors.green
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        reached
+                            ? 'Ziel erreicht: $count von $_target Teilnehmern!'
+                            : '$count von $_target Teilnehmern'
+                                '${missing > 0 ? ' - es fehlen noch $missing' : ''}',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: (count / _target).clamp(0.0, 1.0),
+                    minHeight: 8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Button, der die aktive Session des Users während eines Events anzeigt.

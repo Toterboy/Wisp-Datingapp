@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,6 +122,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // "Passwort vergessen?"-Button und der Modus-Wechsel während eines
     // (langsamen) Logins deaktiviert bzw. der ganze Screen wirkte "laggy".
     setState(() => _submitting = true);
+    // Großer, nicht-abwischbarer Ladekreis: Direkt nach dem Klick klar
+    // sichtbar (der kleine Button-Spinner allein wurde als
+    // "passiert nichts" empfunden).
+    unawaited(_showBlockingLoader());
     try {
       final auth = ref.read(authProvider.notifier);
       if (_isRegister) {
@@ -292,7 +298,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       return;
     } finally {
+      _dismissBlockingLoader();
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  /// Großer, nicht-abwischbarer Ladekreis während der Auth-Anfrage.
+  Future<void> _showBlockingLoader() {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black45,
+      builder: (ctx) => const PopScope(
+        canPop: false,
+        child: Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Anmeldung läuft…'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _dismissBlockingLoader() {
+    if (mounted &&
+        Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
     }
   }
 

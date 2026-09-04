@@ -173,7 +173,8 @@ Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.1:
 
 - **Migrationen:** 064 (Bild-Report-Spalten), 065 (`onboarding_done`),
   066 (Präferenz-Sync: „Ich suche", Bundesland), 067 (Dating-Hour-Zeiten
-  Europe/Berlin, Mindestteilnehmer, Dopplungs-Schutz, Mood-Infrastruktur)
+  Europe/Berlin, Mindestteilnehmer, Dopplungs-Schutz, Mood-Infrastruktur),
+  068 (Teilnehmer-Zähler für die Dating-Hour-Fortschrittsanzeige)
 - **Edge Functions:** `report-image` (Bild-Meldung + KI), `admin-ban`
   (Nutzer sperren/entsperren), `notify-user` (aktualisiert: rundes
   Statusleisten-Icon)
@@ -188,7 +189,7 @@ Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.1:
 
 ## Hinweis zum Entwicklungsstand
 
-Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.7.2). Folgende Bereiche sind noch nicht final:
+Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.7.3). Folgende Bereiche sind noch nicht final:
 
 - **Automatischer Gesichtsabgleich** (Profilbild vs. Verifizierungs-Video) → z. B. selbstgehostete Open-Source-Modelle wie DeepStack oder Face Recognition (selbst gehostet, datenschutzfreundlich, EU-fähig)
 - **NSFW-Bild-Moderation** – *melde-basiert umgesetzt*: Chat-Bilder werden nie beim Senden gescannt (E2E), sondern erst bei einer Meldung durch den Empfänger automatisch per NSFW-KI geprüft (Edge Function `report-image`, NSFW-Klassifikator; `HF_API_TOKEN` als Function-Secret konfigurierbar). Der Meldende erhält das KI-Ergebnis direkt und kann bei Widerspruch manuell eskalieren - in beiden Fällen gehen Bild, Report und KI-Ergebnis per E-Mail an das Team. **Noch offen:** automatische Profilbild-Prüfung beim Upload und automatische Account-Sperre bei Wiederholungsverstößen (derzeit manuell).

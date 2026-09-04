@@ -102,6 +102,23 @@ class DatingHourService {
     });
   }
 
+  /// Anzahl aktiver Teilnehmer eines Events (für die "X von 20"-Anzeige).
+  /// Liefert 0 bei Fehlern (Best effort - die Anzeige darf nicht hängen).
+  Future<int> getParticipantCount(String eventId) async {
+    try {
+      final result = await SupabaseService.client.rpc(
+        'get_dating_hour_participant_count',
+        params: {'p_event_id': eventId},
+      );
+      return (result as num?)?.toInt() ?? 0;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[DatingHourService] Teilnehmer-Zähler fehlgeschlagen: $e');
+      }
+      return 0;
+    }
+  }
+
   /// Lädt die zuletzt gespeicherten Dating-Hour-Präferenzen (Migration 067).
   ///
   /// Diese bleiben über Events und Neuinstallationen hinweg erhalten und
