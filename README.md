@@ -53,7 +53,7 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 - **QR Code** – eigenes Profil als QR-Code teilen, fremde Codes scannen oder manuell eingeben; der angezeigte 8-stellige Code ist serverseitig auflösbar (manuelle Eingabe findet den echten Nutzer)
 - **Dating Hour (Event-Modus)** – jeden Samstag 20:00–21:00 Uhr deutscher Zeit (Sommer-/Winterzeit automatisch berücksichtigt):
   - Beitritt jederzeit möglich (serverzeitsynchron, Manipulation der Geräteuhr wird erkannt); Aktualisieren ist rein lesend, Beitritt NUR über „Ich bin dabei" mit Bestätigungsdialog
-  - Erst ab 20 angemeldeten Personen – darunter fällt das Event aus (Schutz vor Fake-Account-Runden)
+  - Erst ab 20 angemeldeten Personen – darunter fällt das Event aus (Schutz vor Fake-Account-Runden); der Fortschritt („X von 20") wird live im Event-Screen angezeigt; nur Konten ab 24 Stunden Alter zählen
   - Keine Wiederholungen: Das Matching bevorzugt Personen, mit denen es noch nie eine Session gab
   - Zwei zufällig zugeordnete Personen chatten direkt E2E-verschlüsselt (ohne Profilansicht); Hinweis-Banner bei >= 10 Jahren Altersdifferenz
   - Nach 5 Minuten: beide können einen Funke „Annehmen" oder „Ablehnen"
@@ -169,21 +169,49 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 
 Nach einem Update müssen vor dem Rollout die Datenbank-Migrationen
 (`supabase/migrations/`, per SQL-Editor oder `supabase db push`) und die
-Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.1:
+Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.3:
 
 - **Migrationen:** 064 (Bild-Report-Spalten), 065 (`onboarding_done`),
   066 (Präferenz-Sync: „Ich suche", Bundesland), 067 (Dating-Hour-Zeiten
   Europe/Berlin, Mindestteilnehmer, Dopplungs-Schutz, Mood-Infrastruktur),
-  068 (Teilnehmer-Zähler für die Dating-Hour-Fortschrittsanzeige)
-- **Edge Functions:** `report-image` (Bild-Meldung + KI), `admin-ban`
-  (Nutzer sperren/entsperren), `notify-user` (aktualisiert: rundes
-  Statusleisten-Icon)
+  068 (Teilnehmer-Zähler + Chat-Bild-Hash-Registrierung),
+  069 (Reporter-Pseudonymisierung), 070 (konsistente Teilnehmer-Zählung)
+- **Edge Functions:** `report-image` (Bild-Meldung + KI + Nachweis-Pflicht),
+  `admin-ban` (Nutzer sperren/entsperren, paginierte Suche),
+  `notify-user` (rundes Statusleisten-Icon), `server-time`
 - **Function-Secrets** (Dashboard → Edge Functions → Secrets):
   - `BREVO_API_KEY` – Mails (Bild-Meldungen, Bug-Reports, Konto-Sperren)
   - `MODERATION_EMAIL` – Empfänger der Bild-Meldungs-Mails
   - `ADMIN_UUID` – Admin-ID für `admin-ban` (identisch zum Build-Flag)
   - `HF_API_TOKEN` – optional, aktiviert die NSFW-KI-Vorprüfung
   - `FIREBASE_SERVICE_ACCOUNT_JSON` – FCM-Versand (bereits vorhanden)
+
+---
+
+## Kommende Funktionen
+
+Geplant und teilweise bereits in Entwicklung (Details:
+[ROADMAP.md](ROADMAP.md)):
+
+**Ab v0.8.0 – Geschmack & Matching:**
+- Musik-Geschmack: Genres (inkl. „Instrumental"), die man mag – und
+  freiwillig solche, die man gar nicht mag; fließt ins Matching ein
+- Quiz-Fragen-Pool vervollständigt; Verbindungs-Score transparent im Profil
+- Inaktive Funken als eigene Rubrik (ohne Streak-Druck), Chats mehrfach
+  auswählbar und löschbar, „Re-Funke" ohne Frist
+- Dating Hour mit thematischen Runden und Frage-Karten für Schüchterne
+- NSFW-Prüfung on-device (Bild verlässt das Gerät nicht) und beim
+  Profilbild-Upload; App komplett zweisprachig (DE/EN)
+
+**Ab v0.9.0 – Nahbereichs-Funke („Transit Spark"):**
+- Wie es funktioniert: Man lächelt sich im Zug, Café oder auf einer Messe
+  an, traut sich aber nicht anzusprechen. Die Geräte registrieren in der
+  Nähe (3–10 m) anonyme, ephemere Begegnungs-Tokens (BLE, 45 Min. Cache).
+  Tippen später beide auf „Blicke getauscht" und wählen 1–3 Merkmale
+  (z. B. schwarzer Hoodie + Messe-Lanyard), matcht Supabase die Tokens –
+  auch wenn die Personen inzwischen weit voneinander entfernt sind.
+  Ein Funke entsteht nur bei beidseitigem Signal. Privat: keine Bilder im
+  Umlauf, Tokens rotieren und verfallen automatisch.
 
 ---
 
