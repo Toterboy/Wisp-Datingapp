@@ -10,6 +10,13 @@
 -- bleibt dem Team über die Benachrichtigungs-Mail erhalten; in der DB ist
 -- der Meldende pseudonymisiert.
 
+-- 1) Foreign Key entfernen: Er verhindert den Typwechsel (uuid -> text)
+--    und ist mit der Pseudonymisierung ohnehin obsolet (ein Hash ist
+--    bewusst KEINE auflösbare Referenz mehr).
+ALTER TABLE public.photo_moderation
+  DROP CONSTRAINT IF EXISTS photo_moderation_reporter_id_fkey;
+
+-- 2) Typ wechseln und Bestands-Werte sofort hashen.
 ALTER TABLE public.photo_moderation
   ALTER COLUMN reporter_id TYPE text
   USING CASE
