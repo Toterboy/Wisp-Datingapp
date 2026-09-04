@@ -49,6 +49,36 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
 
   final _codeCtrl = TextEditingController();
 
+  /// True, wenn bereits ein verifizierter 2FA-Faktor existiert - dann zeigt
+  /// der Screen die "aktiv"-Ansicht statt des Einrichtungs-Flows.
+  bool _twoFaActive = false;
+
+  /// Schützt das programmatische Verlassen („Später erinnern", fertig)
+  /// vor dem blockierenden PopScope: Ohne dieses Flag poppte der Screen
+  /// endlos gegen die eigene Sperre ("Seite öffnet sich immer neu").
+  bool _leaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2FA-Stand FRISCH laden: Zeigt bereits aktivierte 2FA sofort als
+    // "aktiv" an (vorher fehlte der Haken / die Einrichtung schlug fehl).
+    _refreshStatus();
+  }
+
+  Future<void> _refreshStatus() async {
+    final service = _tryGetService();
+    if (service == null) return;
+    try {
+      final status = await service.loadStatus();
+      if (!mounted) return;
+      ref.read(mfaStatusProvider.notifier).state = status;
+      setState(() => _twoFaActive = status.hasVerifiedFactors);
+    } catch (_) {
+      // Best effort: Intro bleibt sichtbar.
+    }
+  }
+
   @override
   void dispose() {
     _clipboardClearTimer?.cancel();
@@ -93,12 +123,10 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
       if (kDebugMode) debugPrint('[MfaSetup] enroll fehlgeschlagen: $e');
       if (mounted) {
         setState(() {
-          // Im Debug-Modus die Original-Fehlermeldung mit anzeigen,
-          // sonst ist die Ursache nur im Log sichtbar.
-          _error = kDebugMode
-              ? 'Einrichtung konnte nicht gestartet werden '
-                  '(${e is AuthException ? e.message : e}). '
-                  'Bitte versuche es später erneut.'
+          // Kuratierte Server-Meldungen (z. B. "2FA ist bereits
+          // aktiviert") IMMER zeigen; nur Unbekanntes bleibt generisch.
+          _error = e is AuthException
+              ? e.message
               : 'Einrichtung konnte nicht gestartet werden. '
                   'Bitte versuche es später erneut.';
           _loading = false;
@@ -167,8 +195,13 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
   /// Weiter: Wurde der Screen aufgestapelt geöffnet (Einrichtung,
   /// Einstellungen), zurück dorthin – sonst zur Startseite.
   void _continueFlow() {
-    if (context.canPop()) {
-      context.pop();
+    // PopScope-Sperre für das programmatische Verlassen aufheben - sonst
+    // poppt der Screen endlos gegen die eigene Sperre ("öffnet sich
+    // immer wieder neu").
+    _leaving = true;
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     } else {
       context.go(AppRoutes.home);
     }
@@ -181,9 +214,9 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
     // bleibt er ohne Leading.
     final canLeave = Navigator.of(context).canPop();
     return PopScope(
-      canPop: false,
+      canPop: _leaving,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _continueFlow();
+        if (!didPop && !_leaving) _continueFlow();
       },
       child: Scaffold(
       appBar: AppBar(
@@ -209,6 +242,40 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
   }
 
   Widget _buildIntro() {
+    // 2FA bereits aktiv? Dann "aktiv"-Ansicht mit Haken statt des
+    // Einrichtungs-Flows (User-Bericht: "steht nicht, dass ich es
+    // eingerichtet habe" + "Einrichten geht nicht").
+    if (_twoFaActive) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Icon(
+            Icons.verified_user,
+            size: 64,
+            color: Colors.green,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '2FA ist aktiviert',
+            style: Theme.of(context).textTheme.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Dein Konto ist mit einer Authenticator-App geschützt. '
+            'Bei der Anmeldung wird zusätzlich zum Passwort der '
+            'aktuelle Code abgefragt.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          FilledButton.icon(
+            onPressed: _continueFlow,
+            icon: const Icon(Icons.check),
+            label: const Text('Fertig'),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

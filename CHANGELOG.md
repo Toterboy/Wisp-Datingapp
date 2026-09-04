@@ -11,6 +11,32 @@ können sich Schnittstellen und Verhalten jederzeit ändern.
 
 Fix-Release: Usability und Stabilität.
 
+### Behoben (Nachtrag +4)
+
+- **2FA-Status zuverlässig**: Der MFA-Status wird beim Laden mit
+  Session-Auffrischung und Wiederholung versucht - die Einstellungs-Kachel
+  und der MFA-Screen zeigen den echten Stand (vorher: „nicht eingerichtet"
+  trotz aktiver 2FA, wenn der Status-Abruf fehlschlug)
+- **Passkey-Anlegen bei aktiver 2FA mit klarer Meldung**: Existiert schon
+  ein verifizierter Faktor, erscheint jetzt „2FA ist für dieses Konto
+  bereits aktiviert." statt einer kryptischen Ablehnung
+- **„Später erinnern" schließt die 2FA-Seite** statt sie endlos neu zu
+  öffnen (PopScope-Sperre wurde vom programmatischen Verlassen nicht
+  aufgehoben)
+- **Profil-Editor: Tab-Wechsel fragt zuverlässig** - Reine Textfeld-
+  Änderungen lösten keinen Rebuild aus, der Dirty-Flag blieb dadurch false
+  und die Nachfrage beim Tab-Wechsel unterblieb (Listener halten ihn jetzt
+  synchron); der Zurück-Button im AppBar fragt ebenfalls explizit
+- **Altersspanne 18-18 jetzt erhöhenbar** - Die RangeSlider ließ bei
+  identischen Werten nur den unteren Regler greifen; im Profil-Editor sind
+  es jetzt zwei getrennte Regler (Mindest-/Höchstalter)
+- **Alle Dropdowns abgerundet** - Die fünf Dropdowns im Profil-Editor
+  (Geschlecht, „Was suchst du?", Land, Bundesland, Suchradius-Modus)
+  folgen jetzt ebenfalls der 16-px-Rundung
+- **Dating-Hour-Meldung präzisiert**: „Präferenzen gespeichert. Deine
+  Teilnahme meldest du über ‚Ich bin dabei' am Event-Tag an." (statt der
+  verwirrenden Formulierung „Du bist noch nicht angemeldet")
+
 ### Behoben
 
 - **Automatische Abmeldung nach Stunden behoben**: Der Session-Token läuft

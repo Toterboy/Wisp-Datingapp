@@ -4,12 +4,39 @@ Fix-Release: Stabilität und Usability. Danke an alle Tester von v0.7.2!
 
 ## Behoben
 
+**2FA klar angezeigt** Die Einstellungs-Seite zeigt jetzt zuverlässig, ob
+2FA aktiv ist („2FA ist aktiviert" mit Haken) - der Status wird frisch vom
+Server geladen statt aus einem veralteten Zwischenspeicher.
+
+**Passkey + 2FA** Wer 2FA aktiv hat und einen Passkey anlegen will,
+bekommt jetzt die 2FA-Bestätigungsabfrage sicher angezeigt; ist der
+Passkey schon vorhanden, erscheint eine klare Meldung statt einer
+kryptischen Ablehnung.
+
+**„Später erinnern" schließt die Seite** Bei der 2FA-Seite öffnete sich
+die Seite vorher immer wieder neu - jetzt schließt sie sich ordentlich.
+
+**Profil-Editor fragt zuverlässig** Beim Wechsel des Tabs oder über den
+Zurück-Pfeil wird jetzt sicher nach ungespeicherten Profil-Änderungen
+gefragt.
+
+**Altersspanne 18-18 jetzt erhöhenbar** Die beiden Regler der Altersspanne
+waren bei identischen Werten verklemmt - im Profil-Editor gibt es jetzt
+zwei getrennte Regler (Mindest-/Höchstalter).
+
+**Alle Dropdowns abgerundet** Die fünf Dropdowns im Profil-Editor folgen
+jetzt ebenfalls der 16-px-Rundung.
+
 **Automatische Abmeldung nach Stunden** Wer „Angemeldet bleiben" aktiv
 hatte, wurde nach einigen Stunden trotzdem ausgeloggt: Der Sitzungs-Token
 läuft nach etwa einer Stunde ab, und schlug die einmalige Auffrischung
 beim Öffnen der App fehl (z. B. kurzzeitig kein Netz), war man draußen.
 Jetzt wird mehrfach hintereinander aufgefrischt - nur bei echtem
 Token-Verlust bleibt man ausgeloggt.
+
+**Dating-Hour-Meldung präzisiert** Nach dem Speichern der Dating-Hour-
+Präferenzen heißt es jetzt klar: „Deine Teilnahme meldest du über ‚Ich
+bin dabei' am Event-Tag an."
 
 **Passkey-Erstellen trotz 2FA** Der 2FA-Status wurde aus einem Cache
 gelesen, der veraltet oder nie geladen war. Dadurch fehlte die

@@ -361,8 +361,8 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Präferenzen gespeichert. Du bist noch nicht '
-                'angemeldet.'),
+            content: Text('Präferenzen gespeichert. Deine Teilnahme meldest '
+                'du über "Ich bin dabei" am Event-Tag an.'),
             behavior: SnackBarBehavior.floating,
           ),
         );

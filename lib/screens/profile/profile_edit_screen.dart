@@ -142,6 +142,17 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     // Dirty-Referenz: exakt der Wert, mit dem das Stadt-Feld belegt wurde.
     _prefillCity = _cityCtrl.text;
 
+    // Tab-Wechsel-Bug-Fix: Reine Textfeld-Änderungen triggern KEINEN
+    // Rebuild - der Dirty-Flag blieb dadurch false und die Bottom-Navigation
+    // fragte beim Verlassen nicht nach. Diese Listener halten den Flag
+    // bei jedem Tastenanschlag synchron.
+    for (final controller in [_nameCtrl, _bioCtrl, _cityCtrl, _stateCtrl]) {
+      controller.addListener(() {
+        if (!mounted) return;
+        ref.read(profileEditDirtyProvider.notifier).state = _isDirty();
+      });
+    }
+
     // Initial signed URL für aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
       _signedAvatarUrlFuture = ref
@@ -624,7 +635,29 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         title: const Text('Profil bearbeiten'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          // Explizite Dirty-Prüfung am Zurück-Button: Ein blinder
+          // context.pop() wird vom blockierenden PopScope abgefangen und
+          // wiederholte Dialoge bzw. verlorene Änderungen vermieden.
+          onPressed: () async {
+            if (_isDirty()) {
+              final choice = await _confirmUnsavedChanges();
+              if (!mounted || choice == null || choice == 'cancel') return;
+              if (choice == 'save') {
+                await _save();
+                return; // _saveInternal navigiert bei Erfolg selbst.
+              }
+              ref.read(profileEditDirtyProvider.notifier).state = false;
+              if (!mounted || !context.mounted) return;
+              context.go(AppRoutes.profile);
+              return;
+            }
+            if (!mounted || !context.mounted) return;
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.profile);
+            }
+          },
         ),
       ),
       body: SingleChildScrollView(
@@ -713,7 +746,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               _field(
                 child: DropdownButtonFormField<Gender>(
                   initialValue: _gender,
-                  decoration: const InputDecoration(labelText: 'Geschlecht'),
+                  decoration: InputDecoration(
+                    labelText: 'Geschlecht',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                   items: [
                     for (final g in Gender.values)
                       DropdownMenuItem(value: g, child: Text(g.label)),
@@ -744,8 +782,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               _field(
                 child: DropdownButtonFormField<RelationshipType>(
                   initialValue: _relationshipType,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Was suchst du?',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -819,7 +860,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               _field(
                 child: DropdownButtonFormField<String>(
                   initialValue: _countryValue,
-                  decoration: const InputDecoration(labelText: 'Land'),
+                  decoration: InputDecoration(
+                    labelText: 'Land',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                   items: kSupportedCountries
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
@@ -840,8 +886,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     initialValue: _stateCtrl.text.isEmpty
                         ? null
                         : _stateCtrl.text,
-                    decoration: const InputDecoration(labelText: 'Bundesland'),
-                    hint: const Text('Bitte wählen'),
+                    decoration: InputDecoration(
+                      labelText: 'Bundesland',
+                      hint: const Text('Bitte wählen'),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
                     items: kGermanStates
                         .map((s) =>
                             DropdownMenuItem(value: s, child: Text(s)))
@@ -866,8 +917,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 child: DropdownButtonFormField<DistanceFilterMode>(
                   initialValue:
                       ref.read(userPreferencesProvider).distanceFilterMode,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Suchradius definieren über',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -959,7 +1013,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ),
               const SizedBox(height: 16),
               // Altersspanne (fehlte im Profil-Editor bislang komplett) -
-              // mit altersbasierter Klemmung wie in der Einrichtung.
+              // als ZWEI getrennte Slider statt RangeSlider: Bei identischen
+              // Werten (z. B. 18-18) kann der RangeSlider nur den
+              // START-Thumb greifen - das Höchstalter ließe sich dann nicht
+              // erhöhen (User-Bericht).
               Consumer(
                 builder: (context, ref, _) {
                   final settings = ref.watch(settingsProvider);
@@ -969,28 +1026,55 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     filterMin: settings.ageRangeMin,
                     filterMax: settings.ageRangeMax,
                   );
-                  final labelMin =
-                      settings.ageRangeMin.clamp(allowedMin, allowedMax);
-                  final labelMax =
-                      settings.ageRangeMax.clamp(labelMin, allowedMax);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bevorzugte Altersspanne: $labelMin bis $labelMax Jahre',
+                        'Mindestalter: ${settings.ageRangeMin} Jahre',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      RangeSlider(
-                        values: RangeValues(
-                          labelMin.toDouble(),
-                          labelMax.toDouble(),
-                        ),
+                      Slider(
+                        value: settings.ageRangeMin
+                            .clamp(allowedMin, settings.ageRangeMax)
+                            .toDouble(),
                         min: allowedMin.toDouble(),
-                        max: allowedMax.toDouble(),
-                        divisions: (allowedMax - allowedMin).clamp(1, 83),
+                        max: settings.ageRangeMax
+                            .clamp(allowedMin, allowedMax)
+                            .toDouble(),
+                        divisions: (settings.ageRangeMax - allowedMin)
+                            .clamp(1, 83),
+                        label: '${settings.ageRangeMin} Jahre',
                         onChanged: (v) => ref
                             .read(settingsProvider.notifier)
-                            .setAgeRange(v.start.round(), v.end.round()),
+                            .setAgeRange(
+                              v.round(),
+                              settings.ageRangeMax
+                                  .clamp(v.round(), allowedMax),
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Höchstalter: ${settings.ageRangeMax} Jahre',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Slider(
+                        value: settings.ageRangeMax
+                            .clamp(settings.ageRangeMin, allowedMax)
+                            .toDouble(),
+                        min: settings.ageRangeMin
+                            .clamp(allowedMin, allowedMax)
+                            .toDouble(),
+                        max: allowedMax.toDouble(),
+                        divisions: (allowedMax - settings.ageRangeMin)
+                            .clamp(1, 83),
+                        label: '${settings.ageRangeMax} Jahre',
+                        onChanged: (v) => ref
+                            .read(settingsProvider.notifier)
+                            .setAgeRange(
+                              settings.ageRangeMin
+                                  .clamp(allowedMin, v.round()),
+                              v.round(),
+                            ),
                       ),
                     ],
                   );

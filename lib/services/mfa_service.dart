@@ -22,10 +22,16 @@ class MfaService {
 
   /// Lädt den MFA-Zustand: aktuelles Sicherheitslevel (AAL) und ob
   /// verifizierte Faktoren existieren.
+  ///
+  /// Härtung (0.7.3): Schlägt der erste Abruf fehl (Access-Token kann nach
+  /// Stunden im Hintergrund abgelaufen sein), wird die Session explizit
+  /// aufgefrischt und EINMAL erneut geladen. Ohne diesen Retry zeigte die
+  /// App fälschlich "2FA nicht eingerichtet" ("Haken fehlt") und blockierte
+  /// das Passkey-Anlegen ("trotz 2FA geht es nicht").
   Future<MfaStatus> loadStatus() async {
     if (!_hasSession) return const MfaStatus.initial();
 
-    try {
+    Future<MfaStatus> readStatus() async {
       final aalResponse =
           _client.auth.mfa.getAuthenticatorAssuranceLevel();
       final factorsResponse = await _client.auth.mfa.listFactors();
@@ -39,13 +45,30 @@ class MfaService {
         hasAnyFactor: hasAnyFactor,
         loaded: true,
       );
+    }
+
+    try {
+      return await readStatus();
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[MfaService] loadStatus fehlgeschlagen: $e');
+        debugPrint('[MfaService] loadStatus 1. Versuch fehlgeschlagen: $e');
       }
-      // Fail-closed: Bei Fehler keine Aussage – Router zeigt keinen
-      // Setup-Prompt an, verlangt aber auch keine Challenge.
-      return const MfaStatus.initial();
+      // Session auffrischen und erneut versuchen.
+      try {
+        await _client.auth.refreshSession();
+        final status = await readStatus();
+        if (kDebugMode) {
+          debugPrint('[MfaService] loadStatus nach Refresh erfolgreich');
+        }
+        return status;
+      } catch (e2) {
+        if (kDebugMode) {
+          debugPrint('[MfaService] loadStatus nach Refresh fehlgeschlagen: $e2');
+        }
+        // Fail-closed: Bei Fehler keine Aussage — Router zeigt keinen
+        // Setup-Prompt an, verlangt aber auch keine Challenge.
+        return const MfaStatus.initial();
+      }
     }
   }
 
@@ -65,7 +88,17 @@ class MfaService {
           await _client.auth.mfa.unenroll(f.id);
         }
       }
+      // Bereits VERIFIZIERTER TOTP-Faktor vorhanden? Dann ist 2FA aktiv -
+      // ein zweiter Faktor wird vom Server abgelehnt (Limit). Klare
+      // Meldung statt kryptischem "Einrichtung konnte nicht gestartet
+      // werden" (User-Bericht: "Einrichten drücken und es geht nicht").
+      if (existing.all.any((f) =>
+          f.status == FactorStatus.verified &&
+          f.factorType == FactorType.totp)) {
+        throw const AuthException('2FA ist für dieses Konto bereits aktiviert.');
+      }
     } catch (e) {
+      if (e is AuthException) rethrow;
       // Aufräumen ist Best-Effort: Kein Grund, den Start abzubrechen.
       if (kDebugMode) {
         debugPrint('[MfaService] Aufräumen alter Faktoren fehlgeschlagen: $e');
