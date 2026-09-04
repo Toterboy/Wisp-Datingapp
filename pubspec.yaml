@@ -1,7 +1,7 @@
 ﻿name: wisp
 description: Eine moderne, datenschutzfreundliche Dating-App mit Blind Mode (PersÃ¶nlichkeit zuerst).
 publish_to: 'none'
-version: 0.7.3+2
+version: 0.7.3+3
 
 environment:
   sdk: ^3.10.0

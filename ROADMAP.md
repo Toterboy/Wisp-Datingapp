@@ -49,6 +49,23 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       Altersdifferenz-Hinweis (>= 10 Jahre) im Event-Chat, Admin-
       Blackscreen behoben + Card-Look, Zurück-Geste beendet die App nicht
       mehr, Formulierungs-Fix, Passkey-Erstellung mit 2FA-Step-up
+- [x] **0.7.3** – Fix-Release: Altersspanne im Profil-Editor ergänzt,
+      Ladekreis direkt nach dem Anmelde-Klick, Dating-Hour-Zurück führt zur
+      Seite davor, Teilnehmer-Fortschritt „X von 20" im Event-Screen
+      (Migration 068), 2FA-Anzeige/Passkey (frischer MFA-Status + Step-up
+      vor der Passkey-Erstellung), Auto-Logout nach Stunden behoben
+      (Session-Refresh mit Wiederholung beim Start), Benachrichtigungs-
+      Symbol als klare Herz-Silhouette (vorher praktisch leer),
+      Reporter-Pseudonymisierung (069), Nachweis-Pflicht für Bild-Meldungen
+      (068), 20er-Ziel nur mit Accounts >= 24 h (070)
+- [x] **Dating-Hour-Zeit: Fallback gehärtet** – Live-Check bestätigte:
+      `server-time` antwortet korrekt; die Regression war der transiente
+      Fallback auf die lokale Gerätezeit bei fehlgeschlagenem Zeit-Abruf.
+      Jetzt: Sync mit Retry + Backoff beim Start und bei App-Rückkehr
+      (bis zu 3 Versuche), deutliches Warn-Banner solange keine
+      Serverzeit, und die harte Prüfung (Beitritt) bleibt serverseitig
+      (Event-Status aus der DB). Verbleibend: Bei einem erneuten Vorfall
+      Ursache per App-Log bestätigen
 
 ## In Arbeit
 
@@ -56,38 +73,6 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       `wispdating_icon_base.png`; Größen/Masken/Farbwelt-Abstimmung folgen)
 - [ ] F-Droid-Veröffentlichung (Build-Seite fertig: google-freier Flavor,
       UnifiedPush, Fastlane-Metadaten – Einreichung steht noch aus)
-
-- [x] **0.7.3** – Fix-Release: Altersspanne im Profil-Editor ergänzt,
-      Ladekreis direkt nach dem Anmelde-Klick, Dating-Hour-Zurück führt zur
-      Seite davor, Teilnehmer-Fortschritt „X von 20" im Event-Screen
-      (Migration 068), 2FA-Anzeige/Passkey (frischer MFA-Status + Step-up
-      vor der Passkey-Erstellung), Auto-Logout nach Stunden behoben
-      (Session-Refresh mit Wiederholung beim Start), Benachrichtigungs-
-      Symbol als klare Herz-Silhouette (vorher praktisch leer)
-
-## Geplant für 0.7.4
-
-- [ ] **Dating-Hour-Zeiten: Regression teilweise aufgeklärt (Live-Check
-      2026-09-04)** – Die Edge Function `server-time` ist deployed und
-      antwortet korrekt (UTC-ISO, Format passt zum Client). Die Regression
-      war daher sehr wahrscheinlich ein transienter Fehlschlag des
-      Zeit-Abrufs auf dem Testgerät: Dann fällt der Client auf die LOKALE
-      Gerätezeit zurück (isVerified = false, Warn-Banner erscheint) – je
-      nach Zeitzone unschön. Offene Aufgabe: Fallback härten (Sync-Retry
-      beim Start mit Backoff, deutliche Nutzer-Warnung solange keine
-      Serverzeit, ggf. Event-Fenster serverseitig statt clientseitig
-      berechnen) und die Ursache per App-Log bestätigen
-- [ ] **Dating-Hour-Präferenzen: „Zurück" = Seite davor** – Der Zurück-Weg
-      vom Präferenzen-Screen führt zur aufrufenden Seite (nicht zu
-      Home/App)
-- [ ] **Altersspanne im Profil-Editor ergänzen** – Sie ist derzeit nur in
-      der Einrichtung einstellbar, fehlt aber im Profil-Editor
-- [ ] **Ladekreis nach dem Anmelden** – Direkt nach dem Tippen auf
-      „Einloggen" erscheint sofort ein Ladekreis (aktuell passiert kurz
-      „nichts", während Auth/Profil/Präferenzen laden)
-- [ ] **Dating Hour: Teilnehmer-Ziel sichtbar** – Anzeige „X von 20
-      Teilnehmern" (und wie viele noch fehlen), damit man sieht, ob das
-      Event stattfindet
 
 ## Geplant für 0.8.0 (Geschmack & Matching)
 

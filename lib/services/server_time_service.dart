@@ -71,12 +71,32 @@ class ServerTimeService with WidgetsBindingObserver {
     if (_initializing) return;
     _initializing = true;
     try {
-      await syncNow();
-
-      _syncTimer?.cancel();
-      _syncTimer = Timer.periodic(syncInterval, (_) => syncNow());
+      // Fallback-Härtung (Zeit-Regression 0.7.2 → Fix 0.7.3): Bis zu 3
+      // Sync-Versuche mit Backoff, bis ein verifizierter Offset vorliegt.
+      // Schlägt der ERSTE Versuch fehl (z. B. kein Netz beim Start), bleibt
+      // die App sonst minutenlang auf der unsicheren Gerätezeit - und die
+      // Dating-Hour-Anzeige hängt dann von der Geräte-Zeitzone ab.
+      await _syncWithRetry();
+      _startSyncTimer(syncInterval);
     } finally {
       _initializing = false;
+    }
+  }
+
+  void _startSyncTimer(Duration syncInterval) {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(syncInterval, (_) => syncNow());
+  }
+
+  /// Bis zu 3 Versuche mit Backoff, bis ein verifizierter Offset vorliegt.
+  Future<void> _syncWithRetry() async {
+    const backoffs = [Duration(seconds: 0), Duration(seconds: 3), Duration(seconds: 8)];
+    for (var attempt = 0; attempt < backoffs.length; attempt++) {
+      if (backoffs[attempt] > Duration.zero) {
+        await Future<void>.delayed(backoffs[attempt]);
+      }
+      await syncNow();
+      if (_hasVerifiedOffset) return;
     }
   }
 
@@ -196,15 +216,16 @@ class ServerTimeService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Kein Netzverkehr im Hintergrund: Timer pausieren, bei Rückkehr
-    // sofort synchronisieren und den Timer neu starten.
+    // Kein Netzverkehr im Hintergrund: Timer pausieren, bei Rückkehr in den
+    // Vordergrund sofort synchronisieren (mit Retry, falls der erste Versuch
+    // ins Leere geht) und den Timer neu starten.
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _syncTimer?.cancel();
     } else if (state == AppLifecycleState.resumed) {
-      unawaited(syncNow());
-      _syncTimer?.cancel();
-      _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) => syncNow());
+      unawaited(_syncWithRetry());
+      _startSyncTimer(const Duration(minutes: 5));
     }
+  }
   }
 }

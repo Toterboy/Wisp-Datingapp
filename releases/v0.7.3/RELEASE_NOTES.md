@@ -23,6 +23,12 @@ jetzt beim Antippen direkt vom Server.
 **Benachrichtigungs-Symbol** Das Statusleisten-Symbol war praktisch leer
 (nur wenige helle Pixel). Jetzt eine klare Herz-Silhouette.
 
+**Dating-Hour-Zeit robuster** Schlägt der Abruf der Serverzeit fehl (z. B.
+kurzzeitig kein Netz), versucht die App es jetzt mehrfach, bevor sie auf
+die Gerätezeit zurückfällt - die Dating-Hour-Anzeige hängt damit nicht
+mehr sofort von der Geräte-Zeitzone ab. Die harte Beitritts-Prüfung läuft
+unverändert serverseitig.
+
 **Zurück-Geste in der Dating Hour** Führt jetzt zur Seite davor (z. B.
 von den Präferenzen zurück zum Event) statt zur Haupt-Navigation.
 

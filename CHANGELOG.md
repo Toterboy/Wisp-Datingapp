@@ -29,6 +29,13 @@ Fix-Release: Usability und Stabilität.
 - **Benachrichtigungs-Symbol**: Das Statusleisten-Icon war praktisch leer
   (nur ~300 weiße Pixel aus einer zu sparsamen Logo-Rampe). Jetzt eine
   klare Herz-Silhouette
+- **Dating-Hour-Zeit: Fallback gehärtet** - Schlägt der Abruf der
+  Serverzeit beim Start/bei App-Rückkehr fehl, versucht die App es jetzt
+  mehrfach mit Pausen (vorher: sofortiger Fallback auf die lokale
+  Gerätezeit, wodurch die Dating-Hour-Anzeige von der Geräte-Zeitzone
+  abhing). Das Warn-Banner bleibt solange sichtbar, bis eine Serverzeit
+  verifiziert ist; die harte Beitritts-Prüfung läuft unverändert
+  serverseitig
 - **Zurück-Geste in der Dating Hour**: führt jetzt jeweils zur Seite
   davor (z. B. von den Präferenzen zurück zum Event) statt zur
   Haupt-Navigation
