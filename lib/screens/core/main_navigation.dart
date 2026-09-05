@@ -83,9 +83,14 @@ class MainNavigation extends ConsumerWidget {
     WidgetRef ref,
     int i,
   ) async {
-    final location = GoRouterState.of(context).matchedLocation;
+    // Robust: GoRouterState.of(context).matchedLocation liefert im
+    // Shell-Builder-Kontext nicht immer die Sub-Route ("/profile/edit")
+    // - dadurch blieb der Dirty-Schutz stumm. Die volle URI des
+    // Router-Delegates ist verlässlich.
+    final location =
+        GoRouter.of(context).routerDelegate.currentConfiguration.uri.toString();
     final dirty =
-        location == AppRoutes.profileEdit && ref.read(profileEditDirtyProvider);
+        location.startsWith(AppRoutes.profileEdit) && ref.read(profileEditDirtyProvider);
     if (dirty) {
       final choice = await showDialog<String>(
         context: context,

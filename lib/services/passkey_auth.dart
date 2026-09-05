@@ -136,10 +136,21 @@ class PasskeyAuth {
         text.toLowerCase().contains('webauthn');
     if (isAuthApiError) {
       debugPrint('[PasskeyAuth] Server-Fehler: $e');
+      // Server-Grund (kuratiert, kurz) transparent machen: GoTrue-Antworten
+      // sind kurze Sätze ohne Secrets - sie helfen dem Team bei der
+      // Ursachensuche (z. B. "aal2 required", "User enrollments disabled").
+      String reason = '';
+      final msgMatch = RegExp(r'message:\s*([^,}]+)').firstMatch(text);
+      if (msgMatch != null) {
+        reason = ' (Server: ${msgMatch.group(1)!.trim().substring(0, msgMatch.group(1)!.trim().length.clamp(0, 120))})';
+      } else {
+        final statusMatch = RegExp(r'\bstatus: (\d{3})').firstMatch(text);
+        if (statusMatch != null) reason = ' (HTTP ${statusMatch.group(1)})';
+      }
       return AppException(
         'Der Server hat die Passkey-Anfrage abgelehnt. Bitte prüfe in den '
         'Supabase-Einstellungen, ob "Passkeys" aktiviert ist und die '
-        'RP-ID auf auth.wispdating.de gesetzt ist.',
+        'RP-ID auf auth.wispdating.de gesetzt ist.$reason',
       );
     }
 

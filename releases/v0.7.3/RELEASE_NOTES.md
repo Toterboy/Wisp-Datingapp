@@ -22,7 +22,15 @@ gefragt.
 
 **Altersspanne 18-18 jetzt erhöhenbar** Die beiden Regler der Altersspanne
 waren bei identischen Werten verklemmt - im Profil-Editor gibt es jetzt
-zwei getrennte Regler (Mindest-/Höchstalter).
+zwei getrennte Regler (Mindest-/Höchstalter), die sich beim Verschieben
+gegenseitig mitnehmen.
+
+**Passkey-Fehler mit Grund** Lehnt der Server eine Passkey-Anfrage ab,
+wird der kurze Server-Grund jetzt in der Meldung mit angezeigt - das
+hilft bei der Ursachensuche.
+
+**Profil-Editor: Tab-Wechsel fragt zuverlässig** Nach ungespeicherten
+Änderungen wird jetzt auch beim Wechsel des Tabs sicher gefragt.
 
 **Alle Dropdowns abgerundet** Die fünf Dropdowns im Profil-Editor folgen
 jetzt ebenfalls der 16-px-Rundung.

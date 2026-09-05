@@ -1034,23 +1034,24 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Slider(
-                        value: settings.ageRangeMin
-                            .clamp(allowedMin, settings.ageRangeMax)
-                            .toDouble(),
+                        value: settings.ageRangeMin.toDouble(),
                         min: allowedMin.toDouble(),
-                        max: settings.ageRangeMax
-                            .clamp(allowedMin, allowedMax)
-                            .toDouble(),
-                        divisions: (settings.ageRangeMax - allowedMin)
-                            .clamp(1, 83),
+                        max: allowedMax.toDouble(),
+                        divisions: (allowedMax - allowedMin).clamp(1, 83),
                         label: '${settings.ageRangeMin} Jahre',
-                        onChanged: (v) => ref
-                            .read(settingsProvider.notifier)
-                            .setAgeRange(
-                              v.round(),
-                              settings.ageRangeMax
-                                  .clamp(v.round(), allowedMax),
-                            ),
+                        // Zieht der Nutzer das Minimum über das Maximum,
+                        // schiebt das Maximum mit (kein Einfrieren).
+                        onChanged: (v) {
+                          final newMin = v.round();
+                          ref
+                              .read(settingsProvider.notifier)
+                              .setAgeRange(
+                                newMin,
+                                newMin > settings.ageRangeMax
+                                    ? newMin
+                                    : settings.ageRangeMax,
+                              );
+                        },
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -1058,23 +1059,24 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Slider(
-                        value: settings.ageRangeMax
-                            .clamp(settings.ageRangeMin, allowedMax)
-                            .toDouble(),
-                        min: settings.ageRangeMin
-                            .clamp(allowedMin, allowedMax)
-                            .toDouble(),
+                        value: settings.ageRangeMax.toDouble(),
+                        min: allowedMin.toDouble(),
                         max: allowedMax.toDouble(),
-                        divisions: (allowedMax - settings.ageRangeMin)
-                            .clamp(1, 83),
+                        divisions: (allowedMax - allowedMin).clamp(1, 83),
                         label: '${settings.ageRangeMax} Jahre',
-                        onChanged: (v) => ref
-                            .read(settingsProvider.notifier)
-                            .setAgeRange(
-                              settings.ageRangeMin
-                                  .clamp(allowedMin, v.round()),
-                              v.round(),
-                            ),
+                        // Zieht der Nutzer das Maximum unter das Minimum,
+                        // schiebt das Minimum mit.
+                        onChanged: (v) {
+                          final newMax = v.round();
+                          ref
+                              .read(settingsProvider.notifier)
+                              .setAgeRange(
+                                newMax < settings.ageRangeMin
+                                    ? newMax
+                                    : settings.ageRangeMin,
+                                newMax,
+                              );
+                        },
                       ),
                     ],
                   );

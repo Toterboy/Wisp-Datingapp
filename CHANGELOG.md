@@ -29,7 +29,15 @@ Fix-Release: Usability und Stabilität.
   synchron); der Zurück-Button im AppBar fragt ebenfalls explizit
 - **Altersspanne 18-18 jetzt erhöhenbar** - Die RangeSlider ließ bei
   identischen Werten nur den unteren Regler greifen; im Profil-Editor sind
-  es jetzt zwei getrennte Regler (Mindest-/Höchstalter)
+  es jetzt zwei getrennte Regler (Mindest-/Höchstalter), die sich beim
+  Verschieben gegenseitig mitnehmen
+- **Passkey-Fehler transparent**: Bei einer Server-Ablehnung wird jetzt
+  der kurze Server-Grund in der Meldung mit angezeigt (z. B. "AAL2
+  required") - für die Ursachensuche statt einer pauschalen Ablehnung
+- **Profil-Editor: Tab-Wechsel zuverlässig erkannt** - Die Nachfrage nach
+  ungespeicherten Änderungen griff beim Reiter-Wechsel nicht, weil die
+  Route-Erkennung im Shell-Kontext die Unterseite nicht sah (jetzt über
+  die volle URI gelöst)
 - **Alle Dropdowns abgerundet** - Die fünf Dropdowns im Profil-Editor
   (Geschlecht, „Was suchst du?", Land, Bundesland, Suchradius-Modus)
   folgen jetzt ebenfalls der 16-px-Rundung
