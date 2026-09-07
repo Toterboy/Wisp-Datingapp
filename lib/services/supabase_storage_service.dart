@@ -105,14 +105,25 @@ class SupabaseStorageService {
   /// Akzeptiert sowohl verschlüsselte Einträge (`path|key|iv`) als auch
   /// Legacy-Klartext-Pfade. Liefert die BILD-BYTES (keine URL!) - der
   /// Aufrufer zeigt sie mit `Image.memory`/`MemoryImage` an.
+  ///
+  /// Performance (v0.8.1): Ergebnis wird pro Referenz IM SPEICHERER
+  /// gecacht - Profil, Vorschau und QR-Screen laden ohne Wartezeit; der
+  /// Cache-Key ist die komplette Referenz, ein neues Bild = neuer Key.
+  static final Map<String, Uint8List> _avatarMemoryCache = {};
+
   Future<Uint8List?> loadAvatarBytes(String ref) async {
+    final cached = _avatarMemoryCache[ref];
+    if (cached != null) return cached;
     try {
       final parsed = AvatarCrypto.parseRef(ref);
       final path = parsed?.path ?? AvatarCrypto.pathOf(ref);
       final data =
           await _client.storage.from(_bucket).download(path);
-      if (parsed == null) return data; // Legacy: Klartext.
-      return AvatarCrypto.decrypt(data, parsed.key, parsed.iv);
+      final result = parsed == null
+          ? data // Legacy: Klartext.
+          : AvatarCrypto.decrypt(data, parsed.key, parsed.iv);
+      _avatarMemoryCache[ref] = result;
+      return result;
     } catch (e) {
       if (kDebugMode) {
         log('[SupabaseStorageService] Avatar-Download/Entschlüsselung '

@@ -1,7 +1,6 @@
-# WispDating v0.8.0 (Build 12)
+# WispDating v0.8.0 – Release Notes
 
-Datum: 07.09.2026 · **Geschmack & Matching** – der große Feature-Meilenstein,
-inkl. aller Nachträge (Build 11–12).
+**Geschmack & Matching** – der große Feature-Meilenstein.
 
 ## Neu
 
@@ -12,16 +11,15 @@ inkl. aller Nachträge (Build 11–12).
 - **Verbindungs-Score sichtbar**: Find-your-Match zeigt „Match: X %" –
   serverseitig berechnet (Distanz 40 %, gemeinsame Interessen 30 %,
   Musik 30 %), Kandidaten sind danach sortiert.
-- **Verschlüsselte Profilbilder (neu in Build 12)**: Avatare werden
-  clientseitig per AES-256-GCM verschlüsselt – der Server sieht nie das
-  Klartextbild. Bilder überstehen Neuinstallationen (Migration 077) und
-  sind im öffentlichen Profil sichtbar.
-- **NSFW-Prüfung on-device (neu aktiv in Build 12)**: Profilbilder werden
-  VOR dem Upload komplett auf dem Gerät geprüft (gebündeltes ONNX-Modell,
-  ~12 MB). Bei Nichtbestehen verlässt das Bild das Gerät nicht –
-  wahlweise „Anderes Bild wählen" oder „Einspruch einlegen" (Team-Review).
-  Verifiziert durch einen permanenten Inferenz-Test. Auch die Meldungs-
-  Vorprüfung läuft on-device.
+- **Verschlüsselte Profilbilder**: Avatare werden clientseitig per
+  AES-256-GCM verschlüsselt – der Server sieht nie das Klartextbild.
+  Bilder überstehen Neuinstallationen und sind im öffentlichen Profil
+  sichtbar.
+- **NSFW-Prüfung on-device**: Profilbilder werden vor dem Upload komplett
+  auf dem Gerät geprüft (gebündeltes ONNX-Modell, ~12 MB). Bei
+  Nichtbestehen verlässt das Bild das Gerät nicht – wahlweise „Anderes
+  Bild wählen" oder „Einspruch einlegen" (Team-Review). Auch die
+  Meldungs-Vorprüfung läuft on-device.
 - **Profilbild-Änderung mit Speichern-Dialog**: Bildauswahl zeigt sofort
   eine lokale Vorschau; hochgeladen wird erst beim Speichern, Abbrechen
   verwirft (das Bild war nie auf dem Server).
@@ -30,7 +28,7 @@ inkl. aller Nachträge (Build 11–12).
 - **Chat-Verlauf: drei Modi**: Aus / 200 Nachrichten / kompletter Verlauf
   (Standard) – AES-256-verschlüsselt lokal (SecureHive).
 - **Angemeldete Geräte mit echtem Modell**: z. B. „Samsung SM-S921B"
-  statt „Android (SDK 34)" (Migration 078).
+  statt „Android (SDK 34)".
 - **Mindestversions-Gate**: Clients unter der serverseitigen Mindest-
   version zeigen einen Update-Screen.
 - **Crash-Journal**: Der letzte Absturz wird lokal gespeichert; beim
@@ -43,20 +41,33 @@ inkl. aller Nachträge (Build 11–12).
   karten** für Schüchterne.
 - **Quiz-Fragen-Pool**: 60 echte Fragen ersetzen die 5 Platzhalter.
 - **Komplett zweisprachig (DE/EN)**: inkl. Farbschemata, Stimmungs-Chips,
-  Entdecken-Modi, Sichtbarkeits-Optionen; konsequent „Funke(n)"/„Spark(s)".
+  Entdecken-Modi, Sichtbarkeits-Optionen und Safety Center; konsequent
+  „Funke(n)"/„Spark(s)".
 - **Dating Hour**: Teilnehmer-Zähler zeigt die echte Gesamtzahl (20 ist
-  nur das Mindestziel); klarer Hinweis „samstags".
-- **Design**: abgerundete Klick-Animation überall (auch TabBars), plus
-  kleinere Feinschliffe.
+  nur das Mindestziel); klare Formulierung „samstags".
+- **Design**: abgerundete Klick-Animation überall (auch TabBars).
 
-## Stabilität (Build 12)
+## Behoben
 
-- **Migrations-robuste Sync-Schicht**: Profil-Laden zweistufig, Writes
-  selbstheilend (fehlende Spalten werden automatisch übersprungen),
-  Präferenz-/Theme-Restore dreistufig – eine fehlende Migration kann nie
-  mehr „alles löschen". Sync-Fehler werden im Profil-Editor sichtbar
-  gemeldet.
-- Server-Diagnose: `supabase/check_columns.sql` zeigt fehlende Migrationen.
+- **„App merkt sich nichts mehr"**: Lade- und Schreibvorgänge sind
+  migrations-robust – Profil-Laden zweistufig, Schreibvorgänge entfernen
+  fehlende Spalten automatisch, Präferenz-/Theme-Restore dreistufig.
+  Eine fehlende Migration kann nie mehr Name, Bio, Theme oder Suchradius
+  gemeinsam auslöschen.
+- **Sync-Fehler sichtbar**: Profil-Speichern zeigt die genaue Server-
+  Fehlerursache; Diagnose-Skript `supabase/check_columns.sql` beiliegend.
+- **Profilbild-Speicherung**: Die photos-Spalte existierte serverseitig
+  nicht – Bilder waren bisher rein lokal. Jetzt persistent (Migration
+  077) und im öffentlichen Profil sichtbar.
+- **NSFW-Check still außer Kraft**: Das Modell lud nie (ONNX-IR-Version,
+  Batch-Dimension, Pixelskalierung) – behoben und durch einen permanenten
+  Inferenz-Test abgesichert.
+- **Profilbild-Vorschau sofort**: Im Editor erscheint das gewählte Bild
+  direkt; Profil, Vorschau und QR-Teilen laden Bilder ohne Wartezeit
+  (Speicher-Cache), der QR-Screen zeigt jetzt das echte Profilbild.
+- **Sichtbarkeits-Meldung**: Beim Wechsel Jeder ↔ Nur Funken erscheint
+  keine „Pause beendet"-Meldung mehr.
+- **Dating Hour**: „Täglich" korrigiert zu „samstags".
 
 ## Verteilung
 

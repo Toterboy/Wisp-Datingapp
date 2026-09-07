@@ -401,9 +401,9 @@ child: Text(L10n.t(context, 'profile.detail.unavailable')),
 /// Profilbild des FREMDEN Nutzers (v0.8.1-Fix): Vorher wurde hier nur ein
 /// Person-Platzhalter gezeigt, weil der public_profiles-View die photos-
 /// Spalte nicht enthielt (Migration 077) und der Screen das Bild gar
-/// nicht lud. Jetzt: signierte URL aus photos.first laden und anzeigen.
+/// nicht lud. Jetzt: Bytes aus dem Storage-Cache laden und anzeigen.
 /// Respektiert Blind Mode / Foto-Freischaltung (isPhotosVisible).
-class _PublicProfileAvatar extends ConsumerWidget {
+class _PublicProfileAvatar extends ConsumerStatefulWidget {
   const _PublicProfileAvatar({
     required this.profile,
     required this.isPhotosVisible,
@@ -413,38 +413,72 @@ class _PublicProfileAvatar extends ConsumerWidget {
   final bool isPhotosVisible;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!isPhotosVisible) {
+  ConsumerState<_PublicProfileAvatar> createState() =>
+      _PublicProfileAvatarState();
+}
+
+class _PublicProfileAvatarState extends ConsumerState<_PublicProfileAvatar> {
+  Future<Uint8List?>? _avatarFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvatar();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PublicProfileAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Neues Bild (neue Referenz) -> neu laden.
+    final oldRef =
+        oldWidget.profile.photos.isNotEmpty ? oldWidget.profile.photos.first : null;
+    final newRef =
+        widget.profile.photos.isNotEmpty ? widget.profile.photos.first : null;
+    if (oldRef != newRef) _loadAvatar();
+  }
+
+  void _loadAvatar() {
+    final path = widget.profile.photos.isNotEmpty
+        ? widget.profile.photos.first
+        : null;
+    if (path == null) {
+      _avatarFuture = null;
+      return;
+    }
+    _avatarFuture = ref
+        .read(supabaseStorageServiceProvider)
+        .loadAvatarBytes(path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isPhotosVisible) {
       return const CircleAvatar(
         radius: 52,
         child: Icon(Icons.visibility_off, size: 48),
       );
     }
-    final path = profile.photos.isNotEmpty ? profile.photos.first : null;
-    if (path == null) {
+    if (_avatarFuture == null) {
       return const CircleAvatar(
         radius: 52,
         child: Icon(Icons.person, size: 56),
       );
     }
-    final storage = ref.watch(supabaseStorageServiceProvider);
     return FutureBuilder<Uint8List?>(
-      future: storage.loadAvatarBytes(path),
+      future: _avatarFuture,
       builder: (context, snapshot) {
         final bytes = snapshot.data;
-        if (snapshot.connectionState != ConnectionState.done || bytes == null) {
-          return const CircleAvatar(
+        if (bytes != null) {
+          return CircleAvatar(
             radius: 52,
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+            backgroundImage: MemoryImage(bytes),
           );
         }
-        return CircleAvatar(
+        // Cache-Treffer kommen synchron an; während des ersten Downloads
+        // dezent der Platzhalter statt einesextra Spinners.
+        return const CircleAvatar(
           radius: 52,
-          backgroundImage: MemoryImage(bytes),
+          child: Icon(Icons.person, size: 56),
         );
       },
     );

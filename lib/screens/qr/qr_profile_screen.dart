@@ -2,9 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/providers/profile_provider.dart';
+import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/widgets/qr_profile.dart';
 import 'package:wisp/utils/constants.dart';
+
+/// Entschlüsselte Bild-Bytes des eigenen Avatars (Speicher-Cache im
+/// Storage-Service macht dies nach dem ersten Laden sofort verfügbar).
+final _qrAvatarBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List?, String>((ref, ref1) async {
+  try {
+    return await ref
+        .read(supabaseStorageServiceProvider)
+        .loadAvatarBytes(ref1);
+  } catch (_) {
+    return null;
+  }
+});
 
 /// Zeigt den eigenen QR-Code und den teilbaren Nutzer-Code an.
 ///
@@ -18,10 +33,15 @@ class QrProfileScreen extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final userId = AppConstants.currentUserId;
     final userCode = generateUserCode(userId);
+    final photoRef =
+        profile.photos.isNotEmpty ? profile.photos.first : null;
+    final avatarBytes = photoRef == null
+        ? null
+        : ref.watch(_qrAvatarBytesProvider(photoRef)).valueOrNull;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mein QR Code'),
+        title: Text(L10n.t(context, 'qr.myCode')),
       ),
       body: SafeArea(
         child: Center(
@@ -30,20 +50,26 @@ class QrProfileScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Profil-Info
+                // Profil-Info (v0.8.1-Fix: echtes Profilbild statt nur
+                // Anfangsbuchstabe - "beim Teilen per QR Code" war das
+                // Bild vorher nicht sichtbar).
                 CircleAvatar(
                   radius: 36,
                   backgroundColor:
                       Theme.of(context).colorScheme.primaryContainer,
-                  child: Text(
-                    profile.name.isNotEmpty
-                        ? profile.name[0].toUpperCase()
-                        : '?',
-                    style: TextStyle(
-                      fontSize: 28,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
+                  backgroundImage:
+                      avatarBytes != null ? MemoryImage(avatarBytes) : null,
+                  child: avatarBytes != null
+                      ? null
+                      : Text(
+                          profile.name.isNotEmpty
+                              ? profile.name[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            fontSize: 28,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -69,7 +95,7 @@ class QrProfileScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Dein Code',
+                              L10n.t(context, 'qr.yourCode'),
                               style: Theme.of(context)
                                   .textTheme
                                   .labelMedium
@@ -95,12 +121,12 @@ class QrProfileScreen extends ConsumerWidget {
                         const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.copy),
-                          tooltip: 'Code kopieren',
+                          tooltip: L10n.t(context, 'qr.copyTooltip'),
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: userCode));
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Code in die Zwischenablage kopiert'),
+                              SnackBar(
+                                content: Text(L10n.t(context, 'qr.copied')),
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
@@ -113,9 +139,7 @@ class QrProfileScreen extends ConsumerWidget {
 
                 const SizedBox(height: 16),
                 Text(
-                  'Teile diesen Code oder den QR Code mit anderen. '
-                  'Sie können dich damit in der App finden und direkt '
-                  'anschreiben.',
+                  L10n.t(context, 'qr.shareHint'),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
