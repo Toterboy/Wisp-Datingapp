@@ -3,6 +3,11 @@
 ![CI](https://github.com/Thoralf/blind_date_app/actions/workflows/ci.yml/badge.svg)
 [![Lizenz: AGPL v3](https://img.shields.io/badge/Lizenz-AGPL_v3-blue.svg)](LICENSE)
 
+Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt Aussehen**. WispDating setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen. Entsteht eine Verbindung, heißt das bei uns **„Funke"**.
+
+Das Projekt ist vollständig kostenlos nutzbar und soll eine echte Alternative zu Tinder & Co. darstellen. Es befindet sich in aktiver Entwicklung und ist noch nicht vollständig funktional. Beiträge und Feedback sind willkommen:
+[Beitragen](CONTRIBUTING.md) · [Verhaltenskodex](CODE_OF_CONDUCT.md) · [Sicherheitslücken melden](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Entscheidungen (ADR)](docs/adr/) · [Build & F-Droid](docs/BUILD.md) · [Architektur](docs/ARCHITEKTUR.md) · [Datenschutz](docs/DATENSCHUTZ.md) · [Passkey-Server-Setup](docs/PASSKEYS_SERVER_SETUP.md)
+
 ## Warum WispDating – und nicht Tinder, Bumble & Co.?
 
 Weil moderne Dating-Apps genau die Probleme haben, die WispDating gezielt
@@ -46,11 +51,6 @@ löst – ohne Abo-Falle, ohne Aufmerksamkeits-Casino, ohne Daten-Hammer:
   (v0.9.0); ein vollständig offlinefähiger Reflexions-Chat mit lokaler
   KI „Sanctuary" (v0.10.0); E2E-Chats im Browser ohne Install für
   Gäste (v0.11.0).
-
-Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt Aussehen**. WispDating setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen. Entsteht eine Verbindung, heißt das bei uns **„Funke"**.
-
-Das Projekt ist vollständig kostenlos nutzbar und soll eine echte Alternative zu Tinder & Co. darstellen. Es befindet sich in aktiver Entwicklung und ist noch nicht vollständig funktional. Beiträge und Feedback sind willkommen:
-[Beitragen](CONTRIBUTING.md) · [Verhaltenskodex](CODE_OF_CONDUCT.md) · [Sicherheitslücken melden](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Entscheidungen (ADR)](docs/adr/) · [Build & F-Droid](docs/BUILD.md) · [Architektur](docs/ARCHITEKTUR.md) · [Datenschutz](docs/DATENSCHUTZ.md) · [Passkey-Server-Setup](docs/PASSKEYS_SERVER_SETUP.md)
 
 ## Unsere Zusagen
 
