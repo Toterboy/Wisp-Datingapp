@@ -11,12 +11,15 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:wisp/l10n/app_strings.dart';
+import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/auth_provider.dart';
+import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/mood_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show UserAttributes;
 import 'package:wisp/services/mfa_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
@@ -38,6 +41,16 @@ class PrivacyScreen extends ConsumerWidget {
     final profile = ref.read(profileProvider);
     final settings = ref.read(settingsProvider);
     final prefs = ref.read(userPreferencesProvider);
+    // Chat-Verläufe (v0.8.0): nur im Export, wenn der verschlüsselte
+    // lokale Verlauf aktiv ist (Opt-in) - sonst existieren keine
+    // gespeicherten Nachrichten.
+    final historyEnabled =
+        await ref.read(chatHistoryLocalEnabledProvider.future);
+    final chatExport = historyEnabled
+        ? await ref.read(chatServiceProvider).exportHistory()
+        : <String, dynamic>{};
+    final qrContacts =
+        historyEnabled ? ref.read(chatProvider.notifier).exportQrContacts() : <Map<String, String>>[];
 
     final exportData = <String, dynamic>{
       'exportedAt': DateTime.now().toIso8601String(),
@@ -47,6 +60,11 @@ class PrivacyScreen extends ConsumerWidget {
       'settings': settings.toJson(),
       'preferences': prefs.toJson(),
       'mood': ref.read(moodProvider)?.value,
+      // Chat-Verläufe (v0.8.0): entschlüsselte Nachrichten AUS DEM lokalen
+      // Speicher - NUR wenn der Nutzer den verschlüsselten Verlauf aktiv
+      // hat. Beim Import werden sie wiederhergestellt (Gerätewechsel).
+      if (chatExport.isNotEmpty) 'chats': chatExport,
+      if (qrContacts.isNotEmpty) 'qrContacts': qrContacts,
       'note': 'Chat-VerlÃ¤ufe sind Ende-zu-Ende verschlÃ¼sselt und verbleiben '
           'auf deinen GerÃ¤ten. Sie werden von keinem Server verarbeitet '
           'und kÃ¶nnen daher nicht exportiert werden.',
@@ -112,6 +130,282 @@ class PrivacyScreen extends ConsumerWidget {
                   Text('${L10n.t(context, 'privacy.exportFailed')}: $e')),
         );
       }
+    }
+  }
+
+  /// Datenimport (v0.8.0):JSON aus dem Export einlesen und Profile,
+  /// Einstellungen und Präferenzen wiederherstellen. Chat-Inhalte sind
+  /// bewusst nicht Teil des Exports/Imports (E2E).
+  Future<void> _importData(BuildContext context, WidgetRef ref) async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L10n.t(context, 'privacy.importTitle')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(L10n.t(context, 'privacy.importBody')),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              maxLines: 8,
+              decoration: InputDecoration(
+                hintText: L10n.t(context, 'privacy.importHint'),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(L10n.t(context, 'common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(L10n.t(context, 'privacy.importApply')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    Map<String, dynamic>? map;
+    try {
+      map = Map<String, dynamic>.from(
+          jsonDecode(ctrl.text) as Map<String, dynamic>);
+    } catch (_) {
+      map = null;
+    }
+    if (map == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'privacy.importInvalid')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Profil.
+      if (map['profile'] is Map) {
+        final profile = UserProfile.fromJson(
+            Map<String, dynamic>.from(map['profile'] as Map));
+        await ref.read(profileProvider.notifier).setProfile(profile);
+      }
+      // Einstellungen (blind mode, Sichtbarkeit, Dark Mode, ...).
+      if (map['settings'] is Map) {
+        await ref.read(settingsProvider.notifier).applyServerUiPrefs(
+            Map<String, dynamic>.from(map['settings'] as Map));
+      }
+      // Präferenzen (Entfernung, Altersspanne, Geschlechter-Filter, ...).
+      if (map['preferences'] is Map) {
+        final prefs = UserPreferences.fromJson(
+            Map<String, dynamic>.from(map['preferences'] as Map));
+        final notifier = ref.read(userPreferencesProvider.notifier);
+        await notifier.setGenderPreferences(prefs.genderPreferences);
+        await notifier.setDistanceFilterMode(prefs.distanceFilterMode);
+        await notifier.setMaxDistanceKm(prefs.maxDistanceKm);
+        await notifier.setPreferredState(prefs.preferredState);
+        await notifier.setLocation(prefs.location);
+        await notifier.setRelationshipType(prefs.relationshipType);
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'privacy.importDone')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${L10n.t(context, 'privacy.importFailed')}: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// E-Mail-Adresse ändern (v0.8.0): Re-Auth per aktuellem Passwort,
+  /// danach updateUser - Supabase sendet Bestätigungs-Links an beide
+  /// Adressen; die Änderung wird erst nach Bestätigung aktiv.
+  Future<void> _changeEmail(BuildContext context, WidgetRef ref) async {
+    final currentEmail =
+        SupabaseService.currentUser?.email ?? '';
+    final emailCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L10n.t(context, 'privacy.changeEmail')),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(L10n.t(context, 'privacy.changeEmailInfo')),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: L10n.t(context, 'auth.email'),
+                  hintText: currentEmail,
+                ),
+                validator: (v) =>
+                    v != null && v.contains('@') ? null : 'Ungültig',
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: passwordCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: L10n.t(context, 'auth.password'),
+                ),
+                validator: (v) =>
+                    v != null && v.length >= 8 ? null : 'Zu kurz',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(L10n.t(context, 'common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(formKey.currentState!.validate()),
+            child: Text(L10n.t(context, 'common.save')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    try {
+      // Re-Auth: aktuelles Passwort verifizieren.
+      await SupabaseService.client.auth.signInWithPassword(
+        email: currentEmail,
+        password: passwordCtrl.text,
+      );
+      await SupabaseService.client.auth.updateUser(
+        UserAttributes(email: emailCtrl.text.trim()),
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'privacy.changeEmailSent')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${L10n.t(context, 'privacy.changeFailed')}: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Passwort ändern (v0.8.0): Re-Auth per aktuellem Passwort, danach
+  /// updateUser - session bleibt bestehen.
+  Future<void> _changePassword(BuildContext context, WidgetRef ref) async {
+    final currentEmail =
+        SupabaseService.currentUser?.email ?? '';
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L10n.t(context, 'privacy.changePassword')),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: currentCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: L10n.t(context, 'auth.passwordCurrent'),
+                ),
+                validator: (v) =>
+                    v != null && v.length >= 8 ? null : 'Zu kurz',
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: newCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: L10n.t(context, 'auth.passwordNew'),
+                ),
+                validator: (v) =>
+                    v != null && v.length >= 8 ? null : 'Zu kurz',
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: confirmCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: L10n.t(context, 'auth.passwordConfirm'),
+                ),
+                validator: (v) =>
+                    v == newCtrl.text ? null : 'Nicht identisch',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(L10n.t(context, 'common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(formKey.currentState!.validate()),
+            child: Text(L10n.t(context, 'common.save')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    try {
+      // Re-Auth: aktuelles Passwort verifizieren.
+      await SupabaseService.client.auth.signInWithPassword(
+        email: currentEmail,
+        password: currentCtrl.text,
+      );
+      await SupabaseService.client.auth
+          .updateUser(UserAttributes(password: newCtrl.text));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'privacy.changePasswordDone')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${L10n.t(context, 'privacy.changeFailed')}: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -202,6 +496,26 @@ class PrivacyScreen extends ConsumerWidget {
             title: Text(L10n.t(context, 'privacy.export')),
             subtitle: Text(L10n.t(context, 'privacy.exportSub')),
             onTap: () => _requestDataExport(context, ref),
+          ),
+          ListTile(
+            leading: const Icon(Icons.upload),
+            title: Text(L10n.t(context, 'privacy.import')),
+            subtitle: Text(L10n.t(context, 'privacy.importSub')),
+            onTap: () => _importData(context, ref),
+          ),
+          const Divider(height: 32),
+          _SectionTitle(L10n.t(context, 'privacy.accountSection')),
+          _InfoCard(text: L10n.t(context, 'privacy.accountInfo')),
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.alternate_email),
+            title: Text(L10n.t(context, 'privacy.changeEmail')),
+            onTap: () => _changeEmail(context, ref),
+          ),
+          ListTile(
+            leading: const Icon(Icons.password),
+            title: Text(L10n.t(context, 'privacy.changePassword')),
+            onTap: () => _changePassword(context, ref),
           ),
           const Divider(height: 32),
           _SectionTitle(L10n.t(context, 'privacy.processors')),

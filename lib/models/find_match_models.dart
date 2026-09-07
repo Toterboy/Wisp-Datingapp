@@ -36,6 +36,7 @@ class MatchWithState {
     required this.unlockLevel,
     required this.failedAttempts,
     this.createdVia = 'swipe',
+    this.status = 'active',
     this.createdAt,
     this.passedAt,
     this.lastAttemptAt,
@@ -46,6 +47,9 @@ class MatchWithState {
   final int unlockLevel;
   final int failedAttempts;
   final String createdVia;
+
+  /// 'active' | 'cooled' | 'ended' (Migration 074).
+  final String status;
   final DateTime? createdAt;
   final DateTime? passedAt;
   final DateTime? lastAttemptAt;
@@ -54,6 +58,10 @@ class MatchWithState {
 
   /// Nur Matches aus dem Find-your-Match-Flow sind quiz-gesperrt.
   bool get quizGated => createdVia == 'find_match' && !quizPassed;
+
+  /// "Erschlossene Funken": ruhig beendet (kein Countdown, kein Druck),
+  /// Re-Funke jederzeit mit einem Tap möglich.
+  bool get cooled => status == 'cooled';
 
   factory MatchWithState.fromJson(Map<String, dynamic> json) {
     final profile = UserProfile.fromPublicView(
@@ -67,6 +75,7 @@ class MatchWithState {
       unlockLevel: (json['unlockLevel'] as num?)?.toInt() ?? 0,
       failedAttempts: (json['failedAttempts'] as num?)?.toInt() ?? 0,
       createdVia: json['createdVia'] as String? ?? 'swipe',
+      status: json['status'] as String? ?? 'active',
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.tryParse(json['createdAt'] as String),

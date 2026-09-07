@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/models/user_mood.dart';
 import 'package:wisp/providers/mood_provider.dart';
 import 'package:wisp/theme/app_theme.dart';
@@ -172,7 +173,7 @@ class _MoodChoiceTile extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              mood.label,
+              L10n.t(context, mood.labelKey),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: isSelected ? color : theme.colorScheme.onSurface,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -221,7 +222,7 @@ class _CurrentMoodCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    mood.label,
+                    L10n.t(context, mood.labelKey),
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),

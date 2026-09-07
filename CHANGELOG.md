@@ -7,6 +7,343 @@ und folgt der [Semantic Versioning Specification (SemVer)](https://semver.org/la
 Solange die Versionsnummer mit `0.` beginnt (Initial Development Phase nach SemVer §4),
 können sich Schnittstellen und Verhalten jederzeit ändern.
 
+## [0.8.0] – Nachtrag 2 – 2026-09-07
+
+Server: Migrationen **066** (falls fehlend), **074, 075, 076, 077, 078**
+einspielen; Gegenprobe mit `supabase/check_columns.sql`.
+
+### Neu
+
+- **Profilbilder Ende-zu-Ende-verschlüsselt**: Avatare werden VOR dem
+  Upload clientseitig per AES-256-GCM verschlüsselt (Zufalls-Schlüssel
+  pro Bild) - der Server sieht ausschließlich Ciphertext. Der Schlüssel
+  steckt im `photos`-Eintrag (`pfad|key|iv`); jeder berechtigte
+  Betrachter entschlüsselt lokal. Alte, unverschlüsselte Avatare
+  bleiben lesbar (AvatarCrypto, Migration 077)
+- **Profilbilder serverseitig**: Die `photos`-Spalte existierte
+  serverseitig bisher gar nicht (Avatare waren rein lokal!). Neu:
+  Migration 077 (Spalte + öffentlicher View), Upload-Referenz wird
+  verifiziert gespeichert, `fetchOwnProfile` lädt sie zurück - das Bild
+  übersteht Neuinstallationen und ist im öffentlichen Profil sichtbar
+- **NSFW-Prüfung on-device wirklich aktiv**: Der still außer Kraft
+  gesetzte Check funktioniert jetzt - die gebündelte Modell-Datei
+  nutzte ONNX-IR-Version 10 (Runtime unterstützt max. 9, gepatcht),
+  der Output-Tensor brauchte Batch-Dimension-Flattening und die
+  Pixel-Vorverarbeitung die vom Modell erwartete 0-255-Skalierung.
+  Neuer permanenter Test (`image_safety_model_test.dart`) führt echte
+  Inferenz aus und verhindert Still-Ausfälle. Klassen-Reihenfolge
+  [NSFL, NSFW, SFW] gegen die Modell-Doku verifiziert
+- **Profilbild-Änderung mit Speichern-Dialog**: Bildauswahl läuft jetzt
+  wie alle anderen Angaben über den Dirty-Flag - lokale Vorschau,
+  Upload erst beim Speichern, Abbrechen verwirft (das Bild war nie auf
+  dem Server); NSFW-Check erfolgt bereits bei der Auswahl
+- **Migrationen-robuste Daten-Sync** (Fix „App merkt sich nichts mehr"):
+  Profil-Laden zweistufig (mit/ohne 077-Spalten), alle Profil-Writes
+  selbstheilend (PostgREST „missing column" wird automatisch aus dem
+  Body entfernt), Präferenz-Laden dreistufig inkl. Theme (`theme_name`
+  bleibt erhalten) - eine fehlende Spalte kann nie wieder Name, Bio,
+  Theme oder Radius gemeinsam auslöschen
+- **Sync-Fehler sichtbar**: Profil-Speichern zeigt im SnackBar die
+  genaue Server-Fehlerursache (z. B. fehlende Migration), statt still
+  „ohne Sync" zu melden; `supabase/check_columns.sql` als
+  Spalten-Diagnose für den Server
+- **Pausenmodus in die Profil-Sichtbarkeit integriert** (Dopplung
+  aufgelöst): „Wer kann mein Profil sehen?" ist jetzt DIE eine Steuerung
+  - Jeder / Nur Funken / Unsichtbar (Pausiert) mit Bestätigungsdialog;
+  der frühere separate Schalter ist entfernt, `paused` bleibt
+  konsistent abgeleitet (auch über Server-Sync)
+- **Chat-Verlauf: drei Modi** statt fester 200er-Grenze: Aus /
+  200 Nachrichten / Kompletter Verlauf (Standard), verschlüsselt
+  (AES-256, SecureHive)
+- **Angemeldete Geräte mit echtem Modell**: `device_info_plus` liefert
+  Hersteller + Modellkennung (z. B. „Samsung SM-S921B") - nach
+  Neuinstallation ist das „zweite Gerät" eindeutig zuordenbar
+  (auth_devices.device_model, Migration 078)
+- **Vollständige Zweisprachigkeit in neueren Bereichen**: Farbschemata
+  (Ozean→Ocean u. a.), Stimmungs-Chips, Entdecken-Modi und
+  Sichtbarkeits-Optionen sind jetzt zweisprachig; Sichtbarkeits-Optionen
+  haben Untertitel-Erklärungen
+- **Konsequente „Funken"-Sprache**: Alle verbliebenen deutschen
+  „Match"-Formulierungen heißen „Funke(n)" (u. a. „Neuer Funke!",
+  „Funke bestätigen", Dating-Hour-Texte, Datenschutzhinweise);
+  „Discovery" heißt auf Deutsch „Entdecken"
+- **Abgerundete Klick-Animation**: Der Ripple folgt global der
+  24-px-Kartenrundung (ListTileTheme in Light + Dark)
+
+### Behoben
+
+- `public_profiles`-View: Migration 077 hing an Postgres'
+  Append-Regel für Views („cannot change name of view column") -
+  `photos` steht jetzt korrekt am Ende der Spaltenliste
+
+## [0.8.0] – Nachtrag (Build 12) – 2026-09-05
+
+### Neu
+
+- **Dating Hour über 20 hinaus**: 20 ist nur das MINDESTZIEL - der
+  Teilnehmer-Zähler nennt jetzt die echte Gesamtzahl („Mindestziel
+  erreicht: 37 Teilnehmer!"), mit Hinweis, dass mehr beliebig möglich
+  ist; serverseitig gab es nie ein Limit
+- **Chat-Export & -Import (Gerätewechsel/Reinstall)**: Der Datenexport
+  enthält jetzt (bei aktivem verschlüsseltem Verlauf) die Chat-
+  Nachrichten inkl. QR-Kontakte; der Import stellt Chats mit
+  ORIGINAL-Match-IDs wieder her und aktiviert die Persistenz implizit
+- **Kleinere APKs / AAB**: build_release.ps1 mit `-SplitPerAbi`
+  (pro-CPU-APKs: arm64 77 MB statt 167 MB) und `-Aab` (Play-App-Bundle)
+
+## [0.8.0] – 2026-09-05
+
+Geschmack & Matching: der große Feature-Meilenstein (Roadmap 0.8.0).
+Server: Migrationen **074** + **075** einspielen.
+
+### Neu
+
+- **Musik-Geschmack**: Im Profil-Editor Genres wählen, die man mag
+  (Mehrfachauswahl, inkl. „Instrumental") - und freiwillig solche, die man
+  explizit nicht mag. Der Geschmack fließt mit 30 % in den Verbindungs-
+  Score ein (Gemeinsamkeiten positiv, Konflikte negativ), ist im
+  eigenen Profil sichtbar und wird im Profil anderer mit hervorgehobener
+  „Gleicher Geschmack"-Anzeige angezeigt (Migration 074)
+- **Verbindungs-Score sichtbar**: Find-your-Match-Kandidaten zeigen jetzt
+  „Match: X %" - serverseitig berechnet aus Distanz (40 %), gemeinsamen
+  Interessen (30 %) und Musik (30 %); die Kandidaten sind danach sortiert
+- **Pausenmodus**: Das eigene Profil lässt sich pausieren (Einstellungen)
+  - unsichtbar in Discovery und Find-your-Match, bestehende Funken und
+  Chats bleiben bestehen (profiles.paused, Migration 076)
+- **Habit-Dealbreaker**: Schalter im Profil-Editor - nur noch Kandidaten,
+  deren Konsum (Rauchen/Alkohol/Drogen) maximal so hoch ist wie der
+  eigene; serverseitig im Matching erzwungen (profiles.habits_dealbreaker,
+  Migration 076)
+- **Kleinere APKs / AAB**: `build_release.ps1` unterstützt jetzt
+  `-SplitPerAbi` (pro-CPU-APKs, ~77 MB statt 167 MB) und `-Aab` (Play-
+  App-Bundle); die nativen Bibliotheken sind sonst dreifach enthalten
+- **Mindestversions-Gate**: app_config.min_app_version_build - Clients
+  unterhalb der Mindestversion zeigen beim Start einen Update-Screen
+  (mit Rückfallebene „Trotzdem fortfahren"), Migration 076
+- **Crash-Journal**: Der letzte Absturz wird lokal gespeichert; beim
+  nächsten Start fragt die App, ob ein Report über den Bug-Report-Kanal
+  gesendet werden soll (datenschutzfreundlich statt Cloud-Crashlytics,
+  nichts verlässt das Gerät ohne Bestätigung)
+- **Verschlüsselter Chat-Verlauf (Opt-in)**: Einstellungen → Sicherheit
+  im Chat - speichert die letzten 200 Nachrichten pro Chat AES-256-
+  verschlüsselt via SecureHive (Key im Keystore); Standard bleibt
+  reiner Arbeitsspeicher (N-8-Design bleibt, jetzt als bewusste Wahl)
+- **Kontext-Icebreaker**: Gemeinsame Interessen erscheinen als
+  Vorschlags-Chip im Chat (vom Nutzer deaktivierbar über das Chat-Menü)
+- **E-Mail- und Passwort-Wechsel in-app** (Datenschutz & Account): mit
+  Re-Auth per aktuellem Passwort; E-Mail-Wechsel mit Bestätigungs-Links
+  an beide Adressen
+- **Daten-Import**: JSON-Datenexport kann wieder eingespielt werden
+  (Profil, Einstellungen, Präferenzen)
+- **Meldungs-Feedback**: Safety Center zeigt eigene Meldungen mit Status
+  (list_my_reports, Migration 076)
+- **Blockierliste**: Safety Center listet blockierte Nutzer mit
+  Entblocken-Button (list_blocked_users, Migration 076)
+- **Inaktive Funken als „Erschlossene Funken"**: Gekühlte Verbindungen
+  rutschen still an das Ende des Interessen-Feeds - ohne Countdown, ohne
+  Ablauf-Benachrichtigung, ohne Verlängerungsdruck (Migration 074)
+- **Re-Funke ohne Druck**: Gekühlte Verbindungen mit einem Tap wieder
+  entzünden (RPC respark_match) - jederzeit, ohne Frist
+- **Chats verwalten**: Im Funken-Feed „Verwalten" antippen, Chats
+  mehrfach auswählen und aus der eigenen Liste entfernen (nur für mich,
+  RPC hide_match) - einzeln oder alle auf einmal
+- **Ehrliches Beenden**: „Funke beenden" zeigt jetzt vorbereitete,
+  freundliche Absage-Texte zur Wahl - oder „Ruhig enden lassen" (ohne
+  Nachricht). Ghosting aktiv erschweren (RPC cool_match)
+- **Ideen-Rad im Meet-Intent** (Test): „Dreh das Rad" wählt aus den
+  bestehenden Date-Kategorien einen Vorschlag, der als E2E-Nachricht
+  geteilt und im Chat bestätigt wird
+- **Dating Hour: Frage-Karten für Schüchterne**: Drei thematische sanfte
+  Fragen (Reise/Alltag/Träume, rotieren pro Stunde) - ein Tap übernimmt
+- **Quiz-Fragen-Pool**: 60 echte Fragen ersetzen die 5 Platzhalter
+  (Migration 075, idempotent); die korrekte Antwort rotiert über die
+  Optionspositionen
+- **UI-Einstellungen serverseitig**: Blind Mode, Foto-Freigabe,
+  Sichtbarkeit, Dark Mode, Benachrichtigungs-Schalter und Bild-Blur
+  werden in profiles.ui_prefs gespiegelt (Migration 074) und nach
+  Neuinstallation/Login wiederhergestellt - sensible Inhalte (Chats,
+  E2E-Identität) bleiben ausgenommen
+
+### NSFW on-device (Scaffold)
+
+- **Lokale Bildmoderation implementiert** (Migration-frei, Paket
+  `onnxruntime` 1.4.1): Der neue `ImageSafetyService` lädt
+  `assets/models/image-safety-classifier-xs.onnx` lazy (OrtEnv + Session
+  einmalig), preprocesset gemeldete Bilder auf 224x224 RGB (NCHW-Float32,
+  0..1) und klassifiziert rein on-device in die Klassen
+  [NSFL, NSFW, SFW] (inkl. Softmax-Fallback bei Logits)
+- **Human-in-the-Loop im Meldedialog**: Die lokale Prüfung startet erst
+  mit dem Öffnen des Meldedialogs (niemals beim Senden/Empfangen, E2E
+  bleibt unangetastet); das Ergebnis wird transparent angezeigt
+  (Warnung ab 0.65 für NSFW/NSFL, sonst neutrale Bestätigung); Übertragung
+  erfolgt NUR nach aktivem Tippen auf "Meldung absenden" - Abbruch
+  verwirft das Bild aus dem Speicher
+- **Report-Payload erweitert**: letzte 3 Textnachrichten als Kontext,
+  SHA-256-pseudonymisierte Reporter-ID und das lokale KI-Ergebnis gehen
+  mit; KEINE automatischen Kontosperren (manuelles Team-Review)
+- **Noch offen**: die Modell-Datei selbst muss in
+  `assets/models/image-safety-classifier-xs.onnx` abgelegt werden (Fehlt
+  sie, deaktiviert sich die lokale Prüfung automatisch und der
+  serverseitige Fallback-Scan aus 0.7.1 greift)
+- Offen ist außerdem der i18n-Rest (zweisprachige Screens)
+
+## [0.7.3] – Nachtrag (Build 9) – 2026-09-05
+
+### Neu
+
+- **Ladekreis bei der Passkey-Anmeldung**: Die Passwort-Anmeldung zeigt
+  seit 0.7.3 direkt nach dem Tap den großen, nicht-abwischbaren
+  „Anmeldung läuft…"-Kreis - der Passkey-Pfad zeigt ihn jetzt genauso
+- **Suchradius wird zuverlässig gespeichert (wie der Name)**: Regler-
+  Änderungen (Entfernung, Altersspanne, Suchradius-Modus) werden jetzt
+  entprellt (1,5 s) automatisch serverseitig gesichert - auch ohne
+  Speichern-Knopf; „Speichern" wartet auf den Server-Sync und meldet
+  einen Fehlschlag klar statt still zu schlucken
+- **Scroll-Hinweis auf der Profil-Seite**: dezenter, design-passender
+  „Strich" am rechten Rand zeigt, dass die Seite weiter nach unten geht
+  (Profil-/Bug-melden-Buttons waren ohne Scrollen unsichtbar); er
+  blendet sich am Seitenende aus
+
+### Behoben
+
+- **„Server-Sync fehlgeschlagen" beim Profil-Speichern (Ursache)**: Die
+  Schreib-Verifikation las zur Kontrolle die VOLLSTÄNDIGE Flags-Zeile -
+  fehlte nur EINE andere Spalte auf dem Server (z. B. 071 nicht
+  eingespielt), scheiterte jede Verifikation und damit jeder Speicher-
+  vorgang. Jetzt wird gezielt nur der geschriebene Schlüssel zurückgelesen;
+  ist allein die Kontrolle nicht möglich (Schema/Netz), gilt der Schreib-
+  vorgang als erfolgt. Zusätzlich Fallbacks beim Laden: Präferenzen/Flags
+  kommen auch dann zurück, wenn 071-Spalten fehlen (dann ohne Theme)
+- **Profildaten nach Passkey-Anmeldung leer**: Der Passkey-Pfad lief
+  früher NUR über den GoTrue-Event-Listener und übersprang die Nachläufe
+  der Passwort-Anmeldung - Token-Persistenz, das Setzen der Signal-User-ID
+  und der explizite Server-Sync (Profil, Präferenzen, Flags) fehlten, so
+  dass Name & Co. nach der Anmeldung leer blieben. Die Passkey-Anmeldung
+  läuft jetzt über [AuthNotifier.loginWithPasskey] mit IDENTISCHEM Ablauf
+  wie die Passwort-Anmeldung; die Demo-Implementierung weist den Flow
+  erwartungsgemäß ab
+- **Fehlalarme der Schreib-Verifikation bei Listen-Spalten**: Der
+  Zurücklesen-Vergleich in updateSetupFlagsAndVerify ist jetzt
+  typensicher (PostgREST liefert List<dynamic>, der Client
+  List<String>) - vorher gab es 3 unnötige Schreibversuche und ein
+  „fehlgeschlagen", obwohl gespeichert war
+- **Geräte-Liste: Reparatur-Skript** `supabase/repair_auth_devices.sql`
+  (idempotent, mit Prüf-Report: Tabelle/RLS/Policies) für Fälle, in
+  denen 071 teilweise eingespielt wurde; Gerätename korrekt formatiert
+  (z. B. „Android (SDK 34)")
+
+## [0.7.3] – Nachtrag (Build 8) – 2026-09-05
+
+### Behoben
+
+- **Passkey-Registrierung (Ursache definitiv identifiziert)**: In den
+  „Relying Party Origins" des Servers standen SHA-1-Fingerprints (20 Byte)
+  der Signatur-Keys - `android:apk-key-hash` verlangt SHA-256 (32 Byte),
+  der Abgleich konnte nie matchen. Fix ist serverseitig (Dashboard Origins
+  ersetzen - exakte Werte in `docs/PASSKEYS_SERVER_SETUP.md`), die App
+  unterstützt die Diagnose: Debug-Builds loggen jetzt den gesendeten
+  WebAuthn-Origin, die Fehlermeldung verweist auf die Setup-Doku
+
+### Server
+
+- Migration **073** (Härtung `auth_devices`): Längen-Constraints für
+  client-gesetzte Werte + Cap von 20 Geräte-Einträgen pro Konto
+  (Trigger mit Upsert-Schonung, gehärteter `search_path`)
+
+## [0.7.3] – Nachtrag (Build 7) – 2026-09-05
+
+### Behoben
+
+- **Speichern-Nachfrage im Profil-Editor (Tab-Wechsel) endgültig
+  repariert**: Die Bottom-Navigation ermittelte die aktive Unter-Route
+  über den Router-Delegates-Kontext - das blieb je nach Zeitpunkt stumm.
+  Der Schutz prüft jetzt direkt den Dirty-Flag (der Editor setzt ihn beim
+  Verlassen zurück); Widget-Tests verifizieren Textfeld-, Regler- und
+  PopScope-Verhalten
+- **Geräte-Liste: Fehler sichtbar statt stummer Abbruch**: Fehlgeschlagene
+  Registrierung/Listung zeigt jetzt die bereinigte Ursache (Tabelle fehlt
+  = Migration 071 fehlt, RLS, Netz, Sitzung) als Hinweis über der Liste
+  bzw. als klarer Fehlerzustand
+- **Passkey "Der Server konnte den Passkey nicht bestätigen"**: Die
+  Meldung verweist jetzt auf die neue Verwaltung; vor dem Anlegen wird
+  transparent auf bereits existierende Passkeys hingewiesen (deren
+  Alt-Einträge die Registrierung blockieren können)
+
+### Neu
+
+- **Passkeys verwalten** (Einstellungen): Listet alle am Konto
+  registrierten Passkeys (Name, erstellt, zuletzt genutzt) und erlaubt
+  Umbenennen/Löschen - damit lassen sich Alt-/Defekt-Einträge entfernen,
+  wenn der Server eine NEUE Registrierung nicht bestätigt
+- **Server**: Migration 072 konsolidiert die öffentliche Profil-View
+  (`public_profiles`, bewusster Definer-Modus - Datenschutz: exakte
+  Geburtsdaten/Koordinaten bleiben serverseitig) und dokumentiert den
+  Advisor-Befund als intentional; Migration 071 bleibt Voraussetzung für
+  die Geräte-Liste
+
+## [0.7.3] – Nachtrag (Build 6) – 2026-09-05
+
+Neue Funktionen und Reparaturen (Konto-Datenhalt, Geräteübersicht, Regler).
+
+Hinweis: Die Roadmap-Punkte für 0.8.0 (Geschmack & Matching, Musik-Genres,
+on-device-Moderation, i18n-Ausbau) sind hier NICHT enthalten - diese Version
+bleibt ein 0.7.x-Patch/Polish-Release.
+
+### Neu
+
+- **Angemeldete Geräte** (Einstellungen → Datenschutz & Account): Zeigt alle
+  Geräte, auf denen das Konto eingeloggt ist (Gerätename, App-Version,
+  letzte Aktivität, eigenes Gerät markiert). Mit einem Tastendruck meldet
+  man sich ÜBERALL außer auf dem aktuellen Gerät ab
+  (`signOut(scope: others)`; Migration 071 mit `auth_devices`-Tabelle,
+  RLS-gesichert)
+- **Themefarbe gehört zum Konto** (Migration 071, `profiles.theme_name`):
+  Die Farbschema-Wahl wird serverseitig gespeichert und direkt beim Login
+  wieder angewendet - auch nach einer App-Neuinstallation
+- **Entfernung & Alter überstehen Neuinstallation**: Die maximale
+  Entfernung wird zusätzlich in die App-Einstellungen gespiegelt (z. B.
+  Dating-Hour-Filter), die Altersspanne kommt weiterhin aus dem Profil -
+  beide werden nach Login/Neuinstallation serverseitig wiederhergestellt
+
+### Behoben
+
+- **Altersspannen-Regler eingefroren ("18-18")**: Die Regler für
+  Mindest-/Höchstalter verwendeten die aktuell gewählten Werte als
+  Slider-Grenzen - bei 18-18 war der Spielraum null, die Regler ließen
+  sich nicht bewegen und wirkten ausgegraut. Jetzt sind es zwei gekoppelte
+  Slider mit den statischen Sicherheitsgrenzen (16-99), die sich beim
+  Ziehen gegenseitig mitnehmen - im Profil-Editor, in der Einrichtung und
+  in den Dating-Hour-Präferenzen (gemeinsames Widget `AgeRangeSliders`,
+  der dortige RangeSlider frohr bei identischen Werten ebenfalls ein)
+- **Speichern-Dialog im Profil-Editor erschien nie bei Reglern/Dropdowns**:
+  Änderungen an Geburtsdatum, Altersspanne, Entfernung, Suchradius-Modus
+  und Bundesland-Filter lösten die "Ungespeicherte Änderungen"-Nachfrage
+  nicht aus (und wurden still übernommen). Jetzt führt jede dieser
+  Änderungen zur Nachfrage; "Verwerfen" setzt die Regler auf den Stand
+  beim Öffnen zurück. Auch die Zurück-GESTE fragt jetzt zuverlässig (der
+  Dirty-Flag wurde beobachtet statt nur post-frame gesetzt)
+- **Weißes Viereck bei Benachrichtigungen behoben (echte Ursache)**: Das
+  Notification-Icon wurde vom Branding-Tool ohne Alpha-Kanal erzeugt
+  (`Image()`-Default = RGB) - Android zeigte daher ein volles weißes
+  Quadrat statt der Herz-Silhouette. Das Icon ist jetzt ein echtes
+  RGBA-Asset; beide Icon-Tools sind gegen stillen Alpha-Verlust gehärtet
+- **Passkey-Erstellen: "Anfrage abgebrochen von Wisp" / "credential
+  verification failed"**: Der Plugin-Authenticator brach vor JEDER
+  Zeremonie eine laufende Operation ab - das konnte die eigene neue
+  Anfrage mit abwürgen. Wisp nutzt jetzt einen eigenen Authenticator ohne
+  dieses Vorabbrechen, plus Doppel-Tap-Schutz an der Kachel und im
+  Service (nur eine Zeremonie gleichzeitig). Server-"Verifikation
+  fehlgeschlagen" bekommt eine verständliche Meldung mit Lösungshinweis
+- **"Speichern fehlgeschlagen"-Fehlalarme bei Präferenzen**: Die
+  Schreib-Verifikation las die Präferenz-Spalten beim Zurücklesen nicht
+  (`max_distance_km`, `age_range_min/max`, ...) - das Speichern von
+  Entfernung/Altersspanne wurde deshalb IMMER als fehlgeschlagen gemeldet,
+  obwohl es geschrieben war
+- **Dating-Hour-Regeln erscheinen nur noch EINMAL** (Migration 071,
+  `profiles.dating_hour_intro_seen`): Der Intro-Flow (Regeln + Erklärung)
+  hängt jetzt am Konto statt am Gerät - nach Neuinstallation/Neu-Anmelden
+  kommt er nicht wieder
+
 ## [0.7.3] – 2026-08-30
 
 Fix-Release: Usability und Stabilität.

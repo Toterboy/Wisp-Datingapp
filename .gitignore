@@ -45,6 +45,7 @@ app.*.map.json
 /android/app/release
 **/build/
 **/.gradle/
+**/.kotlin/
 .vercel
 .env*
 !.env.example
@@ -103,3 +104,12 @@ releases/*/admin/
 
 # Node-Module (generisch, falls wieder Node-Tools im Repo liegen)
 node_modules/
+
+# Screenshot-Goldens (regenerierbare Build-Artefakte, teils > 100 KB):
+# Neu erzeugen mit STORE_SHOTS=1 flutter test --update-goldens test/screenshots/
+test/screenshots/goldens/
+
+# Plattform-Ephemeral-Ordner (Flutter-Tool, auto-generiert)
+**/Flutter/ephemeral/
+**/.symlinks/
+**/Pods/

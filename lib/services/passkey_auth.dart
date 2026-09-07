@@ -1,14 +1,19 @@
+// Die Passkey-API von GoTrue ist als @experimental markiert (Supabase
+// Beta-Feature) - bewusst genutzt, Ignorieren der Warnung projectweit.
+// ignore_for_file: experimental_member_use
+
 import 'package:flutter/foundation.dart';
-import 'package:passkeys/authenticator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/services/wisp_passkey_authenticator.dart';
 
 /// Kapselt die native Passkey-Anmeldung/-Registrierung.
 ///
-/// Nutzt das `passkeys`-Plugin für die Plattform-Prompts (FaceID/TouchID/
-/// Biometrie) und Supabase Auth für die WebAuthn-Ceremony (Server-Seite).
+/// Nutzt den [WispPasskeyAuthenticator] für die Plattform-Prompts
+/// (FaceID/TouchID/Biometrie) und Supabase Auth für die WebAuthn-Ceremony
+/// (Server-Seite).
 ///
 /// Voraussetzungen (sonst schlägt der Dialog/Login fehl):
 ///  - Supabase Dashboard: Passkeys aktiv, RP-ID = `auth.wispdating.de`
@@ -19,7 +24,29 @@ import 'package:wisp/services/supabase_service.dart';
 class PasskeyAuth {
   PasskeyAuth._();
 
-  static final PasskeyAuthenticator _authenticator = PasskeyAuthenticator();
+  static final WispPasskeyAuthenticator _authenticator =
+      WispPasskeyAuthenticator();
+
+  /// Busy-Guard: Nur EINE Zeremonie gleichzeitig. Ein Doppel-Tap auf
+  /// "Passkey erstellen" startete sonst zwei Registrierungen parallel -
+  /// die zweite brach die erste ab ("Anfrage abgebrochen von Wisp") und
+  /// die Challenge-Verrechnung endete in "credential verification failed".
+  static bool _ceremonyRunning = false;
+
+  static Future<T> _runSingle<T>(Future<T> Function() action) async {
+    if (_ceremonyRunning) {
+      throw AppException(
+        'Eine Passkey-Anfrage läuft bereits. Bitte warte einen Moment '
+        'und bestätige den Dialog auf dem Bildschirm.',
+      );
+    }
+    _ceremonyRunning = true;
+    try {
+      return await action();
+    } finally {
+      _ceremonyRunning = false;
+    }
+  }
 
   /// Meldet den Nutzer mit einem vorhandenen Passkey an.
   ///
@@ -31,29 +58,80 @@ class PasskeyAuth {
   /// options` prüft `gotrue_meta_security`) – ohne Token lehnt er mit
   /// `captcha_verification_failed` ab, bevor der native Dialog erscheint
   /// ("Server hat die Passkey-Anfrage abgelehnt").
-  static Future<void> signIn({String? captchaToken}) async {
-    if (!SupabaseService.isInitialized) {
-      throw AppException('Passkey-Login ist derzeit nicht verfügbar.');
-    }
-    try {
-      await SupabaseService.client.auth.signInWithPasskey(
-        _authenticator,
-        captchaToken: captchaToken,
-      );
-    } catch (e) {
-      throw _explain(e, login: true);
-    }
+  static Future<void> signIn({String? captchaToken}) {
+    return _runSingle(() async {
+      if (!SupabaseService.isInitialized) {
+        throw AppException('Passkey-Login ist derzeit nicht verfügbar.');
+      }
+      try {
+        await SupabaseService.client.auth.signInWithPasskey(
+          _authenticator,
+          captchaToken: captchaToken,
+        );
+      } catch (e) {
+        throw _explain(e, login: true);
+      }
+    });
   }
 
   /// Registriert ein neues Passkey für den bereits eingeloggten Nutzer.
-  static Future<void> register() async {
+  static Future<void> register() {
+    return _runSingle(() async {
+      if (!SupabaseService.isInitialized) {
+        throw AppException('Passkey-Setup ist derzeit nicht verfügbar.');
+      }
+      try {
+        await SupabaseService.client.auth.registerPasskey(_authenticator);
+      } catch (e) {
+        throw _explain(e, login: false);
+      }
+    });
+  }
+
+  /// Liste der Passkeys, die auf dem Konto registriert sind.
+  ///
+  /// Wirft bei Fehlern (z. B. AAL2 nötig) - der Aufrufer behandelt das.
+  static Future<List<Passkey>> listRegistered() async {
     if (!SupabaseService.isInitialized) {
-      throw AppException('Passkey-Setup ist derzeit nicht verfügbar.');
+      throw AppException('Passkey-Verwaltung ist derzeit nicht verfügbar.');
     }
+    return SupabaseService.client.auth.passkey.list();
+  }
+
+  /// Löscht einen Passkey vom Konto (z. B. Alt-Gerät / doppelte Einträge).
+  ///
+  /// WICHTIG bei der Fehlersuche ("Der Server konnte den Passkey nicht
+  /// bestätigen"): Ist auf dem Konto ein ALTER/Defekt-Passkey hinterlegt,
+  /// kann dessen excludeCredentials-Eintrag die Registrierung stören -
+  /// Löschen und Neuanlegen behebt das.
+  static Future<void> delete({required String passkeyId}) async {
+    if (!SupabaseService.isInitialized) {
+      throw AppException('Passkey-Verwaltung ist derzeit nicht verfügbar.');
+    }
+    await SupabaseService.client.auth.passkey.delete(passkeyId: passkeyId);
+  }
+
+  /// Bennent einen Passkey um (z. B. "Pixel 8" statt generischem Namen).
+  static Future<void> rename({
+    required String passkeyId,
+    required String friendlyName,
+  }) async {
+    if (!SupabaseService.isInitialized) {
+      throw AppException('Passkey-Verwaltung ist derzeit nicht verfügbar.');
+    }
+    await SupabaseService.client.auth.passkey.update(
+      passkeyId: passkeyId,
+      friendlyName: friendlyName,
+    );
+  }
+
+  /// Anzahl der bereits registrierten Passkeys (Best-Effort; null bei
+  /// Fehler - z. B. wenn AAL2 nötig wäre).
+  static Future<int?> countRegistered() async {
     try {
-      await SupabaseService.client.auth.registerPasskey(_authenticator);
-    } catch (e) {
-      throw _explain(e, login: false);
+      return (await listRegistered()).length;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -131,6 +209,23 @@ class PasskeyAuth {
         'Bitte versuche es erneut.',
       );
     }
+    // GoTrue lehnt ab, NACHDEM die native Zeremonie lief: Die WebAuthn-
+    // Verifikation des Credentials scheitert ("credential verification
+    // failed"). Häufigste Ursache (Diagnose, siehe
+    // docs/PASSKEYS_SERVER_SETUP.md): Der Origin des installierten APKs
+    // (android:apk-key-hash:<SHA-256>) fehlt in GOTRUE_WEBAUTHN_RP_ORIGINS
+    // - der native Dialog funktioniert trotzdem, weil er nur die
+    // assetlinks.json prüft. Zweitursache: Alter/Defekt-Passkey am Konto.
+    if (text.toLowerCase().contains('verification failed')) {
+      debugPrint('[PasskeyAuth] Verifikation fehlgeschlagen: $e');
+      return AppException(
+        'Der Server konnte den Passkey nicht bestätigen. Wahrscheinlich '
+        'fehlt der Ursprung (apk-key-hash) der installierten App in der '
+        'Passkey-Konfiguration des Servers - siehe '
+        'docs/PASSKEYS_SERVER_SETUP.md. Alternativ: alten Passkey unter '
+        '"Passkeys verwalten" löschen und erneut anlegen.',
+      );
+    }
     final isAuthApiError = text.contains('AuthApiException') ||
         RegExp(r'\bstatus: 4\d\d\b').hasMatch(text) ||
         text.toLowerCase().contains('webauthn');
@@ -139,14 +234,7 @@ class PasskeyAuth {
       // Server-Grund (kuratiert, kurz) transparent machen: GoTrue-Antworten
       // sind kurze Sätze ohne Secrets - sie helfen dem Team bei der
       // Ursachensuche (z. B. "aal2 required", "User enrollments disabled").
-      String reason = '';
-      final msgMatch = RegExp(r'message:\s*([^,}]+)').firstMatch(text);
-      if (msgMatch != null) {
-        reason = ' (Server: ${msgMatch.group(1)!.trim().substring(0, msgMatch.group(1)!.trim().length.clamp(0, 120))})';
-      } else {
-        final statusMatch = RegExp(r'\bstatus: (\d{3})').firstMatch(text);
-        if (statusMatch != null) reason = ' (HTTP ${statusMatch.group(1)})';
-      }
+      final reason = _serverReason(text);
       return AppException(
         'Der Server hat die Passkey-Anfrage abgelehnt. Bitte prüfe in den '
         'Supabase-Einstellungen, ob "Passkeys" aktiviert ist und die '
@@ -161,5 +249,18 @@ class PasskeyAuth {
     return AppException(
       'Passkey-$action fehlgeschlagen. Bitte versuche es später erneut.',
     );
+  }
+
+  /// Extrahiert den kurzen Server-Grund aus einer GoTrue-Fehlermeldung
+  /// (ohne Secrets): "message: ..." bzw. den HTTP-Status.
+  static String _serverReason(String text) {
+    final msgMatch = RegExp(r'message:\s*([^,}]+)').firstMatch(text);
+    if (msgMatch != null) {
+      final raw = msgMatch.group(1)!.trim();
+      return ' (Server: ${raw.substring(0, raw.length.clamp(0, 120))})';
+    }
+    final statusMatch = RegExp(r'\bstatus: (\d{3})').firstMatch(text);
+    if (statusMatch != null) return ' (HTTP ${statusMatch.group(1)})';
+    return '';
   }
 }

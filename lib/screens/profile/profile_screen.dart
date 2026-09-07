@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,8 +15,10 @@ import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/screens/admin/admin_screen.dart';
 import 'package:wisp/services/supabase_storage_service.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/widgets/profile_widgets.dart';
+import 'package:wisp/widgets/scroll_more_hint.dart';
 
 /// Profil-Anzeige des eigenen Nutzers mit Schnellzugriff auf Bearbeiten
 /// und Einstellungen.
@@ -27,127 +31,141 @@ class ProfileScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
 
     final genderLabel = profile.gender != null && profile.gender!.isNotEmpty
-        ? Gender.fromValue(profile.gender)?.label ?? ''
+        ? (Gender.fromValue(profile.gender) != null
+            ? L10n.t(context, Gender.fromValue(profile.gender)!.labelKey)
+            : '')
         : '';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mein Profil'),
+        title: Text(L10n.t(context, 'profile.title')),
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_2),
-            tooltip: 'Mein QR Code',
+            tooltip: L10n.t(context, 'profile.qrTooltip'),
             onPressed: () => context.push(AppRoutes.qrProfile),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            tooltip: 'Einstellungen',
+            tooltip: L10n.t(context, 'settings.title'),
             onPressed: () => context.push(AppRoutes.settings),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Center(child: _OwnAvatar()),
-            const SizedBox(height: 16),
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Versteckter Admin-Zugang: Long-Press auf den Namen
-                  // oeffnet nur fuer die konfigurierte Admin-ID den
-                  // Admin-Bereich. Normale Nutzer erreichen ihn nicht.
-                  GestureDetector(
-                    onLongPress: isCurrentUserAdmin()
-                        ? () => context.go(AppRoutes.admin)
-                        : null,
-                    child: Text(
-                      profile.name.isEmpty ? 'Unbekannt' : profile.name,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Center(
-              child: Text(
-                '${profile.age != null ? '${profile.age} Jahre' : 'Alter unbekannt'}'
-                '${genderLabel.isNotEmpty ? ' · $genderLabel' : ''}'
-                '${profile.city.isNotEmpty ? ' · ${profile.city}' : ''}',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-            if (profile.personalityType != null) ...[
-              const SizedBox(height: 4),
+      body: ScrollMoreHint(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Center(child: _OwnAvatar()),
+              const SizedBox(height: 16),
               Center(
-                child: Chip(
-                  label: Text('Typ ${profile.personalityType}'),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                      Text('Über mich',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Text(
-                      profile.bio.isEmpty ? 'Noch keine Bio.' : profile.bio,
+                    // Versteckter Admin-Zugang: Long-Press auf den Namen
+                    // oeffnet nur fuer die konfigurierte Admin-ID den
+                    // Admin-Bereich. Normale Nutzer erreichen ihn nicht.
+                    GestureDetector(
+                      onLongPress: isCurrentUserAdmin()
+                          ? () => context.go(AppRoutes.admin)
+                          : null,
+                      child: Text(
+                        profile.name.isEmpty
+                            ? L10n.t(context, 'profile.unknown')
+                            : profile.name,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            if (profile.interests.isNotEmpty) ...[
+              Center(
+                child: Text(
+                  '${profile.age != null ? '${profile.age} ${L10n.t(context, 'profile.years')}' : L10n.t(context, 'profile.ageUnknown')}'
+                  '${genderLabel.isNotEmpty ? ' · $genderLabel' : ''}'
+                  '${profile.city.isNotEmpty ? ' · ${profile.city}' : ''}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              if (profile.personalityType != null) ...[
+                const SizedBox(height: 4),
+                Center(
+                  child: Chip(
+                    label: Text(
+                        '${L10n.t(context, 'profile.typePrefix')} ${profile.personalityType}'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Interessen',
+                      Text(L10n.t(context, 'profile.aboutMe'),
                           style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 12),
-                      InterestChips(interests: profile.interests),
+                      const SizedBox(height: 8),
+                      Text(
+                        profile.bio.isEmpty
+                            ? L10n.t(context, 'profile.noBio')
+                            : profile.bio,
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-            ],
-            const _MoodCard(),
-            const SizedBox(height: 12),
-            Card(
-              child: SwitchListTile(
-                title: const Text('Persönlichkeit vor Aussehen'),
-                subtitle: const Text('Fotos erst nach Funke anzeigen'),
-                value: settings.blindModeEnabled,
-                onChanged: (v) =>
-                    ref.read(settingsProvider.notifier).toggleBlindMode(v),
+              if (profile.interests.isNotEmpty) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(L10n.t(context, 'profile.interests'),
+                            style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 12),
+                        InterestChips(interests: profile.interests),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              const _MoodCard(),
+              const SizedBox(height: 12),
+              Card(
+                child: SwitchListTile(
+                  title: Text(L10n.t(context, 'profile.blindModeTitle')),
+                  subtitle: Text(L10n.t(context, 'profile.blindModeSub')),
+                  value: settings.blindModeEnabled,
+                  onChanged: (v) {
+                    ref.read(settingsProvider.notifier).toggleBlindMode(v);
+                    // Blind Mode gehört zu den gespiegelten UI-Einstellungen
+                    // (v0.8.0) - entprellt serverseitig sichern.
+                    scheduleUiPrefsServerSync(
+                        ref.read(settingsProvider));
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => _showProfileMenu(context, ref, profile, settings),
-              icon: const Icon(Icons.person),
-              label: const Text('Profil'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => context.push(AppRoutes.bugReport),
-              icon: const Icon(Icons.bug_report),
-              label: const Text('Bug melden'),
-            ),
-            const SizedBox(height: 12),
-          ],
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => _showProfileMenu(context, ref, profile, settings),
+                icon: const Icon(Icons.person),
+                label: Text(L10n.t(context, 'profile.profileBtn')),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => context.push(AppRoutes.bugReport),
+                icon: const Icon(Icons.bug_report),
+                label: Text(L10n.t(context, 'profile.bugReportBtn')),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );
@@ -168,8 +186,8 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Profil bearbeiten'),
-              subtitle: const Text('Daten, Interessen und Vorstellung ändern'),
+              title: Text(L10n.t(context, 'profile.menu.edit')),
+              subtitle: Text(L10n.t(context, 'profile.menu.editSub')),
               onTap: () {
                 Navigator.of(ctx).pop();
                 context.push(AppRoutes.profileEdit);
@@ -177,8 +195,8 @@ class ProfileScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.visibility),
-              title: const Text('Profil Vorschau'),
-              subtitle: const Text('So sehen dich andere'),
+              title: Text(L10n.t(context, 'profile.menu.preview')),
+              subtitle: Text(L10n.t(context, 'profile.menu.previewSub')),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _showProfilePreview(context, ref, profile, settings);
@@ -186,8 +204,9 @@ class ProfileScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.record_voice_over),
-              title: const Text('Vorstellung Vorschau'),
-              subtitle: const Text('Deine Text- und Audio-Vorstellung ansehen'),
+              title: Text(L10n.t(context, 'profile.menu.introPreview')),
+              subtitle:
+                  Text(L10n.t(context, 'profile.menu.introPreviewSub')),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _showIntroPreview(context, ref, profile);
@@ -227,14 +246,14 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
               Text(
-                'Meine Vorstellung',
+                L10n.t(context, 'profile.intro.title'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               if (profile.introText.isEmpty)
-                const Text(
-                  'Du hast noch keine Text-Vorstellung hinterlegt.',
-                  style: TextStyle(color: Colors.grey),
+                Text(
+                  L10n.t(context, 'profile.intro.empty'),
+                  style: const TextStyle(color: Colors.grey),
                 )
               else
                 Text(
@@ -248,9 +267,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Andere lernen dich über diese Vorstellung kennen, bevor '
-                'sie ein Foto sehen. Bearbeiten kannst du sie unter '
-                'Profil bearbeiten.',
+                L10n.t(context, 'profile.intro.hint'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -281,6 +298,14 @@ class ProfileScreen extends ConsumerWidget {
       revealPhotosAfterMatch: settings.revealPhotosAfterMatch,
       isMatched: true, // Bei Vorschau davon ausgehen, dass Match besteht
     );
+    // Echtes (verschlüsseltes) Profilbild laden - v0.8.1-Fix: Die Vorschau
+    // zeigte vorher NUR den Person-Platzhalter, egal welches Bild gesetzt
+    // war. Einmalig vor dem Sheet erzeugt, damit der FutureBuilder nicht
+    // bei jedem Rebuild neu lädt.
+    final photoRef = profile.photos.isNotEmpty ? profile.photos.first : null;
+    final Future<Uint8List?> avatarFuture = (isPhotosVisible && photoRef != null)
+        ? ref.read(supabaseStorageServiceProvider).loadAvatarBytes(photoRef)
+        : Future<Uint8List?>.value(null);
 
     showModalBottomSheet<void>(
       context: context,
@@ -310,49 +335,73 @@ class ProfileScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Profil Vorschau',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
               Text(
-                'So sehen dich andere Nutzer (inkl. Alters Schutz & Blind Mode):',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                L10n.t(context, 'profile.preview.title'),
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              const SizedBox(height: 24),
-              Center(
-                child: CircleAvatar(
-                  radius: 56,
-                  backgroundColor: isPhotosVisible
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : Colors.grey.shade300,
-                  child: !isPhotosVisible
-                      ? const Icon(Icons.visibility_off, size: 48, color: Colors.white)
-                      : const Icon(Icons.person, size: 56, color: Colors.white),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            L10n.t(context, 'profile.preview.hint'),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-              ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: CircleAvatar(
+              radius: 56,
+              backgroundColor: isPhotosVisible
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Colors.grey.shade300,
+              child: !isPhotosVisible
+                  ? const Icon(Icons.visibility_off, size: 48, color: Colors.white)
+                  : FutureBuilder<Uint8List?>(
+                      future: avatarFuture,
+                      builder: (context, snap) {
+                        final bytes = snap.data;
+                        if (bytes != null) {
+                          return ClipOval(
+                            child: Image.memory(bytes,
+                                width: 112, height: 112, fit: BoxFit.cover),
+                          );
+                        }
+                        return const Icon(Icons.person,
+                            size: 56, color: Colors.white);
+                      },
+                    ),
+            ),
+          ),
               const SizedBox(height: 16),
               Center(
-                child: Text(
-                  '${profile.name}${profile.age != null ? ', ${profile.age}' : ''}'
-                  '${profile.gender != null && profile.gender!.isNotEmpty ? ' · ${Gender.fromValue(profile.gender!)?.label ?? profile.gender}' : ''}'
-                  '${profile.city.isNotEmpty ? ' · ${profile.city}' : ''}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                  textAlign: TextAlign.center,
-                ),
+                child: Builder(builder: (context) {
+                  final genderName = profile.gender != null &&
+                          profile.gender!.isNotEmpty
+                      ? (Gender.fromValue(profile.gender) != null
+                          ? L10n.t(
+                              context, Gender.fromValue(profile.gender)!.labelKey)
+                          : profile.gender!)
+                      : '';
+                  return Text(
+                    '${profile.name}${profile.age != null ? ', ${profile.age}' : ''}'
+                    '${genderName.isNotEmpty ? ' · $genderName' : ''}'
+                    '${profile.city.isNotEmpty ? ' · ${profile.city}' : ''}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  );
+                }),
               ),
               if (profile.personalityType != null) ...[
                 const SizedBox(height: 8),
                 Center(
-                  child: Chip(label: Text('Typ ${profile.personalityType}')),
+                  child: Chip(
+                      label: Text(
+                          '${L10n.t(context, 'profile.preview.type')} ${profile.personalityType}')),
                 ),
               ],
               if (!isPhotosVisible) ...[
@@ -370,9 +419,7 @@ class ProfileScreen extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Deine Fotos sind aufgrund deiner Einstellungen '
-                          '(Persönlichkeit vor Aussehen / Alters Schutz) '
-                          'für andere nicht sichtbar.',
+                          L10n.t(context, 'profile.preview.photoHidden'),
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Theme.of(context).colorScheme.onPrimaryContainer,
                               ),
@@ -389,11 +436,13 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                    Text('Über mich',
+                    Text(L10n.t(context, 'profile.preview.aboutMe'),
                           style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
                       Text(
-                        profile.bio.isEmpty ? 'Noch keine Bio.' : profile.bio,
+                        profile.bio.isEmpty
+                            ? L10n.t(context, 'profile.preview.noBio')
+                            : profile.bio,
                       ),
                     ],
                   ),
@@ -407,7 +456,7 @@ class ProfileScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Interessen',
+                        Text(L10n.t(context, 'profile.preview.interests'),
                             style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 12),
                         InterestChips(interests: profile.interests),
@@ -418,8 +467,7 @@ class ProfileScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 16),
               Text(
-                'Hinweis: Die tatsächliche Sichtbarkeit hängt vom Alter '
-                'und den Einstellungen der jeweiligen Betrachter ab.',
+                L10n.t(context, 'profile.preview.note'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -459,20 +507,24 @@ class _MoodCard extends ConsumerWidget {
           ),
         ),
         title: Text(
-          mood != null ? 'Heute ${mood.label}' : 'Kein Mood ausgewählt',
+          mood != null
+              ? '${L10n.t(context, 'mood.today')} ${L10n.t(context, mood.labelKey)}'
+              : L10n.t(context, 'mood.noneSelected'),
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
         subtitle: Text(
           mood != null
-              ? 'Tippe, um deine Stimmung zu ändern.'
-              : 'Tippe, um deine Stimmung des Tages zu wählen.',
+              ? L10n.t(context, 'mood.changeHint')
+              : L10n.t(context, 'mood.selectHint'),
           style: theme.textTheme.bodySmall,
         ),
         trailing: TextButton(
           onPressed: () => context.push(AppRoutes.moodPicker),
-          child: Text(mood != null ? 'Ändern' : 'Wählen'),
+          child: Text(mood != null
+              ? L10n.t(context, 'mood.change')
+              : L10n.t(context, 'mood.select')),
         ),
       ),
     );
@@ -518,8 +570,8 @@ class _OwnIntroAudioPlayerState extends ConsumerState<_OwnIntroAudioPlayer> {
         if (mounted) {
           setState(() => _loading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Audio-Vorstellung nicht gefunden.'),
+            SnackBar(
+              content: Text(L10n.t(context, 'profile.intro.audioMissing')),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -539,8 +591,8 @@ class _OwnIntroAudioPlayerState extends ConsumerState<_OwnIntroAudioPlayer> {
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Audio-Vorstellung konnte nicht geladen werden.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'profile.intro.audioLoadError')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -553,9 +605,9 @@ class _OwnIntroAudioPlayerState extends ConsumerState<_OwnIntroAudioPlayer> {
   @override
   Widget build(BuildContext context) {
     if (!widget.hasAudio) {
-      return const Text(
-        'Noch keine Audio-Vorstellung hinterlegt.',
-        style: TextStyle(color: Colors.grey),
+      return Text(
+        L10n.t(context, 'profile.intro.audioEmpty'),
+        style: const TextStyle(color: Colors.grey),
       );
     }
     return FilledButton.tonalIcon(
@@ -567,19 +619,21 @@ class _OwnIntroAudioPlayerState extends ConsumerState<_OwnIntroAudioPlayer> {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : Icon(_playing ? Icons.stop : Icons.play_arrow),
-      label: Text(_playing ? 'Stopp' : 'Audio-Vorstellung anhören'),
+      label: Text(_playing
+          ? L10n.t(context, 'profile.intro.stop')
+          : L10n.t(context, 'profile.intro.listen')),
     );
   }
 }
 
-/// Signierte URL für das EIGENE Profilbild (Owner-RLS erlaubt direkten
-/// Zugriff - kein match-media nötig, welches Self-Requests ablehnt).
-final _ownAvatarUrlProvider =
-    FutureProvider.autoDispose.family<String?, String>((ref, path) async {
+/// Entschlüsselte Bild-Bytes für das EIGENE Profilbild (v0.8.1: Avatare
+/// sind AES-256-GCM-verschlüsselt - Download + lokale Entschlüsselung).
+final _ownAvatarBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List?, String>((ref, ref1) async {
   try {
     return await ref
         .read(supabaseStorageServiceProvider)
-        .getSignedAvatarUrl(path);
+        .loadAvatarBytes(ref1);
   } catch (_) {
     return null;
   }
@@ -591,19 +645,18 @@ class _OwnAvatar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final photos = ref.watch(profileProvider).photos;
-    final path = photos.isNotEmpty ? photos.first : null;
-    final url = path == null
+    final photoRef = photos.isNotEmpty ? photos.first : null;
+    final bytes = photoRef == null
         ? null
-        : ref.watch(_ownAvatarUrlProvider(path)).valueOrNull;
+        : ref.watch(_ownAvatarBytesProvider(photoRef)).valueOrNull;
 
     final placeholder = Icon(Icons.person,
         size: 56, color: Theme.of(context).colorScheme.onSurfaceVariant);
 
     return CircleAvatar(
       radius: 52,
-      backgroundImage:
-          (url != null && url.isNotEmpty) ? NetworkImage(url) : null,
-      child: (url == null || url.isEmpty) ? placeholder : null,
+      backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+      child: bytes == null ? placeholder : null,
     );
   }
 }

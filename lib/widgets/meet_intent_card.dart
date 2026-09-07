@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisp/providers/meet_intent_provider.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// Vorschlag-Karte für ein echtes Treffen im Chat.
 ///
@@ -61,7 +62,7 @@ class _MeetIntentCardState extends ConsumerState<MeetIntentCard> {
       return _card(
         icon: Icons.celebration,
         color: Colors.green,
-        title: 'Schön, dass ihr euch getroffen habt! 🎉',
+        title: L10n.t(context, 'meet.metTitle'),
         body: 'Wir hoffen, ihr hattet eine schöne Zeit. '
             'Echte Verbindungen statt nur Online-Reden.',
       );
@@ -80,7 +81,7 @@ class _MeetIntentCardState extends ConsumerState<MeetIntentCard> {
       return _card(
         icon: Icons.schedule,
         color: Theme.of(context).colorScheme.primary,
-        title: 'Du möchtest dich treffen',
+        title: L10n.t(context, 'meet.youWant'),
         body: 'Wir haben ${widget.partnerName} deinen Wunsch weitergegeben. '
             'Sobald ${widget.partnerName} zustimmt, könnt ihr planen.',
       );
@@ -90,7 +91,7 @@ class _MeetIntentCardState extends ConsumerState<MeetIntentCard> {
       return _card(
         icon: Icons.favorite,
         color: Theme.of(context).colorScheme.primary,
-        title: '${widget.partnerName} würde sich gerne mit dir treffen',
+        title: L10n.tf(context, 'meet.theyWant', {'name': widget.partnerName}),
         body: 'Was hältst du davon, es mal wirklich zu versuchen?',
         actions: [
           FilledButton(
@@ -120,7 +121,7 @@ class _MeetIntentCardState extends ConsumerState<MeetIntentCard> {
         ),
         TextButton(
           onPressed: () => setState(() => _dismissed = true),
-          child: const Text('Vielleicht später'),
+          child: Text(L10n.t(context, 'meet.later')),
         ),
       ],
     );
@@ -147,7 +148,7 @@ class _MeetIntentCardState extends ConsumerState<MeetIntentCard> {
               ],
             ),
             const SizedBox(height: 8),
-            const Text('Ideen für ein erstes Treffen:'),
+            Text(L10n.t(context, 'meet.ideas')),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,

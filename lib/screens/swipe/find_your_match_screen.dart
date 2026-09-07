@@ -220,14 +220,30 @@ class _FindYourMatchScreenState extends ConsumerState<FindYourMatchScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        '${current.name}${current.age != null ? ', ${current.age}' : ''}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleLarge
-                                            ?.copyWith(
-                                                fontWeight: FontWeight.bold),
-                                      ),
+                                       Text(
+                                         '${current.name}${current.age != null ? ', ${current.age}' : ''}',
+                                         style: Theme.of(context)
+                                             .textTheme
+                                             .titleLarge
+                                             ?.copyWith(
+                                                 fontWeight: FontWeight.bold),
+                                       ),
+                                       // Verbindungs-Score (0-100):
+                                       // Distanz + gemeinsame Interessen +
+                                       // Musik (serverseitig berechnet).
+                                       if (current.matchScore != null)
+                                         Text(
+                                           'Match: ${current.matchScore} %',
+                                           style: Theme.of(context)
+                                               .textTheme
+                                               .labelLarge
+                                               ?.copyWith(
+                                                 color: Theme.of(context)
+                                                     .colorScheme
+                                                     .primary,
+                                                 fontWeight: FontWeight.bold,
+                                               ),
+                                         ),
                                       if (current.city.isNotEmpty)
                                         Text(
                                           current.city,

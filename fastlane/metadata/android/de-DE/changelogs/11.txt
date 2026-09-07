@@ -1,0 +1,8 @@
+NSFW-Bildmoderation jetzt on-device:
+- Lokale Pruefung (ONNX, image-safety-classifier-xs) nur nach manueller Bild-Meldung
+- Transparentes Ergebnis im Meldedialog (Human-in-the-Loop)
+- Uebertragung nur nach aktiver Bestaetigung, Abbruch verwirft das Bild
+- Report mit Kontextnachrichten, pseudonymisierter ID und lokalem Score
+
+Hinweis: Modelldatei assets/models/image-safety-classifier-xs.onnx beilegen (siehe docs).
+Server: Migrationen 074 + 075 einspielen.

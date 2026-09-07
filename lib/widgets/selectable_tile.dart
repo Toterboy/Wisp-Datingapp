@@ -22,6 +22,7 @@ class SelectableTile<T> extends StatelessWidget {
     required this.groupValue,
     required this.title,
     required this.onChanged,
+    this.subtitle,
     super.key,
   });
 
@@ -29,6 +30,9 @@ class SelectableTile<T> extends StatelessWidget {
   final T? groupValue;
   final String title;
   final ValueChanged<T?> onChanged;
+
+  /// Optionale Erklaerung unter dem Titel.
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -64,10 +68,32 @@ class SelectableTile<T> extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
+                    child: subtitle == null
+                        ? Text(
+                            title,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
+                          ),
                   ),
                 ],
               ),

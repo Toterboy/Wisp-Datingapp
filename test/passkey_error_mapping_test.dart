@@ -75,6 +75,18 @@ void main() {
       expect(e.message, isNot(contains('Supabase-Einstellungen')));
     });
 
+    test('"credential verification failed" erhaelt Loesungshinweis', () {
+      final e = PasskeyAuth.explainError(
+        'AuthApiException: status: 400, message: credential verification failed',
+        login: false,
+      );
+      // Verständliche Meldung statt der Server-Rohmeldung ...
+      expect(e.message, contains('nicht bestätigen'));
+      // ... mit konkretem Lösungsweg (Alt-Eintrag über Verwaltung löschen).
+      expect(e.message, contains('Passkeys verwalten'));
+      expect(e.message, isNot(contains('Supabase-Einstellungen')));
+    });
+
     test('unbekannter Fehler bleibt im Release generisch (kein Leak)', () {
       final e = PasskeyAuth.explainError(
         'CreatePublicKeyCredentialDomException: internals xyz=secret',

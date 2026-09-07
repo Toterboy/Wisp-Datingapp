@@ -15,6 +15,15 @@
 #   .\tool\build_release.ps1                  # baut beide Varianten + kopiert
 #   .\tool\build_release.ps1 -Flavor play     # nur Play-Variante
 #   .\tool\build_release.ps1 -SkipBuild       # nur kopieren/umbenennen
+#   .\tool\build_release.ps1 -SplitPerAbi     # pro-CPU-APKs (~55 MB statt 156 MB)
+#   .\tool\build_release.ps1 -Aab             # zusätzlich Play-App-Bundle (.aab)
+#
+# APK-GRÖSSE (Hintergrund): Ein universelles APK enthält die nativen
+# Bibliotheken (Flutter-Engine, WebRTC, ONNX Runtime) DREIMAL - für
+# arme64, armv7 und x86_64. Jede Kopie ist ~45 MB. Mit --split-per-abi
+# entstehen drei getrennte APKs (~55 MB pro Gerät); der Play Store
+# liefert automatisch nur die passende. Für Play-Uploads besser gleich
+# -Aab nutzen (das .aab ist das pflichtige Store-Format).
 #
 # Die Version wird automatisch aus pubspec.yaml gelesen (z. B. 0.7.0+4).
 
@@ -22,9 +31,17 @@ param(
     [ValidateSet("both", "play", "fdroid")]
     [string]$Flavor = "both",
 
-    # Uberspringt das Kompilieren (nutzt vorhandene APKs unter
+    # Überspringt das Kompilieren (nutzt vorhandene APKs unter
     # build/app/outputs/flutter-apk/) - z. B. nach einem Version-Bump.
     [switch]$SkipBuild,
+
+    # Pro-CPU-APKs bauen (arme64-v8a, armeabi-v7a, x86_64) - deutlich
+    # kleinere Downloads als das universelle APK.
+    [switch]$SplitPerAbi,
+
+    # Zusätzlich ein Play-App-Bundle (.aab) bauen (pflichtiges
+    # Store-Format; Play liefert pro Gerät nur die nötigen ABIs aus).
+    [switch]$Aab,
 
     [string]$OutRoot = "releases"
 )
@@ -59,6 +76,22 @@ function Copy-FlavorApk {
     Write-Host "    OK: $dst" -ForegroundColor Green
 }
 
+function Copy-SplitApks {
+    param([string]$FlavorName)
+    $dir = "build\app\outputs\flutter-apk"
+    $abis = @("arm64-v8a", "armeabi-v7a", "x86_64")
+    foreach ($abi in $abis) {
+        $src = Join-Path $dir "app-$FlavorName-$abi-release.apk"
+        if (Test-Path -LiteralPath $src) {
+            $dst = Join-Path $OutDir "WispDating-v$VersionName-$FlavorName-$abi.apk"
+            Copy-Item -LiteralPath $src -Destination $dst -Force
+            Write-Host "    OK: $dst" -ForegroundColor Green
+        } else {
+            Write-Warning "Split-APK nicht gefunden: $src"
+        }
+    }
+}
+
 # ---------------------------------------------------------------------
 # Bauen
 # ---------------------------------------------------------------------
@@ -67,12 +100,16 @@ if ($SkipBuild) {
 } else {
     if ($Flavor -in @("both", "play")) {
         Write-Host "==> Baue PLAY-Variante..." -ForegroundColor Cyan
-        flutter build apk --release --flavor play
+        $abiArgs = @()
+        if ($SplitPerAbi) { $abiArgs += "--split-per-abi" }
+        flutter build apk --release --flavor play @abiArgs
         if ($LASTEXITCODE -ne 0) { throw "Play-Build fehlgeschlagen." }
     }
     if ($Flavor -in @("both", "fdroid")) {
         Write-Host "==> Baue F-DROID-Variante (ohne Google/Firebase)..." -ForegroundColor Cyan
-        flutter build apk --release --flavor fdroid --dart-define=FDROID=true
+        $abiArgs = @()
+        if ($SplitPerAbi) { $abiArgs += "--split-per-abi" }
+        flutter build apk --release --flavor fdroid --dart-define=FDROID=true @abiArgs
         if ($LASTEXITCODE -ne 0) { throw "F-Droid-Build fehlgeschlagen." }
     }
 }
@@ -80,11 +117,12 @@ if ($SkipBuild) {
 # ---------------------------------------------------------------------
 # Kopieren & Benennen
 # ---------------------------------------------------------------------
-if ($Flavor -in @("both", "play")) {
-    Copy-FlavorApk -FlavorName "play"
-}
-if ($Flavor -in @("both", "fdroid")) {
-    Copy-FlavorApk -FlavorName "fdroid"
+if ($SplitPerAbi) {
+    if ($Flavor -in @("both", "play")) { Copy-SplitApks -FlavorName "play" }
+    if ($Flavor -in @("both", "fdroid")) { Copy-SplitApks -FlavorName "fdroid" }
+} else {
+    if ($Flavor -in @("both", "play")) { Copy-FlavorApk -FlavorName "play" }
+    if ($Flavor -in @("both", "fdroid")) { Copy-FlavorApk -FlavorName "fdroid" }
 }
 
 Write-Host ""

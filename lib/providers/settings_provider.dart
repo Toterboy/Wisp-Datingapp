@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisp/models/app_settings.dart';
 import 'package:wisp/models/profile_visibility.dart';
 import 'package:wisp/services/local_storage.dart';
+import 'package:wisp/services/supabase_database_service.dart';
+import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// StateNotifier, der die App-Einstellungen verwaltet und sicher persistiert.
@@ -65,10 +69,31 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _persist();
   }
 
-  /// Setzt die Profil-Sichtbarkeit (Privatsphäre).
+  /// Profil-Sichtbarkeit (Privatsphäre) - EINE zentrale Steuerung.
+  /// 'hidden' IST der Pausenmodus: Der lokale Flag `paused` und der
+  /// serverseitige Filter (profiles.paused, 076) werden mitgeführt, damit
+  /// Discovery/Find-your-Match den Nutzer sofort ausblenden.
   Future<void> setProfileVisibility(ProfileVisibility value) async {
-    state = state.copyWith(profileVisibility: value);
+    final wasPause = state.profileVisibility == ProfileVisibility.hidden;
+    final isPause = value == ProfileVisibility.hidden;
+    if (value == state.profileVisibility) return;
+    state = state.copyWith(profileVisibility: value, paused: isPause);
     await _persist();
+    scheduleUiPrefsServerSync(state);
+    // Serverseitige Umsetzung (076): die Kandidaten-RPCs lesen
+    // profiles.paused. Nur bei echtem Wechsel schreiben.
+    if (SupabaseService.isInitialized && isPause != wasPause) {
+      unawaited(() async {
+        try {
+          await SupabaseDatabaseService(SupabaseService.client)
+              .updateOwnProfile({'paused': isPause});
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[Settings] Pause-Sync fehlgeschlagen: $e');
+          }
+        }
+      }());
+    }
   }
 
   /// Setzt das Theme (null = System).
@@ -120,6 +145,151 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _persist();
   }
 
+  /// Pausenmodus (v0.8.0): Profil unsichtbar in Discovery/FYM, Funken
+  /// und Chats bleiben. Serverseitig gespiegelt (profiles.paused, 076).
+  /// Hält die Sichtbarkeit konsistent: paused == hidden (eine Steuerung).
+  Future<void> setPaused(bool value) async {
+    var vis = state.profileVisibility;
+    if (value) {
+      vis = ProfileVisibility.hidden;
+    } else if (vis == ProfileVisibility.hidden) {
+      vis = ProfileVisibility.everyone;
+    }
+    state = state.copyWith(profileVisibility: vis, paused: value);
+    await _persist();
+  }
+
+  /// Habit-Dealbreaker (v0.8.0): nur Kandidaten mit <= eigenem Konsum.
+  Future<void> setHabitsDealbreaker(bool value) async {
+    state = state.copyWith(habitsDealbreaker: value);
+    await _persist();
+  }
+
+  /// Kontext-Icebreaker-Chip im Chat ein-/ausschalten (v0.8.0).
+  Future<void> setContextIcebreaker(bool value) async {
+    state = state.copyWith(contextIcebreakerEnabled: value);
+    await _persist();
+  }
+
+  /// Server-Flags (Migration 076) übernehmen: Pausenmodus und
+  /// Habit-Dealbreaker. Server gewinnt (gleiche Logik wie ui_prefs).
+  /// paused bleibt mit der Sichtbarkeit konsistent (paused == hidden).
+  Future<void> applyServerFlags({bool? paused, bool? habitsDealbreaker}) async {
+    var next = state;
+    var changed = false;
+    if (paused != null && paused != next.paused) {
+      var vis = next.profileVisibility;
+      if (paused) {
+        vis = ProfileVisibility.hidden;
+      } else if (vis == ProfileVisibility.hidden) {
+        vis = ProfileVisibility.everyone;
+      }
+      next = next.copyWith(paused: paused, profileVisibility: vis);
+      changed = true;
+    }
+    if (habitsDealbreaker != null &&
+        habitsDealbreaker != next.habitsDealbreaker) {
+      next = next.copyWith(habitsDealbreaker: habitsDealbreaker);
+      changed = true;
+    }
+    if (changed) {
+      state = next;
+      await _persist();
+    }
+  }
+
+  /// Übernimmt die serverseitig gespiegelten UI-Einstellungen
+  /// (profiles.ui_prefs, Migration 074) nach Login/Neuinstallation.
+  /// Server gewinnt bei vorhandenen Schlüsseln; fehlende Schlüssel
+  /// (alter Serverstand) lassen den lokalen Stand unangetastet.
+  Future<void> applyServerUiPrefs(Map<String, dynamic>? ui) async {
+    if (ui == null || ui.isEmpty) return;
+    var next = state;
+    var changed = false;
+
+    T? read<T>(String key) => ui[key] is T ? ui[key] as T : null;
+
+    final blind = read<bool>('blindModeEnabled');
+    if (blind != null && blind != next.blindModeEnabled) {
+      next = next.copyWith(blindModeEnabled: blind);
+      changed = true;
+    }
+    final reveal = read<bool>('revealPhotosAfterMatch');
+    if (reveal != null && reveal != next.revealPhotosAfterMatch) {
+      next = next.copyWith(revealPhotosAfterMatch: reveal);
+      changed = true;
+    }
+    final visibilityRaw = read<String>('profileVisibility');
+    if (visibilityRaw != null) {
+      final v = ProfileVisibility.fromValue(visibilityRaw);
+      if (v != next.profileVisibility) {
+        next = next.copyWith(profileVisibility: v);
+        changed = true;
+      }
+    }
+    final dark = read<bool>('useDarkMode');
+    if (dark != null && dark != next.useDarkMode) {
+      next = next.copyWith(useDarkMode: dark);
+      changed = true;
+    }
+    final master = read<bool>('notificationsEnabled');
+    if (master != null && master != next.notificationsEnabled) {
+      next = next.copyWith(notificationsEnabled: master);
+      changed = true;
+    }
+    final notifyMatches = read<bool>('notifyMatches');
+    final notifyLikes = read<bool>('notifyLikes');
+    final notifyMessages = read<bool>('notifyMessages');
+    final notifyDatingHour = read<bool>('notifyDatingHour');
+    final blur = read<bool>('blurChatImages');
+    if (notifyMatches != null && notifyMatches != next.notifyMatches) {
+      next = next.copyWith(notifyMatches: notifyMatches);
+      changed = true;
+    }
+    final paused = read<bool>('paused');
+    if (paused != null && paused != next.paused) {
+      var vis = next.profileVisibility;
+      if (paused) {
+        vis = ProfileVisibility.hidden;
+      } else if (vis == ProfileVisibility.hidden) {
+        vis = ProfileVisibility.everyone;
+      }
+      next = next.copyWith(paused: paused, profileVisibility: vis);
+      changed = true;
+    }
+    final icebreaker = read<bool>('contextIcebreakerEnabled');
+    if (icebreaker != null && icebreaker != next.contextIcebreakerEnabled) {
+      next = next.copyWith(contextIcebreakerEnabled: icebreaker);
+      changed = true;
+    }
+    final dealbreaker = read<bool>('habitsDealbreaker');
+    if (dealbreaker != null && dealbreaker != next.habitsDealbreaker) {
+      next = next.copyWith(habitsDealbreaker: dealbreaker);
+      changed = true;
+    }
+    if (notifyLikes != null && notifyLikes != next.notifyLikes) {
+      next = next.copyWith(notifyLikes: notifyLikes);
+      changed = true;
+    }
+    if (notifyMessages != null && notifyMessages != next.notifyMessages) {
+      next = next.copyWith(notifyMessages: notifyMessages);
+      changed = true;
+    }
+    if (notifyDatingHour != null && notifyDatingHour != next.notifyDatingHour) {
+      next = next.copyWith(notifyDatingHour: notifyDatingHour);
+      changed = true;
+    }
+    if (blur != null && blur != next.blurChatImages) {
+      next = next.copyWith(blurChatImages: blur);
+      changed = true;
+    }
+
+    if (changed) {
+      state = next;
+      await _persist();
+    }
+  }
+
   /// Markiert die Einführung (Willkommens-Screen) als gesehen, damit sie
   /// beim nächsten Start nicht erneut erscheint.
   Future<void> markIntroSeen() async {
@@ -145,11 +315,21 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   /// Der Server gewinnt bei "abgeschlossen" – so erscheint die Einrichtung
   /// nach einer App-Neuinstallation NICHT erneut, nur weil die lokale
   /// Speicherung fehlt. Lokal wird der Stand ebenfalls gespiegelt.
+  ///
+  /// [themeName]: Gespeicherte Themefarbe (profiles.theme_name, Migration
+  /// 071) - wird beim Login/Neuinstallation direkt wieder angewendet.
+  /// Nur bei nicht-leerem Wert (null = Server kennt noch keine Farbe).
+  ///
+  /// [datingHourIntroSeen]: Dating-Hour-Regeln/Erklärung bereits gesehen
+  /// (profiles.dating_hour_intro_seen, Migration 071). Nur-Upgrade: Das
+  /// Intro erscheint pro Konto nur EINMAL, nicht bei jeder Neuinstallation.
   Future<void> syncSetupFlagsFromServer({
     required bool oneTimeSettingsCompleted,
     required bool communityGuidelinesAccepted,
     required bool personalityTestCompleted,
     required bool onboardingDone,
+    String? themeName,
+    bool? datingHourIntroSeen,
   }) async {
     var changed = false;
     var next = state;
@@ -169,6 +349,19 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     // Nur-Upgrade - ein einmaliger Abschluss wird NIE zurückgenommen.
     if (onboardingDone && !next.onboardingDone) {
       next = next.copyWith(onboardingDone: true);
+      changed = true;
+    }
+    // Themefarbe: Server gewinnt bei bekanntem Wert ( Neuinstallation
+    // soll die Farbe direkt wiederhaben - Nutzerwunsch).
+    if (themeName != null &&
+        themeName.isNotEmpty &&
+        themeName != next.themeName) {
+      next = next.copyWith(themeName: themeName);
+      changed = true;
+    }
+    // Dating-Hour-Intro: Nur-Upgrade (gesehen bleibt gesehen).
+    if (datingHourIntroSeen == true && !next.datingHourIntroSeen) {
+      next = next.copyWith(datingHourIntroSeen: true);
       changed = true;
     }
     if (changed) {
@@ -242,6 +435,47 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 /// Checks abgeschlossen sind, wird weitergeleitet - so ist die
 /// Screen-Reihenfolge beim Erststart garantiert (Willkommen vor Login).
 final settingsLoadedProvider = StateProvider<bool>((ref) => false);
+
+/// Spiegelt den Rest der UI-Einstellungen nach profiles.ui_prefs (v0.8.0,
+/// Migration 074) - "Nach Neuinstallation ist ALLES wieder da". Sensible
+/// Inhalte (Chats, E2E-Identität) sind bewusst NICHT Teil davon.
+///
+/// Entprellt (1,5 s): Schalter feuern schnell hintereinander; es geht
+/// maximal EIN Schreibvorgang pro Ruhe-Window raus. Fire-and-forget -
+/// Fehler blockieren die UI nicht (der Stand wird beim nächsten Aufruf
+/// bzw. Login erneut gespiegelt).
+Timer? _uiPrefsSyncTimer;
+
+void scheduleUiPrefsServerSync(AppSettings settings) {
+  if (!SupabaseService.isInitialized) return;
+  _uiPrefsSyncTimer?.cancel();
+  _uiPrefsSyncTimer = Timer(const Duration(milliseconds: 1500), () {
+    unawaited(() async {
+      try {
+          await SupabaseDatabaseService(SupabaseService.client)
+              .updateOwnProfile({
+            'ui_prefs': {
+              'blindModeEnabled': settings.blindModeEnabled,
+              'revealPhotosAfterMatch': settings.revealPhotosAfterMatch,
+              'profileVisibility': settings.profileVisibility.value,
+              'paused': settings.paused,
+              'useDarkMode': settings.useDarkMode,
+            'notificationsEnabled': settings.notificationsEnabled,
+            'notifyMatches': settings.notifyMatches,
+            'notifyLikes': settings.notifyLikes,
+            'notifyMessages': settings.notifyMessages,
+            'notifyDatingHour': settings.notifyDatingHour,
+            'blurChatImages': settings.blurChatImages,
+          },
+        });
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[Settings] ui_prefs-Sync fehlgeschlagen: $e');
+        }
+      }
+    }());
+  });
+}
 
 /// Provider für die App-Einstellungen.
 final settingsProvider =

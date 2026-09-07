@@ -5,20 +5,23 @@ import 'package:flutter/material.dart';
 /// Muss mit dem Enum `mood_type` in der Datenbank übereinstimmen
 /// (siehe `supabase/migrations/024_user_mood.sql`).
 enum Mood {
-  happy('happy', 'Glücklich', Icons.sentiment_very_satisfied, Color(0xFFFFB74D)),
-  relaxed('relaxed', 'Entspannt', Icons.spa, Color(0xFF81C784)),
-  adventurous('adventurous', 'Abenteuerlustig', Icons.explore, Color(0xFF64B5F6)),
-  flirty('flirty', 'Flirty', Icons.favorite, Color(0xFFF06292)),
-  thoughtful('thoughtful', 'Nachdenklich', Icons.psychology, Color(0xFF9575CD)),
-  tired('tired', 'Müde', Icons.bedtime, Color(0xFF90A4AE));
+  happy('happy', 'Glücklich', 'mood.happy', Icons.sentiment_very_satisfied, Color(0xFFFFB74D)),
+  relaxed('relaxed', 'Entspannt', 'mood.relaxed', Icons.spa, Color(0xFF81C784)),
+  adventurous('adventurous', 'Abenteuerlustig', 'mood.adventurous', Icons.explore, Color(0xFF64B5F6)),
+  flirty('flirty', 'Flirty', 'mood.flirty', Icons.favorite, Color(0xFFF06292)),
+  thoughtful('thoughtful', 'Nachdenklich', 'mood.thoughtful', Icons.psychology, Color(0xFF9575CD)),
+  tired('tired', 'Müde', 'mood.tired', Icons.bedtime, Color(0xFF90A4AE));
 
-  const Mood(this.value, this.label, this.icon, this.color);
+  const Mood(this.value, this.label, this.labelKey, this.icon, this.color);
 
   /// Datenbank-Wert (muss mit `mood_type`-Enum übereinstimmen).
   final String value;
 
-  /// Angezeigter deutscher Label.
+  /// Fallback-Label (deutsch) - Anzeige bevorzugt über [labelKey] via L10n.
   final String label;
+
+  /// L10n-Schlüssel (v0.8.1: EN-Übersetzung der farbigen Stimmungs-Chips).
+  final String labelKey;
 
   /// Icon, das das Mood repräsentiert.
   final IconData icon;

@@ -65,6 +65,30 @@ class FindYourMatchService {
         .toList();
   }
 
+  // -- v0.8.0: Match-Status-RPCs (Migration 074) ---------------------------
+
+  /// "Ruhig enden lassen": Funke wird gekühlt (active -> cooled). Er
+  /// erscheint bei BEIDEN unter "Erschlossene Funken" ohne Countdown.
+  Future<void> coolMatch(int matchId) async {
+    await _client.rpc('cool_match', params: {'p_match_id': matchId});
+  }
+
+  /// "Re-Funke ohne Druck": gekühlte Verbindung mit einem Tap reaktivieren
+  /// (cooled -> active).
+  Future<void> resparkMatch(int matchId) async {
+    await _client.rpc('respark_match', params: {'p_match_id': matchId});
+  }
+
+  /// Endgültig beenden (für beide Seiten): status -> ended.
+  Future<void> endMatch(int matchId) async {
+    await _client.rpc('end_match', params: {'p_match_id': matchId});
+  }
+
+  /// "Chats verwalten": Chat nur für mich aus der Liste nehmen.
+  Future<void> hideMatch(int matchId) async {
+    await _client.rpc('hide_match', params: {'p_match_id': matchId});
+  }
+
   /// Signierte URL für die Intro-Audio-Datei eines Nutzers.
   ///
   /// Die match-media-Edge-Function prüft serverseitig, ob eine Berechtigung

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,9 +14,11 @@ import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/location_check_service.dart';
 import 'package:wisp/services/location_verification_service.dart';
+import 'package:wisp/services/image_safety_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/services/supabase_storage_service.dart';
@@ -24,7 +27,9 @@ import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/geo_names.dart';
 import 'package:wisp/utils/validators.dart';
 import 'package:wisp/widgets/buttons.dart';
+import 'package:wisp/widgets/age_range_sliders.dart';
 import 'package:wisp/widgets/gender_preference_selector.dart';
+import 'package:wisp/widgets/music_taste_widgets.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
 import 'package:wisp/widgets/intro_editor.dart';
 
@@ -99,14 +104,26 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   /// (stellt den Hinweis am Speichern-Button dar).
   bool _showValidationError = false;
 
+  /// Kurzbeschreibung des letzten Server-Sync-Fehlers (v0.8.1-Diagnose):
+  /// erscheint im SnackBar, damit fehlende Migrationen nicht still
+  /// bleiben ("Suchradius kommt nicht in Supabase an").
+  String? _lastSyncError;
+
   late Gender _gender;
   late RelationshipType _relationshipType;
   DateTime? _birthDate;
   String _countryValue = 'Deutschland';
   bool _isDetectingLocation = false;
   String? _locationError;
-  Future<String?>? _signedAvatarUrlFuture;
+  Future<Uint8List?>? _avatarBytesFuture;
   ProviderSubscription<UserProfile>? _profileSub;
+
+  /// Neu gewähltes Profilbild (noch nicht hochgeladen): Wird erst beim
+  /// Speichern hochgeladen (v0.8.1-Fix) - vorher wurde das Bild sofort
+  /// übernommen, ohne Speichern-Aufforderung wie bei den anderen Angaben.
+  /// Der NSFW-Check läuft bereits bei der Auswahl (das Bild verlässt das
+  /// Gerät bei Nichtbestehen nicht).
+  Uint8List? _pendingAvatarBytes;
 
   // Vorstellung (Find your Match): Zustand wird vom IntroEditor gemeldet.
   String _introTextValue = '';
@@ -118,11 +135,36 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   HabitudeLevel? _alcohol;
   HabitudeLevel? _drugs;
 
+  // Musik-Geschmack (v0.8.0): gemagte + ausgeschlossene Genres.
+  List<String> _musicLiked = const [];
+  List<String> _musicDisliked = const [];
+  bool _habitsDealbreaker = false;
+
+  // ---- Dirty-Snapshot (Stand beim Öffnen des Screens) --------------------
+  // Alle Werte, die dieser Screen ändern kann, werden gegen diesen
+  // Snapshot verglichen. Nur so bemerkt der "Speichern?"-Dialog ALLE
+  // Änderungen - auch Regler/Dropdowns, die sofort in die Provider
+  // schreiben (Bug: Änderungen an Geburtsdatum, Altersspanne, Entfernung
+  // und Suchradius-Modus lösten die Nachfrage nie aus).
+  late DateTime? _initialBirthDate;
+  late int _initialAgeMin;
+  late int _initialAgeMax;
+  late int _initialMaxDistanceKm;
+  late DistanceFilterMode _initialDistanceMode;
+  late String? _initialPreferredState;
+
+  /// Referenz auf den Dirty-State-Controller: Im initState gelesen, damit
+  /// der dispose-Callback (wo `ref` nicht mehr nutzbar ist) den Flag
+  /// zurücksetzen kann (siehe dispose-Kommentar).
+  StateController<bool>? _dirtyController;
+
   @override
   void initState() {
     super.initState();
+    _dirtyController = ref.read(profileEditDirtyProvider.notifier);
     final p = ref.read(profileProvider);
     final prefs = ref.read(userPreferencesProvider);
+    final settings = ref.read(settingsProvider);
     _nameCtrl.text = p.name;
     _bioCtrl.text = p.bio;
     _cityCtrl.text = prefs.location ?? p.city;
@@ -132,6 +174,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _smoking = p.smoking;
     _alcohol = p.alcohol;
     _drugs = p.drugs;
+    _musicLiked = List.of(p.musicLiked);
+    _musicDisliked = List.of(p.musicDisliked);
+    _habitsDealbreaker = ref.read(settingsProvider).habitsDealbreaker;
     _countryValue = p.country.isEmpty ? 'Deutschland' : p.country;
     _gender = Gender.fromValue(p.gender) ?? Gender.diverse;
     _relationshipType = prefs.relationshipType ?? RelationshipType.open;
@@ -141,6 +186,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _loadedCity = p.city;
     // Dirty-Referenz: exakt der Wert, mit dem das Stadt-Feld belegt wurde.
     _prefillCity = _cityCtrl.text;
+
+    // Dirty-Snapshot einfrieren (siehe Feld-Kommentar).
+    _initialBirthDate = p.birthDate;
+    _initialAgeMin = settings.ageRangeMin;
+    _initialAgeMax = settings.ageRangeMax;
+    _initialMaxDistanceKm = prefs.maxDistanceKm;
+    _initialDistanceMode = prefs.distanceFilterMode;
+    _initialPreferredState = prefs.preferredState;
 
     // Tab-Wechsel-Bug-Fix: Reine Textfeld-Änderungen triggern KEINEN
     // Rebuild - der Dirty-Flag blieb dadurch false und die Bottom-Navigation
@@ -153,11 +206,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       });
     }
 
+    // NSFW-Modell VORAB laden (v0.8.1): Die erste Klassifizierung laedt
+    // sonst erst beim Bild-Auswaehlen und dauert mehrere Sekunden - der
+    // Check laeuft dadurch sofort und zuverlaessig.
+    unawaited(ImageSafetyService.instance.ensureSession());
+
     // Initial signed URL für aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
-      _signedAvatarUrlFuture = ref
+      _avatarBytesFuture = ref
           .read(supabaseStorageServiceProvider)
-          .getSignedAvatarUrl(p.photos.first);
+          .loadAvatarBytes(p.photos.first);
     }
 
     // Falls das Profil später nachgeladen wird, die Felder nachziehen.
@@ -187,11 +245,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (prev?.photos != next.photos) {
         setState(() {
           if (next.photos.isNotEmpty) {
-            _signedAvatarUrlFuture = ref
+            _avatarBytesFuture = ref
                 .read(supabaseStorageServiceProvider)
-                .getSignedAvatarUrl(next.photos.first);
+                .loadAvatarBytes(next.photos.first);
           } else {
-            _signedAvatarUrlFuture = null;
+            _avatarBytesFuture = null;
           }
         });
       }
@@ -200,6 +258,25 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   @override
   void dispose() {
+    // Invariante für die Tab-Navigation: Der Dirty-Flag ist GENAU DANN
+    // true, wenn dieser Screen offen ist und ungespeicherte Änderungen
+    // hat. Beim Verlassen (dispose) deshalb immer zurücksetzen.
+    //
+    // WICHTIG: Nicht SYNCHRON im dispose schreiben - während des Unmounts
+    // sind die Riverpod-Subscriptions dieses Elements noch aktiv und ein
+    // Write würde ein markNeedsBuild auf ein bereits defunct Element
+    // auslösen. Der Microtask läuft erst NACH abgeschlossenem Unmount.
+    final dirtyController = _dirtyController;
+    _dirtyController = null;
+    if (dirtyController != null) {
+      scheduleMicrotask(() {
+        try {
+          dirtyController.state = false;
+        } catch (_) {
+          // Container bereits weg (App-Ende) - nichts zu tun.
+        }
+      });
+    }
     _profileSub?.close();
     _nameCtrl.dispose();
     _bioCtrl.dispose();
@@ -216,33 +293,98 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               DateTime.now().day),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
-      helpText: 'Wähle dein Geburtsdatum',
+      helpText: L10n.t(context, 'profile.edit.birthDateHelp'),
     );
     if (picked != null) {
       setState(() => _birthDate = picked);
       _formKey.currentState?.validate();
+      // Geburtsdatum zählt als Änderung für den Speichern-Dialog.
+      _syncDirtyFlag();
     }
+  }
+
+  /// NSFW-Ablehnungs-Dialog (v0.8.0): Der Nutzer kann Einspruch einlegen
+  /// (Bild wird trotzdem hochgeladen und vom Team manuell geprüft) oder
+  /// ein anderes Bild wählen. Rückgabe: 'appeal' | 'other' | null.
+  Future<String?> _showNsfwAppealDialog(
+    BuildContext context,
+    ImageSafetyResult verdict,
+  ) {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.block,
+            color: Theme.of(ctx).colorScheme.error, size: 40),
+        title: Text(L10n.t(ctx, 'profile.edit.photoNsfwTitle')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(L10n.t(ctx, 'profile.edit.photoNsfwBody')),
+            const SizedBox(height: 8),
+            Text(
+              'Lokaler Score: ${(verdict.criticalScore * 100).toStringAsFixed(0)} % '
+              '(${verdict.topLabel}).',
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Text(L10n.t(ctx, 'profile.edit.photoNsfwChoice')),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('other'),
+            child: Text(L10n.t(ctx, 'profile.edit.photoNsfwOther')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop('appeal'),
+            child: Text(L10n.t(ctx, 'profile.edit.photoNsfwAppeal')),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickProfileImage() async {
     try {
-      final bytes = await pickAndCropAvatar(context);
+      var bytes = await pickAndCropAvatar(context);
+      while (bytes != null) {
+        // NSFW on-device (v0.8.0, Modell image-safety-classifier-xs):
+        // Das Profilbild wird VOR dem Upload rein lokal geprüft - es
+        // verlässt bei Nichtbestehen das Gerät nicht. Der Nutzer kann
+        // Einspruch einlegen (Upload + Team-Review) oder ein anderes
+        // Bild wählen.
+        final verdict =
+            await ImageSafetyService.instance.classifyImage(bytes);
+        if (verdict == null) break; // Lokal nicht verfügbar -> normal hochladen.
+
+        if (!verdict.isFlagged) break; // Bestanden -> Upload.
+
+        if (!mounted) return;
+        final action = await _showNsfwAppealDialog(context, verdict);
+        if (action == 'appeal') break; // Upload trotzdem (Team-Review).
+        if (!mounted) return;
+        // 'other': erneute Bildauswahl.
+        bytes = await pickAndCropAvatar(context);
+      }
       if (bytes == null) return;
 
-      final storageService = ref.read(supabaseStorageServiceProvider);
-      final path = await storageService.uploadAvatar(bytes);
-
-      await ref.read(profileProvider.notifier).update(photos: [path]);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profilbild aktualisiert.')),
-        );
-      }
+      // v0.8.1-Fix: NICHT sofort hochladen. Das Bild wird vorgehalten
+      // (Vorschau) und der Dirty-Flag gesetzt - wie bei den anderen
+      // Angaben erscheint die Speichern-Aufforderung, und der Upload
+      // passiert erst mit dem Speichern. Dadurch kann ein versehentlich
+      // gewähltes Bild per "Abbrechen" verworfen werden, ohne dass es
+      // je den Server erreicht hat (NSFW-Check lief oben bereits).
+      setState(() => _pendingAvatarBytes = bytes);
+      _syncDirtyFlag();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler beim Hochladen: $e')),
+          SnackBar(
+          content: Text(L10n.tf(context,
+              'profile.edit.photoUploadError',
+              {'error': e.toString()})),
+        ),
         );
       }
     }
@@ -262,8 +404,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (position == null) {
         setState(() {
           _isDetectingLocation = false;
-          _locationError = 'Standort konnte nicht ermittelt werden. '
-              'Bitte gib ihn manuell ein oder erlaube den Zugriff.';
+          _locationError = L10n.t(context, 'profile.edit.locationFailed');
         });
         return;
       }
@@ -273,8 +414,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (await locationService.isLocationSuspicious(position)) {
         setState(() {
           _isDetectingLocation = false;
-          _locationError = 'Hinweis: Dieser Standort weicht deutlich von '
-              'deinen bisherigen Standorten auf diesem Ger\u00e4t ab.';
+          _locationError = L10n.t(context, 'profile.edit.locationSuspicious');
         });
         return;
       }
@@ -328,8 +468,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Standort erkannt und übernommen.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'profile.edit.locationDetected')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -382,13 +522,20 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     }
   }
 
-  /// Prüft, ob das Formular vom gespeicherten Profil abweicht
+  /// Prüft, ob das Formular vom Stand beim Öffnen abweicht
   /// (Grundlage für den ungespeicherte-Änderungen-Schutz).
+  ///
+  /// Umfasst auch die Regler/Dropdowns, die direkt in die Provider
+  /// schreiben (Altersspanne, Entfernung, Suchradius-Modus, Bundesland-
+  /// Filter) und das Geburtsdatum - früher lösten diese KEINE Nachfrage
+  /// aus und wurden still übernommen.
   bool _isDirty() {
     final p = ref.read(profileProvider);
     final prefs = ref.read(userPreferencesProvider);
+    final settings = ref.read(settingsProvider);
     final city = _cityCtrl.text.trim();
-    return _nameCtrl.text.trim() != p.name ||
+    return _pendingAvatarBytes != null ||
+        _nameCtrl.text.trim() != p.name ||
         _bioCtrl.text.trim() != p.bio ||
         city != (_prefillCity ?? '').trim() ||
         _stateCtrl.text.trim() != (p.state ?? '').trim() ||
@@ -399,7 +546,44 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         _introAudioPath != p.introAudioPath ||
         _smoking != p.smoking ||
         _alcohol != p.alcohol ||
-        _drugs != p.drugs;
+        _drugs != p.drugs ||
+        !_listEq(_musicLiked, p.musicLiked) ||
+        !_listEq(_musicDisliked, p.musicDisliked) ||
+        // Regler / Auswahl-Snapshot-Vergleiche:
+        _birthDate != _initialBirthDate ||
+        settings.ageRangeMin != _initialAgeMin ||
+        settings.ageRangeMax != _initialAgeMax ||
+        prefs.maxDistanceKm != _initialMaxDistanceKm ||
+        prefs.distanceFilterMode != _initialDistanceMode ||
+        prefs.preferredState != _initialPreferredState;
+  }
+
+  /// Reihenfolge-unabhängiger Listenvergleich (Dirty-Erkennung).
+  static bool _listEq(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    final sa = [...a]..sort();
+    final sb = [...b]..sort();
+    for (var i = 0; i < a.length; i++) {
+      if (sa[i] != sb[i]) return false;
+    }
+    return true;
+  }
+
+  /// Hält den globalen Dirty-Flag für die Navigation aktuell.
+  void _syncDirtyFlag() {
+    if (!mounted) return;
+    ref.read(profileEditDirtyProvider.notifier).state = _isDirty();
+  }
+
+  /// Setzt Regler-/Auswahl-Änderungen auf den Stand beim Öffnen zurück
+  /// ("Verwerfen"-Zweig des Dialogs).
+  Future<void> _revertSliderChanges() async {
+    final prefsNotifier = ref.read(userPreferencesProvider.notifier);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    await prefsNotifier.setMaxDistanceKm(_initialMaxDistanceKm);
+    await prefsNotifier.setDistanceFilterMode(_initialDistanceMode);
+    await prefsNotifier.setPreferredState(_initialPreferredState);
+    await settingsNotifier.setAgeRange(_initialAgeMin, _initialAgeMax);
   }
 
   /// Fragt nach, was mit ungespeicherten Änderungen passieren soll.
@@ -408,7 +592,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Ungespeicherte Änderungen'),
+        title: Text(L10n.t(context, 'profile.edit.unsavedTitle')),
         content: const Text(
           'Deine Profil-Änderungen wurden noch nicht gespeichert. '
           'Was möchtest du tun?',
@@ -440,16 +624,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Future<bool> _saveInternal({String? redirectTo}) async {
     if (_saving) return false;
     setState(() => _saving = true);
+    _lastSyncError = null;
     try {
       if (!_formKey.currentState!.validate()) {
         // Feedback (Nutzerwunsch): Der Hinweis erscheint direkt am
         // Speichern-Button, damit off-screen-Fehler nicht übersehen werden.
         setState(() => _showValidationError = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Es fehlen noch Angaben oder einige Felder sind fehlerhaft '
-              '(rot markiert).',
+              L10n.t(context, 'profile.edit.missingFields'),
             ),
           ),
         );
@@ -459,10 +643,50 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (age == null) {
         setState(() => _showValidationError = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bitte wähle dein Geburtsdatum')),
+          SnackBar(
+            content: Text(
+                L10n.t(context, 'profile.edit.birthDateMissing')),
+          ),
         );
         return false;
       }
+
+    // Profilbild-Upload (v0.8.1): Das bei der Auswahl vorgehaltene Bild
+    // wird JETZT hochgeladen - zusammen mit allen anderen Änderungen.
+    // Fehler verhindern das Speichern nicht (Bild bleibt vorgehalten,
+    // nächster Speicherklick versucht es erneut).
+    if (_pendingAvatarBytes != null) {
+      try {
+        final storageService = ref.read(supabaseStorageServiceProvider);
+        final ref1 =
+            await storageService.uploadAvatar(_pendingAvatarBytes!);
+        await ref.read(profileProvider.notifier).update(photos: [ref1]);
+        // Server-Write (v0.8.1-Fix): Der photos-Pfad MUSSTE vorher immer
+        // nur lokal landen - der Server kannte das Bild nie. Jetzt sofort
+        // + bestätigt schreiben (verifiziert per Read-Back).
+        if (SupabaseService.isInitialized) {
+          await SupabaseDatabaseService(SupabaseService.client)
+              .updateSetupFlagsAndVerify({'photos': [ref1]});
+        }
+        if (!mounted) return false;
+        setState(() {
+          _pendingAvatarBytes = null;
+          _avatarBytesFuture = storageService.loadAvatarBytes(ref1);
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(L10n.tf(context,
+                  'profile.edit.photoUploadError',
+                  {'error': e.toString()})),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        // Nicht abbrechen: die Textänderungen trotzdem speichern.
+      }
+    }
 
     final location = _cityCtrl.text.trim().isEmpty
         ? null
@@ -489,52 +713,76 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           smoking: _smoking,
           alcohol: _alcohol,
           drugs: _drugs,
+          musicLiked: _musicLiked,
+          musicDisliked: _musicDisliked,
         );
     await ref.read(userPreferencesProvider.notifier).setRelationshipType(
           _relationshipType,
         );
 
-    // Server-Sync NICHT blockierend (unawaited): Lokal ist alles gespeichert,
-    // der Nutzer sieht sofort "Profil gespeichert". Fehler landen im Log -
-    // ein erneutes Speichern synchronisiert erneut.
+    // Server-Sync: Bewusst ABWARTEN (Nutzerwunsch "Suchradius soll wie
+    // der Name gespeichert werden") - der frühere fire-and-forget lief
+    // bei schnellem App-Ende ins Leere. Bei Fehlschlag: klar melden
+    // (lokale Werte bleiben erhalten, nächstes Speichern/der
+    // entprellte Auto-Sync holt es nach).
+    var serverSyncOk = true;
     if (SupabaseService.isInitialized) {
-      unawaited(() async {
-        try {
-          await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
-            'bio': _bioCtrl.text.trim(),
-            'name': _nameCtrl.text.trim(),
-            'state': _stateCtrl.text.trim().isEmpty
-                ? null
-                : _stateCtrl.text.trim(),
-            'interests':
-                ref.read(profileProvider).interests,
-            'intro_text': _introTextValue.trim(),
-            'intro_audio_path': _introAudioPath,
-            'country': _countryValue,
-            'smoking': _smoking?.toServer(),
-            'alcohol': _alcohol?.toServer(),
-            'drugs': _drugs?.toServer(),
-            'city': ?location,
-          });
-        } catch (e) {
-          debugPrint('[ProfileEdit] Server-Sync fehlgeschlagen: $e');
-        }
-        // Präferenzen (Entfernung, "Ich suche", Bundesland, Altersspanne)
-        // zusätzlich serverseitig sichern ("Nichts geht verloren"-
-        // Garantie, Migration 066).
+      try {
+        await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
+          'bio': _bioCtrl.text.trim(),
+          'name': _nameCtrl.text.trim(),
+          'state': _stateCtrl.text.trim().isEmpty
+              ? null
+              : _stateCtrl.text.trim(),
+          'interests':
+              ref.read(profileProvider).interests,
+          'intro_text': _introTextValue.trim(),
+          'intro_audio_path': _introAudioPath,
+          'country': _countryValue,
+          'smoking': _smoking?.toServer(),
+          'alcohol': _alcohol?.toServer(),
+          'drugs': _drugs?.toServer(),
+          'music_liked': _musicLiked,
+          'music_disliked': _musicDisliked,
+          'habits_dealbreaker': _habitsDealbreaker,
+          'photos': ref.read(profileProvider).photos,
+          'city': ?location,
+        });
+        // Dealbreaker-Schalter in die Settings spiegeln (Restore-Pfad).
+        await ref
+            .read(settingsProvider.notifier)
+            .setHabitsDealbreaker(_habitsDealbreaker);
+      } catch (e) {
+        serverSyncOk = false;
+        debugPrint('[ProfileEdit] Server-Sync fehlgeschlagen: $e');
+      }
+      // Präferenzen (Entfernung, "Ich suche", Bundesland, Altersspanne)
+      // zusätzlich serverseitig sichern ("Nichts geht verloren"-
+      // Garantie, Migration 066).
+      if (serverSyncOk) {
         try {
           final s = ref.read(settingsProvider);
-          await ref.read(userPreferencesProvider.notifier).savePreferencesToServer(
+          serverSyncOk = await ref
+              .read(userPreferencesProvider.notifier)
+              .savePreferencesToServer(
                 ageRangeMin: s.ageRangeMin,
                 ageRangeMax: s.ageRangeMax,
                 city: location,
-                stateStr:
-                    _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
+                stateStr: _stateCtrl.text.trim().isEmpty
+                    ? null
+                    : _stateCtrl.text.trim(),
               );
+          if (!serverSyncOk) {
+            _lastSyncError = 'Präferenz-Sync: Server-Verifikation '
+                'fehlgeschlagen (möglicherweise fehlt die Migration 066 '
+                'auf dem Server)';
+          }
         } catch (e) {
+          serverSyncOk = false;
+          _lastSyncError = e.toString();
           debugPrint('[ProfileEdit] Präferenz-Sync fehlgeschlagen: $e');
         }
-      }());
+      }
     }
 
     if (!mounted) return true;
@@ -542,9 +790,22 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     setState(() => _showValidationError = false);
     _prefillCity = location;
     _loadedCity = location;
+    _initialAgeMin = ref.read(settingsProvider).ageRangeMin;
+    _initialAgeMax = ref.read(settingsProvider).ageRangeMax;
+    final prefsNow = ref.read(userPreferencesProvider);
+    _initialMaxDistanceKm = prefsNow.maxDistanceKm;
+    _initialDistanceMode = prefsNow.distanceFilterMode;
+    _initialPreferredState = prefsNow.preferredState;
     ref.read(profileEditDirtyProvider.notifier).state = false;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profil gespeichert')),
+      SnackBar(
+        content: Text(serverSyncOk
+            ? L10n.t(context, 'profile.edit.saved')
+            : '${L10n.t(context, 'profile.edit.savedNoSync')} '
+                '(${_lastSyncError ?? 'unbekannt'})'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+      ),
     );
     if (redirectTo != null) {
       context.go(redirectTo);
@@ -589,6 +850,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
+    // Dirty-Flag BEOBACHTEN (nicht nur post-frame melden): Reine
+    // Textfeld-/Regler-Änderungen triggern sonst KEINEN Rebuild des
+    // PopScope - canPop blieb true und die "Speichern?"-Nachfrage beim
+    // Zurück-GESTE (System-Navigation) kam nie.
+    final isDirty = ref.watch(profileEditDirtyProvider);
 
     // Dirty-Zustand an die Navigation melden (post-frame, damit während
     // des Builds kein Provider geschrieben wird).
@@ -610,7 +876,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     });
 
     return PopScope(
-      canPop: !_isDirty(),
+      canPop: !isDirty,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final choice = await _confirmUnsavedChanges();
@@ -619,7 +885,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           await _save();
           // _saveInternal poppt bei Erfolg selbst.
         } else {
-          // Verwerfen: Dirty-Marker lösen und trotzdem verlassen.
+          // Verwerfen: Regler-Änderungen zurücksetzen, Dirty-Marker
+          // lösen und trotzdem verlassen.
+          await _revertSliderChanges();
           ref.read(profileEditDirtyProvider.notifier).state = false;
           if (context.mounted) {
             if (Navigator.of(context).canPop()) {
@@ -632,7 +900,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       },
       child: Scaffold(
       appBar: AppBar(
-        title: const Text('Profil bearbeiten'),
+        title: Text(L10n.t(context, 'profile.edit.title')),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           // Explizite Dirty-Prüfung am Zurück-Button: Ein blinder
@@ -646,6 +914,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 await _save();
                 return; // _saveInternal navigiert bei Erfolg selbst.
               }
+              await _revertSliderChanges();
               ref.read(profileEditDirtyProvider.notifier).state = false;
               if (!mounted || !context.mounted) return;
               context.go(AppRoutes.profile);
@@ -670,14 +939,23 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               Center(
                 child: Stack(
                   children: [
-                    if (profile.photos.isEmpty)
+                    // NEU gewähltes Bild gewinnt IMMER (Vorschau vor dem
+                    // Speichern) - auch wenn serverseitig noch gar kein
+                    // photos-Eintrag existiert (früher wurde hier der
+                    // Platzhalter dauerhaft angezeigt).
+                    if (_pendingAvatarBytes != null)
+                      CircleAvatar(
+                        radius: 48,
+                        backgroundImage: MemoryImage(_pendingAvatarBytes!),
+                      )
+                    else if (profile.photos.isEmpty)
                       const CircleAvatar(
                         radius: 48,
                         child: Icon(Icons.person, size: 48),
                       )
                     else
-                      FutureBuilder<String?>(
-                        future: _signedAvatarUrlFuture,
+                      FutureBuilder<Uint8List?>(
+                        future: _avatarBytesFuture,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -689,8 +967,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             );
                           }
 
-                          final signedUrl = snapshot.data;
-                          if (signedUrl == null || snapshot.hasError) {
+                          final bytes = snapshot.data;
+                          if (bytes == null || snapshot.hasError) {
                             return const CircleAvatar(
                               radius: 48,
                               child: Icon(Icons.person, size: 48),
@@ -699,7 +977,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
                           return CircleAvatar(
                             radius: 48,
-                            backgroundImage: NetworkImage(signedUrl),
+                            backgroundImage: MemoryImage(bytes),
                           );
                         },
                       ),
@@ -720,7 +998,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   controller: _nameCtrl,
                   keyboardType: TextInputType.text,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: InputDecoration(labelText: L10n.t(context, 'profile.edit.name')),
                   validator: Validators.name,
                 ),
               ),
@@ -730,13 +1008,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   onTap: _pickBirthDate,
                   child: InputDecorator(
                     decoration: InputDecoration(
-                      labelText: 'Geburtsdatum',
-                      hintText: 'TT. MM. JJJJ',
+                      labelText: L10n.t(context, 'profile.edit.birthDate'),
+                      hintText: L10n.t(context, 'profile.edit.birthDateHint'),
                       errorText: Validators.birthDate(_birthDate),
                     ),
                     child: Text(
                       _birthDate == null
-                          ? 'Bitte auswählen'
+                          ? L10n.t(context, 'profile.edit.birthDatePick')
                           : '${_birthDate!.day}.${_birthDate!.month}.'
                               '${_birthDate!.year}',
                     ),
@@ -747,14 +1025,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 child: DropdownButtonFormField<Gender>(
                   initialValue: _gender,
                   decoration: InputDecoration(
-                    labelText: 'Geschlecht',
+                    labelText: L10n.t(context, 'profile.edit.gender'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   items: [
                     for (final g in Gender.values)
-                      DropdownMenuItem(value: g, child: Text(g.label)),
+                      DropdownMenuItem(
+                          value: g,
+                          child: Text(L10n.t(context, g.labelKey))),
                   ],
                   onChanged: (v) {
                     if (v != null) setState(() => _gender = v);
@@ -768,7 +1048,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Ich suche',
+                        L10n.t(context, 'profile.edit.lookingFor'),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 8),
@@ -783,31 +1063,31 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 child: DropdownButtonFormField<RelationshipType>(
                   initialValue: _relationshipType,
                   decoration: InputDecoration(
-                    labelText: 'Was suchst du?',
+                    labelText: L10n.t(context, 'profile.edit.relationship'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: RelationshipType.casual,
-                      child: Text('Lockere Bekanntschaft'),
+                      child: Text(L10n.t(context, 'profile.edit.rel.casual')),
                     ),
                     DropdownMenuItem(
                       value: RelationshipType.dating,
-                      child: Text('Ernsthaftes Dating'),
+                      child: Text(L10n.t(context, 'profile.edit.rel.dating')),
                     ),
                     DropdownMenuItem(
                       value: RelationshipType.relationship,
-                      child: Text('Feste Beziehung'),
+                      child: Text(L10n.t(context, 'profile.edit.rel.relationship')),
                     ),
                     DropdownMenuItem(
                       value: RelationshipType.friends,
-                      child: Text('Freundschaft'),
+                      child: Text(L10n.t(context, 'profile.edit.rel.friends')),
                     ),
                     DropdownMenuItem(
                       value: RelationshipType.open,
-                      child: Text('Offen für alles'),
+                      child: Text(L10n.t(context, 'profile.edit.rel.open')),
                     ),
                   ],
                   onChanged: (v) {
@@ -817,7 +1097,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Standort',
+                L10n.t(context, 'profile.edit.location'),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -828,8 +1108,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   controller: _cityCtrl,
                   keyboardType: TextInputType.text,
                   decoration: InputDecoration(
-                    labelText: 'Ort / Stadt',
-                    hintText: 'z. B. Berlin',
+                    labelText: L10n.t(context, 'profile.edit.city'),
+                    hintText: L10n.t(context, 'profile.edit.cityHint'),
                     suffixIcon: _isDetectingLocation
                         ? const Padding(
                             padding: EdgeInsets.all(14),
@@ -841,7 +1121,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             ),
                           )
                         : IconButton(
-                            tooltip: 'Standort erkennen (GPS)',
+                            tooltip: L10n.t(context, 'profile.edit.gpsTooltip'),
                             onPressed: _detectLocation,
                             icon: const Icon(Icons.my_location),
                           ),
@@ -861,7 +1141,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 child: DropdownButtonFormField<String>(
                   initialValue: _countryValue,
                   decoration: InputDecoration(
-                    labelText: 'Land',
+                    labelText: L10n.t(context, 'profile.edit.country'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -887,8 +1167,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         ? null
                         : _stateCtrl.text,
                     decoration: InputDecoration(
-                      labelText: 'Bundesland',
-                      hint: const Text('Bitte wählen'),
+                      labelText: L10n.t(context, 'profile.edit.state'),
+                      hint: Text(L10n.t(context, 'profile.edit.stateHint')),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -903,9 +1183,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   ),
                 )
               else
-                const Text(
-                  'Bundesland entfällt außerhalb Deutschlands.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                Text(
+                  L10n.t(context, 'profile.edit.stateNotApplicable'),
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               const SizedBox(height: 16),
               const Text(
@@ -918,7 +1198,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   initialValue:
                       ref.read(userPreferencesProvider).distanceFilterMode,
                   decoration: InputDecoration(
-                    labelText: 'Suchradius definieren über',
+                    labelText: L10n.t(context, 'profile.edit.radiusMode'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -942,6 +1222,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       ref
                           .read(userPreferencesProvider.notifier)
                           .setDistanceFilterMode(v);
+                      _syncDirtyFlag();
                     }
                   },
                 ),
@@ -977,6 +1258,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           ref
                               .read(userPreferencesProvider.notifier)
                               .setPreferredState(v);
+                          _syncDirtyFlag();
                         }
                       },
                     );
@@ -1005,6 +1287,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           ref
                               .read(userPreferencesProvider.notifier)
                               .setMaxDistanceKm(rounded);
+                          _syncDirtyFlag();
                         },
                       ),
                     ],
@@ -1012,73 +1295,55 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              // Altersspanne (fehlte im Profil-Editor bislang komplett) -
-              // als ZWEI getrennte Slider statt RangeSlider: Bei identischen
-              // Werten (z. B. 18-18) kann der RangeSlider nur den
-              // START-Thumb greifen - das Höchstalter ließe sich dann nicht
-              // erhöhen (User-Bericht).
+              // Altersspanne: ZWEI gekoppelte Slider (gemeinsames Widget).
+              // WICHTIG: Die Grenzen sind die STATISCHEN Sicherheits-
+              // grenzen (minFilterAge/maxFilterAge) - NICHT clampFilterAge
+              // mit den aktuellen Filterwerten. Letzteres kollabierte den
+              // Spielraum auf exakt die Auswahl: Bei 18-18 waren min=max=
+              // 18, beide Regler "hingen" fest und wirkten ausgegraut
+              // (User-Bericht).
               Consumer(
                 builder: (context, ref, _) {
                   final settings = ref.watch(settingsProvider);
                   final myAge = ref.watch(profileProvider).age;
-                  final (allowedMin, allowedMax) = AgeSafetyRules.clampFilterAge(
-                    viewerAge: myAge ?? 18,
-                    filterMin: settings.ageRangeMin,
-                    filterMax: settings.ageRangeMax,
-                  );
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Mindestalter: ${settings.ageRangeMin} Jahre',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Slider(
-                        value: settings.ageRangeMin.toDouble(),
-                        min: allowedMin.toDouble(),
-                        max: allowedMax.toDouble(),
-                        divisions: (allowedMax - allowedMin).clamp(1, 83),
-                        label: '${settings.ageRangeMin} Jahre',
-                        // Zieht der Nutzer das Minimum über das Maximum,
-                        // schiebt das Maximum mit (kein Einfrieren).
-                        onChanged: (v) {
-                          final newMin = v.round();
-                          ref
-                              .read(settingsProvider.notifier)
-                              .setAgeRange(
-                                newMin,
-                                newMin > settings.ageRangeMax
-                                    ? newMin
-                                    : settings.ageRangeMax,
-                              );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Höchstalter: ${settings.ageRangeMax} Jahre',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Slider(
-                        value: settings.ageRangeMax.toDouble(),
-                        min: allowedMin.toDouble(),
-                        max: allowedMax.toDouble(),
-                        divisions: (allowedMax - allowedMin).clamp(1, 83),
-                        label: '${settings.ageRangeMax} Jahre',
-                        // Zieht der Nutzer das Maximum unter das Minimum,
-                        // schiebt das Minimum mit.
-                        onChanged: (v) {
-                          final newMax = v.round();
-                          ref
-                              .read(settingsProvider.notifier)
-                              .setAgeRange(
-                                newMax < settings.ageRangeMin
-                                    ? newMax
-                                    : settings.ageRangeMin,
-                                newMax,
-                              );
-                        },
-                      ),
-                    ],
+                  // Fallback 18 (erwachsen), solange das Geburtsdatum noch
+                  // nicht geladen ist - 16 wuerde Minderj.-Grenzen (16-19)
+                  // erzwingen und die gespeicherte Spanne verhunzen.
+                  final viewerAge = myAge ?? 18;
+                  final boundsMin = AgeSafetyRules.minFilterAge(viewerAge);
+                  final boundsMax = AgeSafetyRules.maxFilterAge(viewerAge);
+                  // Werte in die erlaubten Grenzen einrasten (nur Anzeige;
+                  // gespeichert wird via onChanged immer im Rahmen).
+                  final min = settings.ageRangeMin
+                      .clamp(boundsMin, boundsMax);
+                  final max = settings.ageRangeMax
+                      .clamp(min, boundsMax);
+                  return AgeRangeSliders(
+                    minValue: min,
+                    maxValue: max,
+                    boundsMin: boundsMin,
+                    boundsMax: boundsMax,
+                    minLabelPrefix:
+                        L10n.t(context, 'profile.edit.minAgeLabel'),
+                    maxLabelPrefix:
+                        L10n.t(context, 'profile.edit.maxAgeLabel'),
+                    labelSuffix: L10n.t(context, 'common.years'),
+                    onChanged: (newMin, newMax) {
+                      ref.read(settingsProvider.notifier).setAgeRange(
+                            newMin,
+                            newMax,
+                          );
+                      // Altersspanne ebenfalls (entprellt) serverseitig
+                      // sichern - Regler-Änderungen sollen dauerhaft
+                      // überleben, auch ohne Speichern-Knopf.
+                      ref
+                          .read(userPreferencesProvider.notifier)
+                          .queueServerSync(
+                            ageRangeMin: newMin,
+                            ageRangeMax: newMax,
+                          );
+                      _syncDirtyFlag();
+                    },
                   );
                 },
               ),
@@ -1089,7 +1354,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                   maxLines: 4,
                   maxLength: 300,
                   keyboardType: TextInputType.text,
-                  decoration: const InputDecoration(labelText: 'Bio'),
+                  decoration: InputDecoration(labelText: L10n.t(context, 'profile.edit.bio')),
                   validator: Validators.bio,
                 ),
               ),
@@ -1110,15 +1375,30 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Gewohnheiten',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                          L10n.t(context, 'profile.edit.habits'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       const SizedBox(height: 4),
                       const Text(
                         'Wie stehst du zu ...? Diese Angaben beeinflussen, '
                         'wen du bei "Find your Match" siehst. Es werden nur '
                         'Personen gezeigt, die maximal so viel konsumieren wie du.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      // Dealbreaker (v0.8.0): harter Filter - Kandidaten
+                      // mit hoeberem Konsum werden serverseitig
+                      // ausgeschlossen.
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Dealbreaker: gleicher Konsum'),
+                        subtitle: const Text(
+                            'Zeig mir nur Personen, die maximal so viel '
+                            'konsumieren wie ich.'),
+                        value: _habitsDealbreaker,
+                        onChanged: (v) {
+                          setState(() => _habitsDealbreaker = v);
+                        },
                       ),
                       const SizedBox(height: 16),
                       HabitudeSelector(
@@ -1143,7 +1423,39 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Interessen',
+              // Musik-Geschmack (v0.8.0): fließt in den Matching-Score
+              // ein (Migration 074) und ist im eigenen Profil sichtbar.
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(L10n.t(context, 'profile.edit.music'),
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text(
+                        L10n.t(context, 'profile.edit.musicSub'),
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      MusicTasteEditor(
+                        liked: _musicLiked,
+                        disliked: _musicDisliked,
+                        onChanged: (liked, disliked) {
+                          setState(() {
+                            _musicLiked = liked;
+                            _musicDisliked = disliked;
+                          });
+                          _syncDirtyFlag();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(L10n.t(context, 'profile.edit.interests'),
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               Wrap(
@@ -1177,15 +1489,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Persönlichkeitstest',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                          L10n.t(context, 'profile.edit.personality'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       const SizedBox(height: 8),
                       Text(
                         ref.watch(settingsProvider).personalityTestCompleted
-                            ? 'Du hast den Test abgeschlossen. Du kannst ihn '
-                                'jederzeit wiederholen.'
-                            : 'Zeig anderen, wer du wirklich bist.',
+                            ? L10n.t(context, 'profile.edit.personalityDone')
+                                : L10n.t(context,
+                                    'profile.edit.personalityOpen'),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
@@ -1197,8 +1509,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         label: ref
                                 .watch(settingsProvider)
                                 .personalityTestCompleted
-                            ? 'Test wiederholen'
-                            : 'Persönlichkeitstest starten',
+                            ? L10n.t(context,
+                                'profile.edit.personalityRetake')
+                            : L10n.t(context,
+                                'profile.edit.personalityStart'),
                         onPressed: () =>
                             context.push(AppRoutes.personalityTest),
                       ),
@@ -1212,8 +1526,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               // markierte Felder sind sonst leicht außer Sicht).
               if (_showValidationError) ...[
                 Text(
-                  'Es fehlen noch Angaben oder einige Felder sind fehlerhaft '
-                  '(rot markiert). Bitte prüfe das Formular.',
+                  L10n.t(context, 'profile.edit.missingFieldsHint'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.error,
@@ -1222,7 +1535,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 const SizedBox(height: 12),
               ],
               PrimaryButton(
-                label: 'Speichern',
+                label: L10n.t(context, 'common.save'),
                 loading: _saving,
                 onPressed: _saving ? null : _save,
               ),

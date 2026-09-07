@@ -9,6 +9,7 @@ import 'package:wisp/models/message.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/widgets/funke_overlay.dart';
@@ -221,8 +222,8 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
       debugPrint('[DatingHourChat] Sende-Fehler: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Nachricht konnte nicht gesendet werden.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'dh.chat.sendFailed')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -286,9 +287,9 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
       await FunkeOverlay.show(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
               content:
-                  Text('Ein Funke ist übersprungen! Chat wird geöffnet...')),
+                  Text(L10n.t(context, 'dh.chat.sparkJumped'))),
         );
       }
       await Future.delayed(const Duration(milliseconds: 1500));
@@ -307,7 +308,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
           children: [
             Icon(Icons.favorite_border, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
-            const Text('Kein Funke'),
+            Text(L10n.t(context, 'dh.chat.noSpark')),
           ],
         ),
         content: Text(message),
@@ -317,7 +318,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
               Navigator.of(ctx).pop();
               if (mounted) context.go(AppRoutes.datingHourEvent);
             },
-            child: const Text('Weiter suchen'),
+            child: Text(L10n.t(context, 'dh.chat.keepSearching')),
           ),
         ],
       ),
@@ -327,8 +328,8 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
   String _getDefaultRejectionMessage() {
     const messages = [
       'Diese Verbindung hat leider nicht ganz gepasst. Aber keine Sorge, das sagt nichts über dich aus! Wir suchen gleich jemand Neues für dich.',
-      'Manchmal funkt es einfach nicht, und das ist völlig okay! Dein nächstes Match wartet schon.',
-      'Nicht jede Begegnung führt zum Match. Aber jeder Chat bringt dich näher an die richtige Person. Weiter so!',
+      'Manchmal funkt es einfach nicht, und das ist völlig okay! Dein nächster Funke wartet schon.',
+      'Nicht jede Begegnung führt zum Funken. Aber jeder Chat bringt dich näher an die richtige Person. Weiter so!',
       'Schade, dass es nicht gepasst hat. Aber hey: Du hast dich getraut, dich zu zeigen! Das nächste Gespräch kommt bestimmt.',
     ];
     return messages[DateTime.now().millisecondsSinceEpoch % messages.length];
@@ -374,8 +375,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    'Ende zu Ende verschlüsselt',
+                  Text(L10n.t(context, 'dh.chat.e2e'),
                     style: TextStyle(
                       fontSize: 10,
                       color: Theme.of(context).colorScheme.primary,
@@ -527,11 +527,20 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
 
           // Eingabe oder Entscheidungs-Buttons
           if (session != null && !session.bothDecided) ...[
-            if (!_showDecision && !session.isExpired)
+            if (!_showDecision && !session.isExpired) ...[
+              // Frage-Karten für Schüchterne (v0.8.0): ein Tap übernimmt
+              // eine sanfte Frage aus einem thematischen Bereich.
+              _ShyQuestionChips(
+                onPick: (question) {
+                  _messageController.text = question;
+                  _sendMessage();
+                },
+              ),
               _ChatInput(
                 controller: _messageController,
                 onSend: _sendMessage,
-              )
+              ),
+            ]
             else if (_showDecision && !_hasVoted)
               _DecisionButtons(
                 onAccept: () => _handleDecision(true),
@@ -610,7 +619,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Bleiben'),
+            child: Text(L10n.t(context, 'dh.chat.stay')),
           ),
           FilledButton(
             onPressed: () {
@@ -618,7 +627,7 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
               _handleDecision(false); // Verlassen = Ablehnen
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Verlassen & Ablehnen'),
+            child: Text(L10n.t(context, 'dh.chat.leaveDecline')),
           ),
         ],
       ),
@@ -727,14 +736,14 @@ class _EmptyChatState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Sag hallo zu $partnerName!',
+              L10n.tf(context, 'dh.chat.sayHello', {'name': partnerName}),
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'Ihr habt 5 Minuten Zeit, euch kennenzulernen. '
-              'Danach entscheidet ihr beide: Match oder weiter suchen?',
+              'Danach entscheidet ihr beide: Funke oder weitersuchen?',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -743,7 +752,7 @@ class _EmptyChatState extends StatelessWidget {
             const SizedBox(height: 24),
             OutlinedButton.icon(
               icon: const Icon(Icons.lightbulb_outline),
-              label: const Text('Gesprächsstarter senden'),
+              label: Text(L10n.t(context, 'dh.chat.icebreakerBtn')),
               onPressed: onIceBreaker,
             ),
           ],
@@ -792,6 +801,66 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
+/// Frage-Karten für Schüchterne (v0.8.0): 3 thematische sanfte Vorschläge
+/// (Reise / Alltag / Träume) - ein Tap übernimmt die Frage. Die Fragen
+/// rotieren pro Runde, damit es nicht repetitive Textbausteine sind.
+class _ShyQuestionChips extends StatelessWidget {
+  const _ShyQuestionChips({required this.onPick});
+
+  final void Function(String question) onPick;
+
+  static const _themes = <String, List<String>>{
+    'Reise ✈️': [
+      'Welche Stadt möchte du unbedingt mal besuchen?',
+      'Bester Reise-Moment deines Lebens?',
+      'Flug, Zug oder Auto – was magst du am liebsten?',
+    ],
+    'Alltag ☀️': [
+      'Was war heute dein kleines Glück?',
+      'Kaffee oder Tee – und wie dazu?',
+      'Was hilft dir wirklich beim Abschalten?',
+    ],
+    'Träume 🌙': [
+      'Wovon würdest du am liebsten träumen?',
+      'Was würdest du machen mit einem freien Monat?',
+      'Welcher Traum hat noch nicht angefangen zu brennen?',
+    ],
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    // Pro Theme eine Frage, rotiert pro Aufruf (Datum + Stunde).
+    final rotation = DateTime.now().hour;
+    final chips = <(String, String)>[];
+    var themeIndex = 0;
+    for (final entry in _themes.entries) {
+      final questions = entry.value;
+      final q = questions[(rotation + themeIndex) % questions.length];
+      chips.add((entry.key, q));
+      themeIndex++;
+    }
+
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          for (final (theme, question) in chips)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                label: Text(theme, style: const TextStyle(fontSize: 12)),
+                tooltip: question,
+                onPressed: () => onPick(question),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Chat-Eingabebereich.
 class _ChatInput extends StatelessWidget {
   const _ChatInput({required this.controller, required this.onSend});
@@ -809,7 +878,7 @@ class _ChatInput extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 decoration: InputDecoration(
-                  hintText: 'Nachricht...',
+                  hintText: L10n.t(context, 'dh.chat.hint'),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -848,8 +917,7 @@ class _DecisionButtons extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Die 5 Minuten sind um!\nMöchtest du dich wiedersehen?',
+            Text(L10n.t(context, 'dh.chat.timeUp'),
               style: Theme.of(context).textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
@@ -859,7 +927,7 @@ class _DecisionButtons extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.close),
-                    label: const Text('Ablehnen'),
+                    label: Text(L10n.t(context, 'dh.chat.decline')),
                     onPressed: onReject,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -872,7 +940,7 @@ class _DecisionButtons extends StatelessWidget {
                 Expanded(
                   child: FilledButton.icon(
                     icon: const Icon(Icons.favorite),
-                    label: const Text('Annehmen'),
+                    label: Text(L10n.t(context, 'dh.chat.accept')),
                     onPressed: onAccept,
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -883,7 +951,7 @@ class _DecisionButtons extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Beide müssen "Annehmen" drücken für einen Funken.',
+              L10n.t(context, 'dh.chat.bothMustAccept'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -912,13 +980,13 @@ class _WaitingForPartner extends StatelessWidget {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Du hast abgestimmt. Warte auf deine Gesprächspartnerin...',
+              L10n.t(context, 'dh.chat.voted'),
               style: Theme.of(context).textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Sobald beide entschieden haben, erfährst du das Ergebnis.',
+              L10n.t(context, 'dh.chat.resultPending'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -928,7 +996,7 @@ class _WaitingForPartner extends StatelessWidget {
             if (onBack != null)
               OutlinedButton.icon(
                 icon: const Icon(Icons.arrow_back),
-                label: const Text('Zurück zur Übersicht'),
+                label: Text(L10n.t(context, 'dh.chat.backToOverview')),
                 onPressed: onBack,
               ),
           ],

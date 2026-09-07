@@ -14,6 +14,7 @@ import 'package:wisp/models/profile_visibility.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/location_check_service.dart';
@@ -26,6 +27,7 @@ import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/geo_names.dart';
+import 'package:wisp/widgets/age_range_sliders.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/gender_preference_selector.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
@@ -350,6 +352,9 @@ class _SettingsPrivacyOnceScreenState
     }
     await _saveHabitudes();
     await settingsNotifier.completeOneTimeSettings();
+    // UI-Einstellungen (Blind Mode, Sichtbarkeit, Dark Mode, ...) einmalig
+    // serverseitig spiegeln (v0.8.0, ui_prefs) - best effort.
+    scheduleUiPrefsServerSync(ref.read(settingsProvider));
     // Setup-Stand serverseitig sichern, damit die Einrichtung nach
     // Neuinstallation/neuem Login nicht erneut erscheint. Fehlschlag wird
     // ANGEZEIGT (bisher: stiller debugPrint, weshalb die Einrichtung
@@ -678,7 +683,7 @@ class _SettingsPrivacyOnceScreenState
                   children: [
                     // Page 1: Privatsphäre & Theme
                     _Page(
-                      title: 'Privatsphäre & Darstellung',
+                      title: L10n.t(context, 'onb.page1.title'),
                       subtitle:
                           'Wer darf dein Profil sehen? Wie soll die App aussehen?',
                       child: Column(
@@ -693,7 +698,7 @@ class _SettingsPrivacyOnceScreenState
                             SelectableTile<ProfileVisibility>(
                               value: v,
                               groupValue: settings.profileVisibility,
-                              title: v.label,
+                              title: L10n.t(context, v.labelKey),
                               onChanged: (val) {
                                 if (val != null) {
                                   notifier.setProfileVisibility(val);
@@ -972,34 +977,45 @@ class _SettingsPrivacyOnceScreenState
                               _LocationNotice(text: _locationValidationError!),
                             ],
                             const SizedBox(height: 20),
-                           Text(
-                             'Bevorzugte Altersspanne: '
-                             '$clampedAgeMin bis $clampedAgeMax Jahre',
-                             style: Theme.of(context).textTheme.titleMedium,
-                           ),
-                             RangeSlider(
-                               values: RangeValues(
-                                 clampedAgeMin.toDouble(),
-                                 clampedAgeMax.toDouble(),
-                               ),
-                              min: allowedAgeMin.toDouble(),
-                              max: allowedAgeMax.toDouble(),
-                              divisions: (allowedAgeMax - allowedAgeMin).clamp(1, 83),
-                              onChanged: (v) => notifier.setAgeRange(
-                                v.start.round(),
-                                v.end.round(),
-                              ),
-                              // Nach dem Loslassen den Fokus entfernen, damit
-                              // kein vergrößerter Thumb-Overlay hängen bleibt.
-                              onChangeEnd: (_) =>
-                                  FocusManager.instance.primaryFocus?.unfocus(),
+                            Text(
+                              'Bevorzugte Altersspanne: '
+                              '$clampedAgeMin bis $clampedAgeMax Jahre',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            // Zwei gekoppelte Slider statt RangeSlider:
+                            // Bei identischen Werten (z. B. 18-18) friert
+                            // ein RangeSlider ein (End-Regler nicht greif-
+                            // bar). Die Grenzen sind die STATISCHEN
+                            // Sicherheitsgrenzen - nicht die Auswahl selbst.
+                            AgeRangeSliders(
+                              minValue: clampedAgeMin,
+                              maxValue: clampedAgeMax,
+                              boundsMin: allowedAgeMin,
+                              boundsMax: allowedAgeMax,
+                              minLabelPrefix:
+                                  L10n.t(context, 'profile.edit.minAgeLabel'),
+                              maxLabelPrefix:
+                                  L10n.t(context, 'profile.edit.maxAgeLabel'),
+                              labelSuffix:
+                                  L10n.t(context, 'common.years'),
+                              onChanged: (min, max) {
+                                notifier.setAgeRange(min, max);
+                                // Entprellter Server-Sync (Regler feuern
+                                // kontinuierlich) - siehe Profile-Editor.
+                                ref
+                                    .read(userPreferencesProvider.notifier)
+                                    .queueServerSync(
+                                      ageRangeMin: min,
+                                      ageRangeMax: max,
+                                    );
+                              },
                             ),
                         ],
                       ),
                     ),
                     // Page 3: Profil & Interessen (Bio, Bundesland, Bild)
                     _Page(
-                      title: 'Dein Profil',
+                      title: L10n.t(context, 'onb.page2.title'),
                       subtitle:
                           'Ein Bild, ein paar Worte über dich und deine '
                           'Interessen helfen anderen, dich kennenzulernen. '
@@ -1344,7 +1360,7 @@ class _SettingsPrivacyOnceScreenState
         ),
         const _RuleItem(
           '3',
-          'Persönlichkeit vor Aussehen: Fotos werden erst nach Match gezeigt.',
+          'Persönlichkeit vor Aussehen: Fotos werden erst nach einem Funke gezeigt.',
         ),
         const _RuleItem(
           '4',

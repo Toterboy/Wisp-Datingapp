@@ -1,4 +1,8 @@
-﻿import 'dart:async';
+﻿// Passkeys sind ein Supabase-Beta-Feature (@experimental) - die Nutzung
+// ist bewusst; die Hinweise werden auf Dateiebene ignoriert.
+// ignore_for_file: experimental_member_use
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,16 +10,20 @@ import 'package:flutter/services.dart'
     show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show Passkey;
 
 import 'package:wisp/models/profile_visibility.dart';
 import 'package:wisp/providers/auth_provider.dart';
+import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/screens/privacy/privacy_screen.dart' show promptTotpCode;
 import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/encryption_service.dart';
+import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/mfa_service.dart';
 import 'package:wisp/services/passkey_auth.dart';
 import 'package:wisp/services/prekey_service.dart';
@@ -29,25 +37,12 @@ import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/widgets/language_switch.dart';
 import 'package:wisp/widgets/theme_picker.dart';
 
-/// Spiegelt die Benachrichtigungs-Schalter in die profiles-Tabelle, damit
-/// die Push-Versendung (Edge Function notify-user) serverseitig gegatet
-/// werden kann. Best effort.
-void _persistNotifyFlags(WidgetRef ref) {
-  if (!SupabaseService.isInitialized) return;
-  unawaited(() async {
-    try {
-      final s = ref.read(settingsProvider);
-      await SupabaseDatabaseService(SupabaseService.client).updateOwnProfile({
-        'notifications_enabled': s.notificationsEnabled,
-        'notify_matches': s.notifyMatches,
-        'notify_likes': s.notifyLikes,
-        'notify_messages': s.notifyMessages,
-        'notify_dating_hour': s.notifyDatingHour,
-      });
-    } catch (e) {
-      debugPrint('[Settings] Notify-Flags-Server-Sync fehlgeschlagen: $e');
-    }
-  }());
+/// Spiegelt den Rest der UI-Einstellungen nach profiles.ui_prefs (v0.8.0,
+/// Migration 074) - damit überstehen Blind Mode, Sichtbarkeit, Dark Mode
+/// und alle Benachrichtigungs-Schalter eine Neuinstallation. Entprellt,
+/// best effort.
+void _persistUiPrefs(WidgetRef ref) {
+  scheduleUiPrefsServerSync(ref.read(settingsProvider));
 }
 
 /// Einstellungen: Blind Mode, Foto-Freigabe, Sichtbarkeit, Theme, Logout.
@@ -124,9 +119,71 @@ class SettingsScreen extends ConsumerWidget {
                     SelectableTile<ProfileVisibility>(
                       value: v,
                       groupValue: settings.profileVisibility,
-                      title: v.label,
-                      onChanged: (val) {
-                        if (val != null) notifier.setProfileVisibility(val);
+                      title: L10n.t(context, v.labelKey),
+                      subtitle: switch (v) {
+                        ProfileVisibility.everyone =>
+                          L10n.t(context, 'settings.visEveryoneSub'),
+                        ProfileVisibility.matchesOnly =>
+                          L10n.t(context, 'settings.visMatchesSub'),
+                        ProfileVisibility.hidden =>
+                          L10n.t(context, 'settings.visHiddenSub'),
+                      },
+                      onChanged: (val) async {
+                        if (val == null || val == settings.profileVisibility) {
+                          return;
+                        }
+                        // 'Unsichtbar (Pausiert)' bestätigen lassen, damit
+                        // kein versehentlicher Tap das Profil versteckt.
+                        if (val == ProfileVisibility.hidden) {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              icon: Icon(
+                                Icons.pause_circle,
+                                color: Theme.of(ctx).colorScheme.primary,
+                                size: 40,
+                              ),
+                              title: Text(
+                                  L10n.t(ctx, 'settings.pauseConfirmTitle')),
+                              content:
+                                  Text(L10n.t(ctx, 'settings.pauseConfirmBody')),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child:
+                                      Text(L10n.t(ctx, 'common.cancel')),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  child: Text(
+                                      L10n.t(ctx, 'settings.pauseConfirmBtn')),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed != true) return;
+                        }
+                        await notifier.setProfileVisibility(val);
+                        if (context.mounted) {
+                          // Meldung nur bei echten Pause-UEBERGAENGEn -
+                          // der Wechsel Jeder <-> Nur Funken hat mit der
+                          // Pause nichts zu tun.
+                          final wasPause = settings.profileVisibility ==
+                              ProfileVisibility.hidden;
+                          final isPause = val == ProfileVisibility.hidden;
+                          if (isPause != wasPause) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isPause
+                                      ? L10n.t(context, 'settings.pauseOn')
+                                      : L10n.t(context, 'settings.pauseOff'),
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
                       },
                     ),
                   const SizedBox(height: 8),
@@ -157,81 +214,12 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   if (SupabaseService.isInitialized) ...[
                     const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.fingerprint),
-                      title: Text(L10n.t(context, 'settings.passkeyCreate')),
-                      subtitle: Text(
-                        L10n.t(context, 'settings.passkeyCreateSub'),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      contentPadding: EdgeInsets.zero,
-                      onTap: () async {
-                        // AAL2-Step-up (GoTrue): Hat der Nutzer 2FA
-                        // aktiviert, verlangt der Server für das Anlegen
-                        // eines Passkeys eine aktuelle Zweitfaktor-
-                        // Bestätigung - ohne sie schlägt die Erstellung
-                        // mit "Server hat abgelehnt" fehl. Status FRISCH
-                        // laden: Der gecachte Provider kann veraltet bzw.
-                        // nie geladen sein ("trotz 2FA geht es nicht",
-                        // "Haken fehlt").
-                        var mfa = ref.read(mfaStatusProvider);
-                        if (SupabaseService.isInitialized) {
-                          try {
-                            mfa = await MfaService(SupabaseService.client)
-                                .loadStatus();
-                            ref.read(mfaStatusProvider.notifier).state = mfa;
-                          } catch (_) {
-                            // Fail-closed: Mit dem alten Stand weiter.
-                          }
-                        }
-                        if (mfa.hasVerifiedFactors &&
-                            mfa.currentAal != 'aal2') {
-                          if (!context.mounted) return;
-                          final code = await promptTotpCode(context);
-                          if (code == null || !context.mounted) return;
-                          try {
-                            await MfaService(SupabaseService.client)
-                                .verifyChallenge(code: code);
-                          } catch (_) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Ungültiger oder abgelaufener Code.'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                            return;
-                          }
-                        }
-                        try {
-                          await PasskeyAuth.register();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(L10n.t(
-                                    context, 'settings.passkeyCreated')),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            final msg = e is AppException
-                                ? e.message
-                                : L10n.t(
-                                    context, 'settings.passkeyFailed');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(msg),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                    ),
+                    // Eigene Stateful-Kachel: Doppel-Tap-Schutz. Zwei
+                    // parallel laufende Passkey-Registrierungen brechen
+                    // sich gegenseitig ab ("Anfrage abgebrochen von Wisp"
+                    // / "credential verification failed").
+                    const _PasskeyTile(),
+                    const _PasskeyManagerCard(),
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.shield_outlined),
@@ -288,7 +276,7 @@ class SettingsScreen extends ConsumerWidget {
                     value: settings.notificationsEnabled,
                     onChanged: (v) {
                       notifier.setNotificationsEnabled(v);
-                      _persistNotifyFlags(ref);
+                      _persistUiPrefs(ref);
                     },
                   ),
                   const Divider(),
@@ -301,7 +289,7 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: settings.notificationsEnabled
                         ? (v) {
                             notifier.setNotifyMatches(v);
-                            _persistNotifyFlags(ref);
+                            _persistUiPrefs(ref);
                           }
                         : null,
                   ),
@@ -314,7 +302,7 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: settings.notificationsEnabled
                         ? (v) {
                             notifier.setNotifyLikes(v);
-                            _persistNotifyFlags(ref);
+                            _persistUiPrefs(ref);
                           }
                         : null,
                   ),
@@ -327,7 +315,7 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: settings.notificationsEnabled
                         ? (v) {
                             notifier.setNotifyMessages(v);
-                            _persistNotifyFlags(ref);
+                            _persistUiPrefs(ref);
                           }
                         : null,
                   ),
@@ -341,7 +329,7 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: settings.notificationsEnabled
                         ? (v) {
                             notifier.setNotifyDatingHour(v);
-                            _persistNotifyFlags(ref);
+                            _persistUiPrefs(ref);
                           }
                         : null,
                   ),
@@ -372,7 +360,7 @@ class SettingsScreen extends ConsumerWidget {
                         ? 'system'
                         : (settings.useDarkMode! ? 'dark' : 'light'),
                     title: L10n.t(context, 'settings.system'),
-                    onChanged: (_) => notifier.setDarkMode(null),
+                    onChanged: (_) { notifier.setDarkMode(null); _persistUiPrefs(ref); },
                   ),
                   SelectableTile<String>(
                     value: 'light',
@@ -380,7 +368,7 @@ class SettingsScreen extends ConsumerWidget {
                         ? 'system'
                         : (settings.useDarkMode! ? 'dark' : 'light'),
                     title: L10n.t(context, 'settings.light'),
-                    onChanged: (_) => notifier.setDarkMode(false),
+                    onChanged: (_) { notifier.setDarkMode(false); _persistUiPrefs(ref); },
                   ),
                   SelectableTile<String>(
                     value: 'dark',
@@ -388,7 +376,7 @@ class SettingsScreen extends ConsumerWidget {
                         ? 'system'
                         : (settings.useDarkMode! ? 'dark' : 'light'),
                     title: L10n.t(context, 'settings.dark'),
-                    onChanged: (_) => notifier.setDarkMode(true),
+                    onChanged: (_) { notifier.setDarkMode(true); _persistUiPrefs(ref); },
                   ),
                   const SizedBox(height: 12),
                   Text(L10n.t(context, 'settings.colors'),
@@ -396,8 +384,25 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   ThemePicker(
                     selectedName: settings.themeName,
-                    onChanged: (t) =>
-                        ref.read(settingsProvider.notifier).setThemeName(t.name),
+                    onChanged: (t) {
+                      ref.read(settingsProvider.notifier).setThemeName(t.name);
+                      // Themefarbe serverseitig spiegeln (Migration 071),
+                      // damit sie nach Neuinstallation/Login direkt wieder
+                      // angewendet wird. Best effort.
+                      if (SupabaseService.isInitialized) {
+                        unawaited(() async {
+                          try {
+                            await SupabaseDatabaseService(
+                              SupabaseService.client,
+                            ).updateOwnProfile({'theme_name': t.name});
+                          } catch (e) {
+                            debugPrint(
+                                '[Settings] Theme-Server-Sync fehlgeschlagen: '
+                                '$e');
+                          }
+                        }());
+                      }
+                    },
                   ),
                   const SizedBox(height: 16),
                   const LanguageSwitch(),
@@ -413,12 +418,15 @@ class SettingsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const _ChatHistoryTile(),
                   SwitchListTile.adaptive(
                     title: Text(L10n.t(context, 'settings.blur')),
                     subtitle: Text(L10n.t(context, 'settings.blurSub')),
                     value: settings.blurChatImages,
-                    onChanged: (v) =>
-                        ref.read(settingsProvider.notifier).setBlurChatImages(v),
+                    onChanged: (v) {
+                      ref.read(settingsProvider.notifier).setBlurChatImages(v);
+                      _persistUiPrefs(ref);
+                    },
                     contentPadding: EdgeInsets.zero,
                   ),
                 ],
@@ -483,6 +491,14 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right),
                     contentPadding: EdgeInsets.zero,
                     onTap: () => context.push(AppRoutes.safetyCenter),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.devices),
+                    title: Text(L10n.t(context, 'settings.devices')),
+                    subtitle: Text(L10n.t(context, 'settings.devicesSub')),
+                    trailing: const Icon(Icons.chevron_right),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => context.push(AppRoutes.devices),
                   ),
                   ListTile(
                     leading: const Icon(Icons.privacy_tip),
@@ -563,7 +579,7 @@ Future<void> _createIdentityBackup(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Backup-Passwort wählen'),
+      title: Text(L10n.t(context, 'settings.backupChoosePw')),
       content: Form(
         key: formKey,
         child: Column(
@@ -668,7 +684,7 @@ Future<void> _restoreIdentityBackup(
   final proceed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Identität wiederherstellen?'),
+      title: Text(L10n.t(context, 'settings.restoreConfirmTitle')),
       content: const Text(
         'Die aktuelle E2E-Identität auf diesem Gerät wird ÜBERSCHRIEBEN '
         '(bestehende verschlüsselte Sitzungen gehen verloren). Verwende nur '
@@ -700,8 +716,8 @@ Future<void> _restoreIdentityBackup(
           TextField(
             controller: blobCtrl,
             maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: 'Backup-Code einfügen',
+            decoration: InputDecoration(
+              labelText: L10n.t(context, 'settings.backupPasteCode'),
             ),
           ),
           const SizedBox(height: 12),
@@ -735,8 +751,8 @@ Future<void> _restoreIdentityBackup(
     await ref.read(preKeyServiceProvider).publishOwnPreKeysFromStore();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('E2E-Identität wiederhergestellt.')),
+      SnackBar(
+          content: Text(L10n.t(context, 'settings.restored'))),
     );
   } catch (_) {
     if (!context.mounted) return;
@@ -745,6 +761,351 @@ Future<void> _restoreIdentityBackup(
         content: Text(
             'Wiederherstellung fehlgeschlagen. Prüfe Code und Passwort.'),
       ),
+    );
+  }
+}
+
+/// Stellt sicher, dass die Session AAL2 erfüllt, wenn 2FA aktiv ist
+/// (GoTrue verlangt das für Passkey-Verwaltung). Status wird FRISCH
+/// geladen - der gecachte Provider kann veraltet bzw. nie geladen sein.
+///
+/// Rückgabe: false = Step-up fehlgeschlagen/abgebrochen (Aufrufer abbrechen).
+Future<bool> _ensurePasskeyAal2(BuildContext context, WidgetRef ref) async {
+  var mfa = ref.read(mfaStatusProvider);
+  if (!SupabaseService.isInitialized) return true;
+  try {
+    mfa = await MfaService(SupabaseService.client).loadStatus();
+    ref.read(mfaStatusProvider.notifier).state = mfa;
+  } catch (_) {
+    // Fail-closed: Mit dem alten Stand weiter.
+  }
+  if (!mfa.hasVerifiedFactors || mfa.currentAal == 'aal2') return true;
+  if (!context.mounted) return false;
+  final code = await promptTotpCode(context);
+  if (code == null || !context.mounted) return false;
+  try {
+    await MfaService(SupabaseService.client).verifyChallenge(code: code);
+    return true;
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'settings.codeInvalid')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    return false;
+  }
+}
+
+/// "Passkey erstellen"-Kachel mit Doppel-Tap-Schutz: Solange die
+/// Registrierung läuft (inkl. 2FA-Step-up), ist die Kachel gesperrt.
+/// Zwei parallele Zeremonien brechen sich sonst gegenseitig ab
+/// ("Anfrage abgebrochen von Wisp" / "credential verification failed").
+class _PasskeyTile extends ConsumerStatefulWidget {
+  const _PasskeyTile();
+
+  @override
+  ConsumerState<_PasskeyTile> createState() => _PasskeyTileState();
+}
+
+class _PasskeyTileState extends ConsumerState<_PasskeyTile> {
+  bool _busy = false;
+
+  Future<void> _startRegistration() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      if (!await _ensurePasskeyAal2(context, ref)) return;
+
+      // Bestands-Check: Hängt auf dem Konto bereits ein (alter) Passkey,
+      // kann dessen excludeCredentials-Eintrag die NEUE Registrierung
+      // serverseitig scheitern lassen ("Der Server konnte den Passkey
+      // nicht bestätigen"). Der Nutzer wird transparent darauf hingewiesen
+      // und kann alt Einträge vorher unter "Passkeys verwalten" löschen.
+      final existing = await PasskeyAuth.countRegistered();
+      if (existing != null && existing > 0 && mounted) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: Icon(Icons.fingerprint,
+                color: Theme.of(ctx).colorScheme.primary, size: 36),
+            title: const Text('Passkey existiert bereits'),
+            content: Text(
+              'Auf deinem Konto sind bereits $existing Passkey(s) '
+              'registriert. Wenn das Anlegen wieder an der Server-'
+              'Bestätigung scheitert, lösche die alten Einträge unter '
+              '"Passkeys verwalten" und versuche es erneut.\n\n'
+              'Trotzdem einen weiteren Passkey erstellen?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Weiter erstellen'),
+              ),
+            ],
+          ),
+        );
+        if (proceed != true || !mounted) return;
+      }
+
+      await PasskeyAuth.register();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L10n.t(context, 'settings.passkeyCreated')),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final msg = e is AppException
+            ? e.message
+            : L10n.t(context, 'settings.passkeyFailed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.fingerprint),
+      title: Text(L10n.t(context, 'settings.passkeyCreate')),
+      subtitle: Text(
+        _busy
+            ? 'Warte auf Bestätigung …'
+            : L10n.t(context, 'settings.passkeyCreateSub'),
+      ),
+      trailing: _busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.chevron_right),
+      contentPadding: EdgeInsets.zero,
+      onTap: _busy ? null : _startRegistration,
+    );
+  }
+}
+
+/// "Passkeys verwalten": Listet alle am Konto registrierten Passkeys
+/// (WebAuthn-Credentials) und erlaubt Umbenennen/Löschen. Wichtig für
+/// die Fehlersuche, wenn der Server eine NEUE Registrierung nicht
+/// bestätigt: Ein alter/defekter Eintrag kann blockieren - löschen und
+/// neu anlegen behebt das.
+class _PasskeyManagerCard extends ConsumerStatefulWidget {
+  const _PasskeyManagerCard();
+
+  @override
+  ConsumerState<_PasskeyManagerCard> createState() =>
+      _PasskeyManagerCardState();
+}
+
+class _PasskeyManagerCardState extends ConsumerState<_PasskeyManagerCard> {
+  List<Passkey>? _passkeys;
+  String? _error;
+  bool _needsStepUp = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load({bool stepUpFirst = false}) async {
+    setState(() {
+      _error = null;
+      _needsStepUp = false;
+    });
+    try {
+      if (stepUpFirst) {
+        if (!await _ensurePasskeyAal2(context, ref)) return;
+      }
+      final list = await PasskeyAuth.listRegistered();
+      if (!mounted) return;
+      setState(() => _passkeys = list);
+    } catch (e) {
+      if (!mounted) return;
+      final text = e.toString().toLowerCase();
+      final aal2Needed = text.contains('aal2') ||
+          text.contains('mfa') ||
+          text.contains('403');
+      setState(() {
+        _passkeys = null;
+        _needsStepUp = aal2Needed;
+        _error = aal2Needed
+            ? 'Zum Anzeigen der Passkeys ist eine 2FA-Bestätigung nötig.'
+            : 'Passkeys konnten nicht geladen werden. Bitte später erneut '
+                'versuchen.';
+      });
+    }
+  }
+
+  Future<void> _rename(Passkey passkey) async {
+    final ctrl = TextEditingController(text: passkey.friendlyName ?? '');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Passkey umbenennen'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Anzeigename',
+            hintText: 'z. B. Pixel 8',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    try {
+      await PasskeyAuth.rename(passkeyId: passkey.id, friendlyName: name);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e is AppException ? e.message : 'Umbenennen fehlgeschlagen.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+      );
+    }
+  }
+
+  Future<void> _delete(Passkey passkey) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.delete_outline,
+            color: Theme.of(ctx).colorScheme.error, size: 36),
+        title: Text(L10n.t(context, 'settings.passkeyDeleteTitle')),
+        content: Text(
+          '"${passkey.friendlyName ?? 'Passkey'}" wird von deinem Konto '
+          'entfernt. Die Anmeldung damit ist danach nicht mehr möglich. '
+          'Der Passkey bleibt ggf. auf dem Gerät gespeichert.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(L10n.t(context, 'settings.delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      if (!await _ensurePasskeyAal2(context, ref)) return;
+      await PasskeyAuth.delete(passkeyId: passkey.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'settings.passkeyDeleted')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e is AppException ? e.message : L10n.t(context, 'settings.deleteFailed');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+      );
+    }
+  }
+
+  String _formatDate(DateTime? utc) {
+    if (utc == null) return '';
+    try {
+      return DateFormat('dd.MM.yyyy').format(utc.toLocal());
+    } catch (_) {
+      return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = _passkeys == null
+        ? (_error ?? 'Registrierte Passkeys auf deinem Konto')
+        : '${_passkeys!.length} registriert - tippe zum Umbenennen, '
+            'Papierkorb zum Entfernen';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          leading: const Icon(Icons.manage_accounts_outlined),
+          title: const Text('Passkeys verwalten'),
+          subtitle: Text(subtitle),
+          trailing: IconButton(
+            tooltip: L10n.t(context, 'common.refresh'),
+            onPressed: _error != null && _needsStepUp
+                ? () => _load(stepUpFirst: true)
+                : _load,
+            icon: const Icon(Icons.refresh),
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
+        for (final passkey in _passkeys ?? const <Passkey>[])
+          ListTile(
+            leading: const Icon(Icons.fingerprint, size: 20),
+            title: Text(passkey.friendlyName ?? 'Passkey'),
+            subtitle: Text(
+              [
+                'Erstellt ${_formatDate(passkey.createdAt)}',
+                if (passkey.lastUsedAt != null)
+                  'Zuletzt genutzt ${_formatDate(passkey.lastUsedAt)}',
+              ].join(' · '),
+            ),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Umbenennen',
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  onPressed: () => _rename(passkey),
+                ),
+                IconButton(
+                  tooltip: L10n.t(context, 'settings.delete'),
+                  icon: Icon(Icons.delete_outline,
+                      size: 20, color: Theme.of(context).colorScheme.error),
+                  onPressed: () => _delete(passkey),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -812,3 +1173,120 @@ class _UnifiedPushTileState extends ConsumerState<_UnifiedPushTile> {
   }
 }
 
+/// Opt-in-Tile für den verschlüsselten lokalen Chat-Verlauf (v0.8.0):
+/// Standard AUS. Aktiviert die AES-256-verschlüsselte SecureHive-Ablage
+/// der letzten 200 Nachrichten pro Chat (Key bleibt im Keystore).
+enum _HistoryMode { off, cap200, all }
+
+class _ChatHistoryTile extends ConsumerStatefulWidget {
+  const _ChatHistoryTile();
+
+  @override
+  ConsumerState<_ChatHistoryTile> createState() => _ChatHistoryTileState();
+}
+
+class _ChatHistoryTileState extends ConsumerState<_ChatHistoryTile> {
+  _HistoryMode _mode = _HistoryMode.all;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(() async {
+      try {
+        final storage = ref.read(localStorageProvider);
+        final enabled = await storage.getBool('chat_history_local') ?? true;
+        final all = await storage.getBool('chat_history_all') ?? true;
+        if (!mounted) return;
+        setState(() {
+          _mode = enabled
+              ? (all ? _HistoryMode.all : _HistoryMode.cap200)
+              : _HistoryMode.off;
+        });
+      } catch (_) {
+        if (mounted) setState(() => _mode = _HistoryMode.all);
+      }
+    }());
+  }
+
+  Future<void> _apply(_HistoryMode mode) async {
+    setState(() => _busy = true);
+    try {
+      final storage = ref.read(localStorageProvider);
+      await storage.saveBool('chat_history_local', mode != _HistoryMode.off);
+      await storage.saveBool('chat_history_all', mode == _HistoryMode.all);
+      ref.read(chatProvider.notifier).setHistoryPersistence(
+            mode != _HistoryMode.off,
+            limit: mode == _HistoryMode.cap200 ? 200 : null,
+          );
+      if (mounted) setState(() => _mode = mode);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pickMode() async {
+    final picked = await showDialog<_HistoryMode>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L10n.t(ctx, 'chathist.dialogTitle')),
+        content: RadioGroup<_HistoryMode>(
+          groupValue: _mode,
+          onChanged: (v) => Navigator.of(ctx).pop(v),
+          child: Column(            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final mode in _HistoryMode.values)
+                RadioListTile<_HistoryMode>(
+                  value: mode,
+                  title: Text(switch (mode) {
+                    _HistoryMode.off => L10n.t(ctx, 'chathist.off.title'),
+                    _HistoryMode.cap200 => L10n.t(ctx, 'chathist.cap200.title'),
+                    _HistoryMode.all => L10n.t(ctx, 'chathist.all.title'),
+                  }),
+                  subtitle: Text(switch (mode) {
+                    _HistoryMode.off => L10n.t(ctx, 'chathist.off.sub'),
+                    _HistoryMode.cap200 => L10n.t(ctx, 'chathist.cap200.sub'),
+                    _HistoryMode.all => L10n.t(ctx, 'chathist.all.sub'),
+                  }),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null && picked != _mode) {
+      await _apply(picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (_mode) {
+      _HistoryMode.off => L10n.t(context, 'chathist.mode.off'),
+      _HistoryMode.cap200 => L10n.t(context, 'chathist.mode.cap200'),
+      _HistoryMode.all => L10n.t(context, 'chathist.mode.all'),
+    };
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        Icons.history,
+        color: _mode == _HistoryMode.off
+            ? Theme.of(context).colorScheme.onSurfaceVariant
+            : Theme.of(context).colorScheme.primary,
+      ),
+      title: Text(L10n.t(context, 'chathist.tileTitle')),
+      subtitle: Text(
+        '${L10n.t(context, 'chathist.tileSubPrefix')} '
+        '${L10n.t(context, 'chathist.modeWord')} $label. '
+        '${L10n.t(context, 'chathist.deleteHint')}',
+      ),
+      trailing: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.chevron_right),
+      onTap: _busy ? null : _pickMode,
+    );
+  }
+}

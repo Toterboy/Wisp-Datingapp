@@ -41,6 +41,16 @@ abstract class AppAuthService {
     String? captchaToken,
   });
 
+  /// Loggt den Nutzer per Passkey (WebAuthn) ein.
+  ///
+  /// MUSS dieselben Nachlauf-Effekte wie [login] setzen (Token-Persistenz,
+  /// Signal-User-ID) - früher fehlten sie im Passkey-Pfad, wodurch nach
+  /// der Passkey-Anmeldung Profildaten nicht zuverlässig geladen wurden.
+  ///
+  /// [captchaToken]: Optionales CAPTCHA-Token (der Server verlangt es für
+  /// den Passkey-Flow ebenfalls, wenn CAPTCHA aktiv ist).
+  Future<void> loginWithPasskey({String? captchaToken});
+
   /// Loggt den Nutzer aus und löscht die lokale Session.
   Future<void> logout();
 

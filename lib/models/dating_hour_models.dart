@@ -334,12 +334,12 @@ class RejectionMessages {
   static const List<String> _messages = [
     'Diese Verbindung hat leider nicht ganz gepasst. Aber keine Sorge, das sagt nichts über dich aus! Wir suchen gleich jemand Neues für dich. 😊',
     'Manchmal funkt es einfach nicht, und das ist völlig okay! Dein nächstes Gespräch wartet schon. 😉',
-    'Nicht jede Unterhaltung führt zum Match, aber jede bringt dich weiter. Weiter so! 🙂',
+    'Nicht jede Unterhaltung führt zum Funken, aber jede bringt dich weiter. Weiter so! 🙂',
     'Die Chemie hat diesmal nicht gestimmt, aber du bist großartig, wie du bist! Neuer Versuch? 😊',
     'Schade, dass es nicht gepasst hat. Aber hey, jeder Chat ist Übung für den richtigen Moment! 💪',
-    'Nicht entmutigen lassen! Manchmal braucht es ein paar Anläufe. Dein Match kommt noch! 😊',
+    'Nicht entmutigen lassen! Manchmal braucht es ein paar Anläufe. Dein Funke kommt noch! 😊',
     'Dieses Gespräch war nicht der richtige Fit. Aber das nächste könnte es sein! Wir suchen weiter... 🚀',
-    'Kein Match dieses Mal, aber du hast Mut bewiesen, dich darauf einzulassen. Respekt! 🌟',
+    'Kein Funke dieses Mal, aber du hast Mut bewiesen, dich darauf einzulassen. Respekt! 🌟',
   ];
 
   /// Gibt eine zufällige freundliche Ablehnungsnachricht zurück.

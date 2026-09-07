@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/theme/app_theme.dart';
 
 /// Farbschema-Auswahl: Kreise mit Vorschau + Label, ausgewählt mit Ring.
@@ -48,10 +49,9 @@ class _ThemeSwatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Feste Kachelgroesse: identische Abstaende/hoehen fuer alle Eintraege,
-    // unabhaengig von der Label-Laenge.
     return Semantics(
-      label: 'Farbschema ${theme.label}',
+      label:
+          '${L10n.t(context, 'theme.colorScheme')} ${L10n.t(context, theme.labelKey)}',
       selected: selected,
       button: true,
       child: InkWell(
@@ -83,7 +83,7 @@ class _ThemeSwatch extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                theme.shortLabel,
+                L10n.t(context, theme.labelKey),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(

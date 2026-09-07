@@ -2,6 +2,116 @@
 
 Fix-Release: Stabilität und Usability. Danke an alle Tester von v0.7.2!
 
+## Nachtrag (Build 9, 05.09.2026)
+
+**Neu**
+
+- **Passkey-Anmeldung mit Ladekreis**: derselbe klare „Anmeldung läuft…"-Kreis
+  wie bei der Passwort-Anmeldung
+- **Suchradius dauerhaft gespeichert**: Änderungen an Entfernung, Altersspanne
+  und Suchradius-Modus sichern sich jetzt automatisch (entprellt) auf dem
+  Server - und überstehen damit Neuinstallation und Gerätewechsel genauso
+  wie Name & Co. „Speichern" wartet auf den Server-Sync und meldet
+  Fehlschläge klar
+- **Profil-Seite**: dezenter Strich am rechten Rand zeigt, dass die Seite
+  weiter nach unten geht (Profil-/Bug-melden-Buttons nicht mehr versteckt)
+
+**Behoben**
+
+- **Name & Daten nach Passkey-Anmeldung leer**: Die Passkey-Anmeldung
+  durchlief nicht dieselben Schritte wie die Passwort-Anmeldung (Token-
+  Speicherung, Signal-User-ID, Server-Sync). Jetzt identischer Ablauf -
+  Profil, Präferenzen und Einstellungen werden nach der Fingerprint-/
+  Gesicht-Anmeldung vollständig geladen
+- **Geräte-Liste**: Reparatur-Skript `supabase/repair_auth_devices.sql`
+  ergänzt (idempotent, mit Prüf-Report) - stellt Tabelle, RLS und alle
+  vier Policies von Migration 071 garantiert her. Ausführung im Supabase
+  SQL-Editor; danach in der App die Geräte-Liste aktualisieren
+- **Server-Syncrobustheit**: Die Schreib-Verifikation liest jetzt gezielt
+  nur den geschriebenen Schlüssel zurück; das Laden von Präferenzen/Flags
+  fällt bei fehlenden 071-Spalten automatisch auf den Kern-Umfang zurück
+  (Entfernung/Alter werden so auch ohne vollständige 071 wiederhergestellt)
+- **Gerätename** in der Geräte-Liste sauber formatiert (z. B. „Android
+  (SDK 34)" statt „Android Version")
+
+**Server (Reihenfolge egal, alles im SQL-Editor ausführbar)**
+
+1. Migrationen 071 (falls vollständig geschehen), 072, 073 einspielen -
+   oder für die Geräte-Tabelle einfach `supabase/repair_auth_devices.sql`
+2. Passkey-„Relying Party Origins" auf die SHA-256-Werte setzen (siehe
+   Build-8-Abschnitt bzw. `docs/PASSKEYS_SERVER_SETUP.md`)
+
+## Nachtrag (Build 8, 05.09.2026) – PASSKEY-FIX
+
+**Ursache gefunden und dokumentiert:** Die Passkey-Registrierung scheiterte
+IMMER an der Server-Verifikation, weil in den „Relying Party Origins" die
+**SHA-1**-Fingerprints der Signatur-Keys hinterlegt waren (20 Byte).
+`android:apk-key-hash` verlangt aber **SHA-256** (32 Byte) – der Abgleich
+konnte nie matchen, während der native Android-Dialog problemlos lief.
+
+**Lösung (Server, sofort wirksam – kein App-Update nötig):** Dashboard →
+Authentication → Passkeys → „Relying Party Origins" ersetzen durch:
+
+```
+https://auth.wispdating.de,android:apk-key-hash:N6pPbMHeuPWVdF6sCs4KGclUcoD8dI8CZr3S7HvpVXI,android:apk-key-hash:WrjQ1eUdTGnHEeMSAqhA6tqoMFqd6yOINSrNwVwwqXk
+```
+
+(1. = Upload-/Release-Key, 2. = Debug-Key; SHA-256, per keytool aus dem
+echten Keystore verifiziert.)
+
+Zusätzlich in Build 8:
+
+- **Debug-Diagnose**: Die App loggt bei jedem Passkey-Versuch den exakt
+  gesendeten WebAuthn-Origin (`[Passkey] clientDataJSON: … origin=…`),
+  damit Abweichungen sofort sichtbar sind
+- **Fehlermeldung präzisiert**: verweist jetzt auf
+  `docs/PASSKEYS_SERVER_SETUP.md` (komplette Anleitung inkl. berechneter
+  Hash-Werte und Symptom-Tabelle)
+- **Migration 073** (Härtung): `auth_devices` mit Längen-Constraints und
+  Cap von 20 Geräten pro Konto
+
+## Nachtrag (Build 7, 05.09.2026)
+
+- **Passkeys verwalten**: Einstellungen → Community & Sicherheit listet
+  jetzt alle Passkeys des Kontos (Name, erstellt, zuletzt genutzt) und
+  erlaubt Umbenennen/Löschen
+- **Speichern-Nachfrage im Profil-Editor**: greift jetzt zuverlässig auch
+  beim Wechsel über die Bottom-Navigation (nicht nur Zurück-Geste) –
+  verifiziert durch neue Widget-Tests (Textfeld, Regler, PopScope)
+- **Geräte-Liste**: zeigt bei Problemen die konkrete Ursache (z. B.
+  „Migration 071 fehlt auf dem Server") statt still zu scheitern
+- Server: bitte Migration **071**, **072** und **073** einspielen
+  (072 = Konsolidierung der öffentlichen Profil-View, behebt den
+  Supabase-Advisor-Befund „security_definer_view" mit Datenschutz-
+  Begründung; 073 = Härtung der Geräte-Tabelle)
+
+## Nachtrag (Build 6, 05.09.2026)
+
+### Neu
+
+- **Angemeldete Geräte**: Einstellungen → Datenschutz & Account →
+  „Angemeldete Geräte". Zeigt alle Geräte, auf denen du eingeloggt bist,
+  und meldet dich mit einem Tastendruck ÜBERALL außer auf diesem Gerät ab.
+- **Themefarbe bleibt am Konto**: Die Farbwahl wird serverseitig
+  gespeichert und direkt beim Login wieder angewendet - auch nach einer
+  App-Neuinstallation. Gleiches gilt für Entfernung und Altersspanne.
+- **Dating-Hour-Regeln** erscheinen jetzt nur noch EINMAL pro Konto, nicht
+  bei jeder Neuinstallation erneut.
+
+### Behoben
+
+- Altersspannen-Regler froren bei 18-18 ein (ausgegraut/unbeweglich) -
+  jetzt gekoppelte Slider mit vollem Spielraum.
+- Die Speichern-Nachfrage im Profil-Editor kam bei Reglern, Dropdowns und
+  Geburtsdatum nie; die Zurück-GESTE fragt jetzt auch zuverlässig.
+- Weißes Viereck bei Benachrichtigungen endgültig behoben (das
+  Benachrichtigungs-Icon hatte keinen Alpha-Kanal).
+- Passkey-Erstellen: „Anfrage abgebrochen" / „credential verification
+  failed" behoben (doppelte Anläufe werden jetzt verhindert).
+
+Hinweis: Vor dem Verteilen die Migration
+`supabase/migrations/071_auth_devices_theme_and_flags.sql` einspielen.
+
 ## Behoben
 
 **2FA klar angezeigt** Die Einstellungs-Seite zeigt jetzt zuverlässig, ob

@@ -9,6 +9,7 @@ import 'package:image/image.dart' as img;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:wisp/services/brevo_bug_report_service.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// Grenzen eines Bugreports (auch serverseitig in der Edge Function
 /// `send-bug-report` erzwungen).
@@ -188,8 +189,8 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
       debugPrint('[BUG_REPORT] Fehler: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Übermittlung fehlgeschlagen. Bitte versuche es später erneut.'),
+        SnackBar(
+          content: Text(L10n.t(context, 'bugreport.sendFailed')),
           behavior: SnackBarBehavior.floating,
         ),
       );

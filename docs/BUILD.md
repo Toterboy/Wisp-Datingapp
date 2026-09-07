@@ -27,6 +27,12 @@ flutter build apk --release --flavor play --dart-define=FDROID=false
 flutter build apk --release --flavor fdroid --dart-define=FDROID=true
 ```
 
+**Alle Release-Varianten per Skript** (empfohlen): 
+`tool/build_release.ps1` baut die Standard-APKs, optional per
+`-SplitPerAbi` (pro-CPU-APKs, arm64/armv7 – deutlich kleiner) und
+`-Aab` (Play-App-Bundle) sowie mit `-AdminUUID <uuid>` Admin-Builds
+(`--dart-define=ADMIN_UUID=…`, nur für das Team, nicht zur Verteilung).
+
 **Wichtig:** Seit es die Flavors gibt, ist ein Build **ohne** `--flavor`
 nicht mehr möglich — Flutter findet die APK sonst nicht (Fehler
 „failed to produce an .apk file"). Immer `--flavor play` oder

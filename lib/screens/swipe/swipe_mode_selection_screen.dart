@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 
 /// Screen zur Auswahl des Entdeckungs-Modus (wird über "Entdecken" in der Bottom-Nav erreicht).
@@ -105,14 +106,17 @@ class SwipeModeSelectionScreen extends ConsumerWidget {
 
 /// Enum für die Entdeckungs-Modi.
 enum DiscoveryMode {
-  findMatch('Find your Match', 'Vorstellung anhören oder lesen, dann entscheiden', Icons.headphones),
-  randomChat('Zufallschat', 'Direkter Text Chat mit zufällig passender Person', Icons.chat_bubble),
-  qrScan('QR Code scannen', 'Code einer Person scannen und direkt verbinden', Icons.qr_code_scanner),
-  datingHour('Dating Hour (Event)', 'Täglich 20 bis 21 Uhr: 5 Minuten Chats mit Entscheidungsphase', Icons.event);
+  findMatch('Find your Match', 'dm.findMatch', 'dm.findMatchDesc', Icons.headphones),
+  randomChat('Zufallschat', 'dm.randomChat', 'dm.randomChatDesc', Icons.chat_bubble),
+  qrScan('QR Code scannen', 'dm.qrScan', 'dm.qrScanDesc', Icons.qr_code_scanner),
+  datingHour('Dating Hour (Event)', 'dm.datingHour', 'dm.datingHourDesc', Icons.event);
 
-  const DiscoveryMode(this.label, this.description, this.icon);
+  const DiscoveryMode(this.label, this.labelKey, this.descriptionKey, this.icon);
   final String label;
-  final String description;
+
+  /// L10n-Schlüssel (v0.8.1: EN-Übersetzung der Entdecken-Modi).
+  final String labelKey;
+  final String descriptionKey;
   final IconData icon;
 }
 
@@ -175,7 +179,7 @@ class _ModeCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      mode.label,
+                      L10n.t(context, mode.labelKey),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: isSelected
@@ -185,7 +189,7 @@ class _ModeCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      mode.description,
+                      L10n.t(context, mode.descriptionKey),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: isSelected
                             ? Theme.of(context)

@@ -1,7 +1,7 @@
 ﻿name: wisp
 description: Eine moderne, datenschutzfreundliche Dating-App mit Blind Mode (PersÃ¶nlichkeit zuerst).
 publish_to: 'none'
-version: 0.7.3+5
+version: 0.8.0+12
 
 environment:
   sdk: ^3.10.0
@@ -40,6 +40,9 @@ dependencies:
 
   # App-Informationen fÃ¼r Bug-Reports (Version)
   package_info_plus: ^10.0.0
+
+  # Echtes Geraetemodell fuer Angemeldete Geraete (v0.8.1)
+  device_info_plus: ^13.2.0
 
   # Ã–ffnen externer Links (GitHub Issues)
   url_launcher: ^6.3.1
@@ -90,6 +93,10 @@ dependencies:
   # Bildverarbeitung fÃ¼r Moderation (Placeholder fÃ¼r ML-Kit)
   image: ^4.2.0
 
+  # NSFW on-device (v0.8.0): lokale Inferenz des Bild-Sicherheits-Modells
+  # (image-safety-classifier-xs, ONNX-Format) - nur bei manueller Meldung.
+  onnxruntime: ^1.4.1
+
   # Path Provider fÃ¼r Dateipfade
   path_provider: ^2.1.4
 
@@ -123,6 +130,9 @@ dependencies:
   # ACHTUNG: BenÃ¶tigt Flutter 3.35+ / Dart 3.9+ und supabase_flutter mit
   # Passkey-UnterstÃ¼tzung (signInWithPasskey/registerPasskey).
   passkeys: ^2.21.0
+  # Direkte Abhängigkeit: WispPasskeyAuthenticator implementiert die
+  # Interface-Klasse des Platform-Interfaces (ohne Pre-Cancel-Verhalten).
+  passkeys_platform_interface: ^2.9.0
 
   # QR-Code (Profil teilen + Scannen)
   qr_flutter: ^4.1.0
@@ -210,6 +220,7 @@ flutter:
     - assets/images/wispdating_icon_base.png
     - assets/images/wispdating_logo_round.png
     - assets/images/wispdating_benachrichtigungsicon.png
+    - assets/models/
     - .env
 
   # Hinweis: In einer echten App wÃ¼rden hier weitere Assets (Bilder, Fonts) registriert.

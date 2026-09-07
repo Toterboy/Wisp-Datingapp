@@ -30,7 +30,7 @@ void main() {
     height: fgContent,
     interpolation: img.Interpolation.cubic,
   );
-  final fg = img.Image(width: fgSize, height: fgSize);
+  final fg = img.Image(width: fgSize, height: fgSize, numChannels: 4);
   final fgOff = (fgSize - fgContent) ~/ 2;
   for (final p in fgScaled) {
     fg.setPixel(p.x + fgOff, p.y + fgOff, p);
@@ -45,7 +45,10 @@ void main() {
   // sofort erkennbare HERZ-Silhouette (Dating!) - zusätzlich kreisförmig
   // auf die Sichtrunde begrenzt.
   const nSize = 96;
-  final n = img.Image(width: nSize, height: nSize);
+  // WICHTIG: numChannels: 4 (RGBA)! Der Default (3 = RGB) verwirft Alpha
+  // STILL - das Icon war dann ein volles 96x96 weisses Quadrat und
+  // erschien in der Statusleiste als weisses VIERECK (User-Bericht).
+  final n = img.Image(width: nSize, height: nSize, numChannels: 4);
 
   // Parametrische Herz-Kurve als Kontur-Punkte (ray-casting Füllung).
   final heart = <List<double>>[];

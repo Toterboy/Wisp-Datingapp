@@ -3,10 +3,54 @@
 ![CI](https://github.com/Thoralf/blind_date_app/actions/workflows/ci.yml/badge.svg)
 [![Lizenz: AGPL v3](https://img.shields.io/badge/Lizenz-AGPL_v3-blue.svg)](LICENSE)
 
+## Warum WispDating – und nicht Tinder, Bumble & Co.?
+
+Weil moderne Dating-Apps genau die Probleme haben, die WispDating gezielt
+löst – ohne Abo-Falle, ohne Aufmerksamkeits-Casino, ohne Daten-Hammer:
+
+- **Persönlichkeit vor Aussehen.** Bei uns heißt der erste Schritt
+  „Find your Match": Du hörst (oder liest) eine Vorstellung, bevor du ein
+  Foto siehst – **Blind Mode ist Standard**, nicht Premium. Tinder zeigt
+  dir zuerst das Bild; bei uns lernst du zuerst die Person kennen.
+- **Ein Funke statt endlosem Swiping.** Verbindungen heißen bei uns
+  **„Funken"** – und sie entstehen nur, wenn beide etwas investieren:
+  Quiz-Fragen statt oberflächlicher Matches, ein Verbindungs-Score aus
+  Entfernung, Interessen und **Musik-Geschmack** statt Dopamin-Feed.
+- **Echt verschlüsselt – Ende-zu-Ende.** Signal-Protokoll und
+  Peer-to-Peer (WebRTC) sind bei uns der Kern, kein Marketing-Versprechen.
+  Selbst **Profilbilder liegen verschlüsselt** (AES-256-GCM) auf dem
+  Server. Klassische Anbieter können Nachrichteninhalte grundsätzlich
+  mitlesen.
+- **On-Device-KI statt Auslagern.** Die NSFW-Prüfung deines Profilbilds
+  läuft **komplett auf deinem Handy** – das Bild verlässt bei
+  Nichtbestehen das Gerät nicht. Kein anderer Anbieter macht das.
+- **Präsenz-frei.** Kein „online"-Badge, kein „schreibt gerade…", keine
+  Lesebestätigungen (siehe [ADR-0007](docs/adr/0007-praesenzfrei.md)).
+  Dating soll zurück ins echte Leben führen – der App-Status ist kein
+  Beziehungs-Tracker.
+- **Inaktivität ist okay.** Abgekühlte Funken verfallen nicht nach 24
+  Stunden in den Ordnner des Vergessens: Inaktive Funken ruhen unter
+  „Erschlossene Funken" und sind per Re-Funke jederzeit ohne Frist wieder
+  belebbar. Keine Verlängerungs-Abos, kein Druck.
+- **Dating Hour: das echte Speed-Dating-Ereignis.** Samstags 20–21 Uhr:
+  5-Minuten-Chats mit Entscheidungsphase, serverzeitsynchron und
+  Anti-Cheat-gesichert – als Event, nicht als zusätzliches Abo-Feature.
+- **Einstellungen, die bleiben.** Profil, Suchradius, Farbwelt,
+  UI-Schalter und selbst der Chat-Verlauf überstehen Neuinstallationen –
+  vollständig serverseitig gespiegelt und migrations-robust.
+- **Kostenlos. Für immer.** Keine Abos, keine Premium-Stufen, keine
+  In-App-Käufe, keine Werbetracker. Open Source (AGPLv3) und
+  selbst hostbar – inklusive Google-freier F-Droid-Variante.
+- **Und bald:** Nahbereichs-Funke „Transit Spark" – anonyme
+  Begegnungs-Tokens für Menschen, denen man im Zug/Café begegnet
+  (v0.9.0); ein vollständig offlinefähiger Reflexions-Chat mit lokaler
+  KI „Sanctuary" (v0.10.0); E2E-Chats im Browser ohne Install für
+  Gäste (v0.11.0).
+
 Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit statt Aussehen**. WispDating setzt auf Blind-Matching („Persönlichkeit zuerst"), Ende-zu-Ende-Verschlüsselung und Peer-to-Peer-Kommunikation, um authentischere Verbindungen zu ermöglichen. Entsteht eine Verbindung, heißt das bei uns **„Funke"**.
 
 Das Projekt ist vollständig kostenlos nutzbar und soll eine echte Alternative zu Tinder & Co. darstellen. Es befindet sich in aktiver Entwicklung und ist noch nicht vollständig funktional. Beiträge und Feedback sind willkommen:
-[Beitragen](CONTRIBUTING.md) · [Verhaltenskodex](CODE_OF_CONDUCT.md) · [Sicherheitslücken melden](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Entscheidungen (ADR)](docs/adr/) · [Build & F-Droid](docs/BUILD.md)
+[Beitragen](CONTRIBUTING.md) · [Verhaltenskodex](CODE_OF_CONDUCT.md) · [Sicherheitslücken melden](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Entscheidungen (ADR)](docs/adr/) · [Build & F-Droid](docs/BUILD.md) · [Architektur](docs/ARCHITEKTUR.md) · [Datenschutz](docs/DATENSCHUTZ.md) · [Passkey-Server-Setup](docs/PASSKEYS_SERVER_SETUP.md)
 
 ## Unsere Zusagen
 
@@ -25,10 +69,10 @@ WispDating ist für Android konzipiert (iOS/Web/Desktop folgen) und basiert auf 
 
 | Variante | Datei | Push |
 | --- | --- | --- |
-| Standard (empfohlen) | `WispDating-v0.7.1-play.apk` | Firebase/FCM |
-| Google-frei (F-Droid-Stil) | `WispDating-v0.7.1-fdroid.apk` | optional via UnifiedPush |
+| Standard (empfohlen) | `WispDating-v0.8.0-play.apk` | Firebase/FCM |
+| Google-frei (F-Droid-Stil) | `WispDating-v0.8.0-fdroid.apk` | optional via UnifiedPush |
 
-Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/releases). Hinweis: Beide Varianten nutzen dieselbe App-ID und können nicht parallel installiert werden.
+Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/releases) (Build-Artefakte liegen lokal unter `releases/v0.8.0/`; dort zusätzlich pro-CPU-APKs (`-play-arm64`/`-play-armv7`, ~77 MB) und Admin-Builds im Unterordner `admin/`, die nicht für die Verteilung bestimmt sind). Hinweis: Beide Varianten nutzen dieselbe App-ID und können nicht parallel installiert werden.
 
 ---
 
@@ -48,7 +92,7 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 
 ### Entdecken
 
-- **Find your Match** – Blind-Matching „Persönlichkeit zuerst": Fotos sind erst nach einem Funke sichtbar (Blind Mode ist standardmäßig aktiv). Beim ersten Öffnen verlangt die App eine eigene Vorstellung (Text UND Audio sind Pflicht). Der gewichtete Matching-Score berücksichtigt Entfernung, gemeinsame Interessen, Persönlichkeits-Kompatibilität (MBTI-Matrix) und Alter; strikte Geschlechts- und Altersfilter.
+- **Find your Match** – Blind-Matching „Persönlichkeit zuerst": Fotos sind erst nach einem Funke sichtbar (Blind Mode ist standardmäßig aktiv). Beim ersten Öffnen verlangt die App eine eigene Vorstellung (Text UND Audio sind Pflicht). Der gewichtete Matching-Score berücksichtigt Entfernung (40 %), gemeinsame Interessen (30 %) und Musik-Geschmack (30 %) und wird transparent als „Match: X %" angezeigt; strikte Geschlechts- und Altersfilter, optionaler Habit-Dealbreaker (Konsum maximal auf eigenem Niveau).
 - **Zufallschat** – automatische Zuordnung zu einem Peer-to-Peer-Textchat basierend auf Alter-/Distanz-Einstellungen
 - **QR Code** – eigenes Profil als QR-Code teilen, fremde Codes scannen oder manuell eingeben; der angezeigte 8-stellige Code ist serverseitig auflösbar (manuelle Eingabe findet den echten Nutzer)
 - **Dating Hour (Event-Modus)** – jeden Samstag 20:00–21:00 Uhr deutscher Zeit (Sommer-/Winterzeit automatisch berücksichtigt):
@@ -88,7 +132,17 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 
 ### Profil
 
-- Mehrere Profilbilder
+- Profilbild mit **lokalem NSFW-Check vor dem Upload**: Das Bild wird
+  on-device geprüft und verlässt bei Nichtbestehen das Gerät nicht
+  (wahlweise „Anderes Bild wählen" oder „Einspruch einlegen" für das
+  Team-Review); der Upload erfolgt erst mit dem Speichern, Abbrechen
+  verwirft
+- **Verschlüsselte Profilbilder**: Avatare werden clientseitig per
+  AES-256-GCM verschlüsselt und erst beim Download lokal entschlüsselt –
+  der Server sieht nie das Klartextbild
+- **Musik-Geschmack**: Genres, die man mag – und freiwillig solche, die
+  man explizit nicht mag; fließt in den Verbindungs-Score ein und ist in
+  Profilen sichtbar (gemeinsame Genres werden hervorgehoben)
 - Profil-Vorschau-Funktion (Ansicht wie andere Nutzer das Profil sehen)
 - Vorstellung-Vorschau (eigene Text-/Audio-Vorstellung abspielbar)
 - Gewohnheiten (Rauchen, Alkohol, Drogen) – ausschließlich in „Profil bearbeiten" änderbar
@@ -98,15 +152,22 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 
 ### Einstellungen & Datenschutz
 
-- Blind Mode (Fotos erst nach Funke), Foto-Freigabe nach Funke, Profil-Sichtbarkeit, Dark Mode, Altersbereich, Entfernung (km/Bundesland/ganz Deutschland), Benachrichtigungen (Master- plus Einzel-Schalter)
+- Blind Mode (Fotos erst nach Funke), Foto-Freigabe nach Funke, Dark Mode, Altersbereich, Entfernung (km/Bundesland/ganz Deutschland), Benachrichtigungen (Master- plus Einzel-Schalter)
+- **Profil-Sichtbarkeit als eine Steuerung**: Jeder / Nur Funken / Unsichtbar (Pausiert) – „Unsichtbar" ist der Pausenmodus (mit Bestätigungsdialog): unsichtbar in Entdecken und Find your Match, bestehende Funken und Chats bleiben
+- **Verschlüsselter Chat-Verlauf**: drei Modi – Aus / 200 Nachrichten / kompletter Verlauf (Standard) – AES-256-verschlüsselt lokal (SecureHive, Key im Keystore)
+- **Konto-Datenhalt**: Name, Bio, Profilbild, Suchradius, Altersspanne, „Ich suche", Bundesland, Ort, Farbwelt, UI-Schalter und die Dating-Hour-Einleitung werden serverseitig gespeichert und nach Neuinstallation/Login automatisch wiederhergestellt – die Sync-Schicht ist migrations-robust (eine fehlende Spalte kann niemals den ganzen Restore auslöschen)
 - **Bild-Blur im Chat**: eingehende Bilder standardmäßig verpixelt, Freischalten nur nach Bestätigung; Bilder direkt meldbar
 - **E2E-Identität sichern/wiederherstellen**: passwortverschlüsseltes Backup der Signal-Identität für den Gerätewechsel
 - **Push ohne Google (UnifiedPush)**: optionale Alternative zu Firebase (benötigt eine Distributor-App wie ntfy)
-- **Safety Center**: Hilfe bei Belästigung/Stalking, In-App-Maßnahmen erklärt
+- **Safety Center**: Hilfe bei Belästigung/Stalking, In-App-Maßnahmen erklärt, eigene Meldungen mit Status, Blockierliste mit Entblocken
 - **Zwei-Faktor-Authentisierung (TOTP)** – QR-Code scannen oder Schlüssel manuell eintragen, einmalige Bestätigung per Code
-- **Passkey erstellen** für passwortlose Anmeldung
+- **Passkeys**: erstellen für passwortlose Anmeldung (mit 2FA-Step-up bei aktiver 2FA) **und verwalten** – alle registrierten Passkeys einsehen (Name, erstellt, zuletzt genutzt), umbenennen und löschen (z. B. Alt-Einträge nach Gerätewechsel)
+- **Angemeldete Geräte**: Übersicht aller Geräte, auf denen das Konto eingeloggt ist (echtes Gerätemodell wie „Samsung SM-S921B", App-Version, letzte Aktivität) – mit „Überall abmelden (außer diesem Gerät)" per Tastendruck
 - **Account löschen** – löscht den Account serverseitig UND alle lokalen Daten vollständig (DSGVO)
-- **Privacy-Screen**: echte JSON-Exportfunktion (Profil, Einstellungen, Präferenzen, Mood) zum Teilen/Speichern sowie Auflistung der Auftragsverarbeiter (Supabase, Google/Firebase, Hugging Face, Apple)
+- **Privacy-Screen**: echte JSON-Exportfunktion (Profil, Einstellungen, Präferenzen, Mood) zum Teilen/Speichern, Daten-Import (JSON wieder einspielbar) sowie Auflistung der Auftragsverarbeiter (Supabase, Google/Firebase, Hugging Face, Apple)
+- **Zweisprachig (DE/EN)**: Die App ist komplett zweisprachig – inklusive Farbschemata, Stimmungs-Chips und Entdecken-Modi; auf Deutsch heißt es konsequent „Funke(n)", auf Englisch „Spark(s)"
+- **Mindestversions-Gate**: Clients unterhalb der serverseitigen Mindestversion zeigen beim Start einen Update-Screen (mit Rückfallebene „Trotzdem fortfahren")
+- **Crash-Journal**: Der letzte Absturz wird lokal gespeichert; beim nächsten Start fragt die App, ob ein Report über den Bug-Report-Kanal gesendet werden soll (nichts verlässt das Gerät ohne Bestätigung)
 - **Bug Report**: Beschreibung (max. 5000 Zeichen) plus bis zu 5 Screenshots/Bilder, Versand per Email
 - Anzeige der App-Version unten (Login/Registrierung und Einstellungen)
 
@@ -128,6 +189,8 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 - **Härtete SQL-Schicht**: RLS auf allen Tabellen, SECURITY DEFINER-Funktionen mit gehärtetem `search_path`, Blockier-Prüfung bei Likes, Rate-limited Existenzabfragen
 - **Release-Signierung**: Build bricht fehl, wenn kein Keystore konfiguriert ist (kein stiller Debug-Fallback)
 - **Bild-Schutz**: eingehende Chat-Bilder standardmäßig verpixelt, Freischaltung nur nach Bestätigung. **Meldung mit KI-Vorprüfung:** Chat-Bilder werden nie automatisch gescannt - erst eine Meldung des Empfängers prüft exakt dieses eine Bild per NSFW-KI (Edge Function `report-image`). Der Meldende sieht das KI-Ergebnis sofort; bei Bestätigung (oder nach Eskalation durch den Meldenden) erhalten Bild, Report und KI-Ergebnis das Team automatisch per E-Mail
+- **NSFW on-device für Profilbilder**: Der Upload-Check läuft komplett lokal (gebündeltes ONNX-Modell via onnxruntime, ~12 MB) – das Bild verlässt bei Nichtbestehen das Gerät nicht; bestandene Bilder werden serverseitig nie gescannt. Verifiziert durch einen permanenten Test mit echter Modell-Inferenz
+- **Verschlüsselte Profilbilder**: Avatare werden clientseitig per AES-256-GCM verschlüsselt (Zufalls-Schlüssel pro Bild, im photos-Eintrag mitgeführt) – bei einem Bucket-Leak sind die Bilder unlesbar; Anzeige nur lokal entschlüsselt
 - **Verschlüsseltes Key-Backup**: die Signal-Identität wird passwortbasiert gesichert (PBKDF2 + AES-256-GCM, frische IVs) – der Server sieht das Backup nie unverschlüsselt
 - **Pseudonymisierung**: Reporter-IDs werden gehasht (SHA-256), kein PII in lokalen Hive-Keys
 - **Serverzeit** als Single Source of Truth für die Dating Hour (Anti-Cheat gegen Manipulation der Geräteuhr); Warn-Banner im Event-Screen bei unverifizierter Serverzeit
@@ -139,6 +202,9 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
   - Automatische Freischaltung aller Funktionen mit Erreichen des 20. Lebensjahres
 - **Foto-Moderation**: NSFW-Prüfung über ein Hugging-Face-Inference-Modell (EU-Router, cert-gepinnt) – aktuell **standardmäßig deaktiviert** (Aktivierung per Build-Flag, siehe „Hinweis zum Entwicklungsstand"); Moderationsergebnisse landen in einer Admin-Warteschlange
 - **Session-Restore** synchron (kein Netzwerk beim App-Start), serverseitige Validierung im Hintergrund
+- **Passkey-/WebAuthn-Konfiguration**: Die GoTrue-Ursprungs-Liste (`Relying Party Origins`) muss den **SHA-256**-Signatur-Hash der installierten APK enthalten (`android:apk-key-hash:…`, 43 Base64URL-Zeichen) – SHA-1-Fingerprints matchen nie. Exakte Werte, Diagnose und Symptom-Tabelle: [docs/PASSKEYS_SERVER_SETUP.md](docs/PASSKEYS_SERVER_SETUP.md)
+- **Geräte-Liste** (`auth_devices`, Migration 071): Jede Zeile wurde vom Gerät selbst angelegt; RLS erlaubt ausschließlich Zugriff auf die eigenen Zeilen – nobody kann fremde Geräte sehen; seit 078 mit echtem Gerätemodell (Hersteller + Kennung, client-gesetzt)
+- **Migrations-robuste Sync-Schicht**: Ladevorgänge fallen stufenweise auf ältere Spaltensätze zurück, Schreibvorgänge entfernen bei PostgREST-„missing column"-Fehlern automatisch die fehlende Spalte und schreiben den Rest – eine nicht eingespielte Migration kann niemals Name, Bio, Theme oder Suchradius gemeinsam auslöschen
 
 ---
 
@@ -155,10 +221,12 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 | Peer-to-Peer         | WebRTC (`flutter_webrtc`)                          |
 | Authentisierung      | Passkeys (`passkeys`), TOTP-Zweitfaktor (Supabase MFA), Firebase Cloud Messaging (nur `play`-Variante) |
 | Push (Google-frei)   | UnifiedPush (`unifiedpush`, F-Droid-Variante)      |
-| Moderation           | NSFW-Klassifikator via Hugging-Face-Inference (nur melde-basiert, Edge Function) |
+| Moderation           | NSFW-Klassifikator via Hugging-Face-Inference (nur melde-basiert, Edge Function) + **on-device ONNX-Modell** (`onnxruntime`) für Profilbilder |
 | Medien               | `image_picker`, `image_cropper`, `camera`, `video_player`, `record`, `just_audio` |
 | Scannen/QR           | `mobile_scanner`, `qr_flutter`                     |
 | Teilen               | `share_plus`                                       |
+| Geräteinfos          | `device_info_plus` (Gerätemodell für „Angemeldete Geräte") |
+| Krypto               | `pointycastle` (AES-256-GCM für Avatare/Backups), `libsignal_protocol_dart` |
 | Lokale Speicherung   | Hive (verschlüsselt), flutter_secure_storage       |
 | Standort             | `geolocator`, `geocoding`                          |
 | Benachrichtigungen   | `flutter_local_notifications`                      |
@@ -169,13 +237,24 @@ Beide finden sich unter [Releases](https://github.com/Toterboy/Wisp-Datingapp/re
 
 Nach einem Update müssen vor dem Rollout die Datenbank-Migrationen
 (`supabase/migrations/`, per SQL-Editor oder `supabase db push`) und die
-Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.3:
+Edge Functions (`supabase/functions/`) auf den Server. Stand v0.8.0:
 
-- **Migrationen:** 064 (Bild-Report-Spalten), 065 (`onboarding_done`),
-  066 (Präferenz-Sync: „Ich suche", Bundesland), 067 (Dating-Hour-Zeiten
-  Europe/Berlin, Mindestteilnehmer, Dopplungs-Schutz, Mood-Infrastruktur),
-  068 (Teilnehmer-Zähler + Chat-Bild-Hash-Registrierung),
-  069 (Reporter-Pseudonymisierung), 070 (konsistente Teilnehmer-Zählung)
+- **Migrationen 064–073** (v0.7.x): Bild-Reports, `onboarding_done`,
+  Präferenz-Sync (066), Dating-Hour-Zeiten/-Zähler (067/068/070),
+  Reporter-Pseudonymisierung (069), Geräte-Liste + Theme-Sync (071),
+  `public_profiles`-Konsolidierung (072), Geräte-Härtung (073)
+- **Migrationen für v0.8.0:**
+  - **074** – Musik-Geschmack, Match-Status, Verbindungs-Score, `ui_prefs`-Sync
+  - **075** – Quiz-Fragen-Pool (60 Fragen)
+  - **076** – Pausenmodus (`paused`), Habit-Dealbreaker,
+    Mindestversions-Gate (`app_config`), Meldungs-Feedback, Blockierliste
+  - **077** – `profiles.photos` + öffentlicher View (Profilbilder;
+    *photos steht bewusst am Ende der View-Spaltenliste – Postgres
+    erlaubt bei `CREATE OR REPLACE VIEW` nur anhängende Spalten*)
+  - **078** – `auth_devices.device_model` (echtes Gerätemodell)
+- **Diagnose:** `supabase/check_columns.sql` im SQL Editor ausführen –
+  zeigt pro Spalte TRUE/FALSE, welche Migrationen fehlen (wichtig bei
+  Symptomen wie „Suchradius/Profilbild wird nicht gespeichert")
 - **Edge Functions:** `report-image` (Bild-Meldung + KI + Nachweis-Pflicht),
   `admin-ban` (Nutzer sperren/entsperren, paginierte Suche),
   `notify-user` (rundes Statusleisten-Icon), `server-time`
@@ -185,6 +264,11 @@ Edge Functions (`supabase/functions/`) auf den Server. Stand v0.7.3:
   - `ADMIN_UUID` – Admin-ID für `admin-ban` (identisch zum Build-Flag)
   - `HF_API_TOKEN` – optional, aktiviert die NSFW-KI-Vorprüfung
   - `FIREBASE_SERVICE_ACCOUNT_JSON` – FCM-Versand (bereits vorhanden)
+- **Passkeys/WebAuthn** (Dashboard → Authentication → Passkeys): RP-ID
+  `auth.wispdating.de`; Origins MÜSSEN den **SHA-256**-Signatur-Hash der
+  installierten APK enthalten. Falsche (SHA-1-)Einträge sind die häufigste
+  Ursache für „Der Server konnte den Passkey nicht bestätigen" – exakte
+  Werte: [docs/PASSKEYS_SERVER_SETUP.md](docs/PASSKEYS_SERVER_SETUP.md)
 
 ---
 
@@ -213,14 +297,37 @@ Geplant und teilweise bereits in Entwicklung (Details:
   Ein Funke entsteht nur bei beidseitigem Signal. Privat: keine Bilder im
   Umlauf, Tokens rotieren und verfallen automatisch.
 
+**Ab v0.10.0 – Sanctuary & lokaler KI-Reflexions-Chat:**
+- Ein vollständig offlinefähiger, geschützter Raum zur Selbstreflexion –
+  betrieben durch rein lokale On-Device-Sprachmodelle (llama.cpp/LiteRT,
+  quantisierte GGUF-Downloads von Hugging Face mit Fortschritt/Resume)
+- Stufenweise Modellauswahl (kompakt/akkusparend bis tiefgründig),
+  Vision-Badge für multimodale Modelle, eigener Modell-Import mit
+  automatischer Erkennung kuratierter Modelle (System-Prompt wird dann
+  automatisch angepasst)
+- Sicherheit: Pflicht-Disclaimer, „Modellqualität beanstanden",
+  lokale Krisen-Erkennung mit Notfallkontakten, Chats nur im RAM oder
+  AES-verschlüsselt lokal
+
+**Ab v0.11.0 – Web-Bridge, Transit-Reachability & Zero-Install Gäste:**
+- Menschen OHNE App erreichen: OS-Share (Quick Share/AirDrop),
+  Hotspot-SSID-Beacon mit Offline-Captive-Portal, NFC, QR in Vollbild
+- Flutter-Web-Gäste (trackerfrei auf Codeberg Pages, Berlin) chatten E2E
+  im Browser – ohne Download, Registrierung, Telefon oder E-Mail;
+  Sitzungen zerstören sich nach 24–48 h selbst
+- Same-Train-Matching über Zug-WLAN-Erkennung (BSSID) und
+  Geschwindigkeits-/Vektor-Abgleich; Live-Strecken-Board auf
+  `wisp.app/live` mit Waggon-Angabe und Merkmalen
+
 ---
 
 ## Hinweis zum Entwicklungsstand
 
-Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.7.3). Folgende Bereiche sind noch nicht final:
+Diese App befindet sich in aktiver Entwicklung (aktuelle Version 0.8.0). Folgende Bereiche sind noch nicht final:
 
 - **Automatischer Gesichtsabgleich** (Profilbild vs. Verifizierungs-Video) → z. B. selbstgehostete Open-Source-Modelle wie DeepStack oder Face Recognition (selbst gehostet, datenschutzfreundlich, EU-fähig)
-- **NSFW-Bild-Moderation** – *melde-basiert umgesetzt*: Chat-Bilder werden nie beim Senden gescannt (E2E), sondern erst bei einer Meldung durch den Empfänger automatisch per NSFW-KI geprüft (Edge Function `report-image`, NSFW-Klassifikator; `HF_API_TOKEN` als Function-Secret konfigurierbar). Der Meldende erhält das KI-Ergebnis direkt und kann bei Widerspruch manuell eskalieren - in beiden Fällen gehen Bild, Report und KI-Ergebnis per E-Mail an das Team. **Noch offen:** automatische Profilbild-Prüfung beim Upload und automatische Account-Sperre bei Wiederholungsverstößen (derzeit manuell).
+- **NSFW-Bild-Moderation** – Profilbilder werden seit 0.8.0 **on-device** geprüft (gebündeltes ONNX-Modell; das Bild verlässt bei Nichtbestehen das Gerät nicht, Einspruch mit Team-Review möglich; die Schwellwert-Praxis braucht noch Abgleich mit echten Fällen). Chat-Bilder werden weiterhin nie beim Senden gescannt (E2E), sondern erst bei einer Meldung durch den Empfänger per NSFW-KI geprüft (Edge Function `report-image`). **Noch offen:** automatische Account-Sperren bei Wiederholungsverstößen (derzeit manuell).
+- **i18n-Rest**: Die App ist zweisprachig; einzelne ältere/harte UI-Strings (u. a. einige Altersfilter- und Einrichtungstexte) stehen noch nicht im L10n-Katalog
 - **Applogo & Branding** – *in Arbeit*: Alle Assets stammen aus einer einzigen Quelldatei (`wispdating_icon_base.png`); Feinschliff (Größen, Masken, Farbwelt-Abstimmung) folgt.
 - **Fake-Account-Erkennung per Standort** – *teilweise umgesetzt*: Vorhanden sind Datenmodell und Manipulationsschutz (Verifizierungs-Felder sind clientseitig nicht schreibbar), Edge Functions mit Plausibilitätsprüfung (unrealistische Positionswechsel >15 km bzw. >300 km/h werden als verdächtig markiert) und eine lokale verschlüsselte Speicherung. **Noch offen:** der serverseitige Abgleich, ob an derselben Position bereits andere Accounts existieren, die Validierung von GPS gegen das angegebene Bundesland/Land, eine Admin-Ansicht zur Prüfung markierter Accounts sowie Konsequenzen (z. B. Einschränkungen bei Verdacht).
 

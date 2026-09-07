@@ -11,6 +11,7 @@ import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
 import 'package:wisp/services/app_auth_service.dart';
 import 'package:wisp/services/auth_service.dart';
+import 'package:wisp/services/device_session_service.dart';
 import 'package:wisp/services/encryption_service.dart';
 import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/mfa_service.dart';
@@ -145,6 +146,19 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // lassen (getToken kann auf Geräten ohne Google-Dienste hängen).
       unawaited(_syncFcmToken());
 
+      // Geräte-Registrierung ("Wo bin ich eingeloggt?", Migration 071):
+      // Dieses Gerät in auth_devices anlegen bzw. last_seen auffrischen.
+      // Best effort mit Timeout - darf den Sync nie blockieren.
+      unawaited(
+        _ref
+            .read(deviceSessionServiceProvider)
+            .enrollCurrentDevice()
+            .timeout(const Duration(seconds: 8))
+            .catchError((Object e) {
+          debugPrint('[AuthNotifier] Geräte-Registrierung fehlgeschlagen: $e');
+        }),
+      );
+
       // Audit H-7/E-3: Eigenes PreKey-Bundle veröffentlichen, falls noch
       // keines existiert (sonst schlägt jeder E2E-Session-Aufbau durch
       // Dritte fehl). Hintergrund, blockiert den Sync nicht.
@@ -175,6 +189,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
       // Setup-Flags-Fetch (unten) nicht überspringen - sonst erscheint die
       // Einrichtung nach Neuinstallation erneut, obwohl der Server sie als
       // abgeschlossen hat.
+      //
+      // Serverseitige Themefarbe (Migration 071) - außerhalb der try-
+      // Blöcke deklariert, weil der Flags-Sync unten sie übernimmt.
+      String? serverThemeName;
       try {
         final profile = await database
             .fetchOwnProfile()
@@ -215,6 +233,18 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
           if (sMin != null && sMax != null) {
             await _ref.read(settingsProvider.notifier).setAgeRange(sMin, sMax);
           }
+          // Entfernung auch in die AppSettings spiegeln (u. a. Dating
+          // Hour liest sie von dort) - war bisher nur lokal, wurde also
+          // nach Neuinstallation auf den Default zurückgesetzt.
+          final sDist = (prefsMap['max_distance_km'] as num?)?.toInt();
+          if (sDist != null) {
+            await _ref
+                .read(settingsProvider.notifier)
+                .setMaxDistanceKm(sDist);
+          }
+          // Themefarbe (Migration 071): Mit dem Login direkt wieder
+          // anwenden - auch nach Neuinstallation.
+          serverThemeName = prefsMap['theme_name'] as String?;
         }
       } catch (e) {
         debugPrint('[AuthNotifier] Präferenz-Sync fehlgeschlagen: $e');
@@ -244,6 +274,29 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
               personalityTestCompleted:
                   flags['personality_test_completed'] == true,
               onboardingDone: flags['onboarding_done'] == true,
+              // Dating-Hour-Regeln nur EINMAL zeigen (Migration 071):
+              // Der Stand hängt am Konto, nicht an der Installation.
+              datingHourIntroSeen:
+                  flags['dating_hour_intro_seen'] == true,
+              // Themefarbe (Migration 071): null/leer = Server kennt keine
+              // Farbe -> lokaler Stand bleibt.
+              themeName: serverThemeName,
+            );
+        // UI-Einstellungen (Blind Mode, Sichtbarkeit, Notify-Schalter,
+        // Dark Mode, Blur) aus profiles.ui_prefs übernehmen (v0.8.0).
+        final uiPrefs =
+            flags['ui_prefs'] is Map ? Map<String, dynamic>.from(flags['ui_prefs'] as Map) : null;
+        if (uiPrefs != null) {
+          await _ref
+              .read(settingsProvider.notifier)
+              .applyServerUiPrefs(uiPrefs);
+        }
+        // Pausenmodus + Habit-Dealbreaker (Migration 076): Server gewinnt.
+        await _ref.read(settingsProvider.notifier).applyServerFlags(
+              paused: flags['paused'] is bool ? flags['paused'] as bool : null,
+              habitsDealbreaker: flags['habits_dealbreaker'] is bool
+                  ? flags['habits_dealbreaker'] as bool
+                  : null,
             );
 
         // Selbstheilung (Fix "Einrichtung erscheint erneut"): Lokale
@@ -389,7 +442,36 @@ class AuthNotifier extends StateNotifier<AsyncValue<bool>> {
     }
   }
 
+  /// Anmeldung per Passkey (WebAuthn) - Spiegel von [login], damit der
+  /// Passkey-Pfad IDENTISCHE Nachläufe hat wie die Passwort-Anmeldung:
+  /// Ladezustand (Ladekreis im Login-Screen), Aufräumen der Registrierungs-
+  /// Zwischnspeicher und der Server-Sync (Profil, Präferenzen, Flags).
+  /// Vorher lief der Passkey-Pfad nur über den Event-Listener ohne diese
+  /// Schritte - Profildaten blieben nach der Anmeldung leer.
+  Future<void> loginWithPasskey({String? captchaToken}) async {
+    if (kDebugMode) {
+      debugPrint('[AuthNotifier] loginWithPasskey() aufgerufen');
+    }
+    state = const AsyncValue.loading();
+    try {
+      await _auth.loginWithPasskey(captchaToken: captchaToken);
+      _ref.read(pendingVerificationEmailProvider.notifier).state = null;
+      _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;
+      state = const AsyncValue.data(true);
+      unawaited(_syncFromServer());
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] loginWithPasskey() FEHLER: $e');
+      }
+      state = AsyncValue.error(e, st);
+      rethrow; // Fehler an den Login-Screen durchreichen
+    }
+  }
+
   Future<void> logout() async {
+    // Eigenen Geräte-Eintrag entfernen (Best effort, VOR dem Abmelden -
+    // danach gibt es keine gültige Session mehr für den Aufruf).
+    await _ref.read(deviceSessionServiceProvider).deregisterCurrentDevice();
     await _auth.logout();
     _ref.read(pendingVerificationEmailProvider.notifier).state = null;
     _ref.read(pendingVerificationCredentialsProvider.notifier).state = null;

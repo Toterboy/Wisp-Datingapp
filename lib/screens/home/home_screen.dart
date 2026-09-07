@@ -13,6 +13,7 @@ import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/widgets/buttons.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// Start-/Dashboard-Screen ("Aktuelles") mit drei Bereichen:
 /// - Neue Nachrichten (bis 5 Einträge mit Vorschau)
@@ -51,7 +52,7 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            tooltip: 'Einstellungen & Privatsphäre',
+            tooltip: L10n.t(context, 'home.settingsTooltip'),
             // P: push() statt go(), damit "Zurück" in den Einstellungen
             // exakt zum aufrufenden Screen (Aktuelles) zurückkehrt.
             onPressed: () => context.push(AppRoutes.settings),
@@ -166,9 +167,9 @@ Widget _buildMessagesSection(
           ),
           const SizedBox(height: 12),
           if (matchesWithMessages.isEmpty)
-            const SizedBox(
-              width: double.infinity,
-              child: _EmptyStateCard(
+SizedBox(
+width: double.infinity,
+child: _EmptyStateCard(
                 icon: Icons.chat_bubble_outline,
                 title: 'Keine neuen Nachrichten',
                 subtitle: 'Wenn du Funken hast, erscheinen hier neue Nachrichten.',
@@ -307,12 +308,12 @@ Widget _buildLikesSection(
           ),
           const SizedBox(height: 12),
           if (likedCount == 0)
-            const SizedBox(
+            SizedBox(
               width: double.infinity,
-              child: _EmptyStateCard(
-                icon: Icons.favorite_border,
-                title: 'Keine neuen Likes',
-                subtitle: 'Lerne Leute über ihre Vorstellung kennen.',
+child: _EmptyStateCard(
+icon: Icons.favorite_border,
+title: L10n.t(context, 'home.noLikes'),
+                subtitle: L10n.t(context, 'home.discoverSub'),
               ),
             )
           else
@@ -386,12 +387,12 @@ Widget _buildMatchesSection(
           ),
           const SizedBox(height: 12),
           if (newMatches == 0)
-            const SizedBox(
+            SizedBox(
               width: double.infinity,
-              child: _EmptyStateCard(
-                icon: Icons.people_outline,
-                title: 'Keine neuen Funken',
-                subtitle: 'Likes führen zu Funken, wenn beide sich mögen.',
+child: _EmptyStateCard(
+icon: Icons.people_outline,
+title: L10n.t(context, 'home.noSparks'),
+                subtitle: L10n.t(context, 'home.likesSub'),
               ),
             )
           else

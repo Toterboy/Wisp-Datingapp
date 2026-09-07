@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,9 +9,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wisp/models/message.dart';
 import 'package:wisp/models/report_models.dart';
 import 'package:wisp/providers/profile_provider.dart';
+import 'package:wisp/services/image_safety_service.dart';
 import 'package:wisp/services/report_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// Ergebnis der Bild-Meldung mit KI-Vorprüfung.
 class ImageReportOutcome {
@@ -56,6 +60,8 @@ class ImageReportService {
     required String reason,
     String details = '',
     bool escalate = false,
+    List<String> contextMessages = const [],
+    double? localScore,
   }) async {
     if (!SupabaseService.isInitialized) {
       throw StateError('Melden derzeit nicht verfügbar (keine Verbindung).');
@@ -63,6 +69,12 @@ class ImageReportService {
     if (imageBase64.length > _maxBase64) {
       throw StateError('Bild ist zu groß für die Meldung.');
     }
+
+    // Pseudonymisierte Reporter-ID (SHA-256): Der Klartext-UUID geht nicht
+    // über die Kabel, das Moderations-Team kann Meldungen desselben
+    // Meldenden trotzdem als zusammengehörig erkennen.
+    final reporterIdSha256 =
+        sha256.convert(utf8.encode(AppConstants.currentUserId)).toString();
 
     final response = await SupabaseService.client.functions.invoke(
       'report-image',
@@ -72,6 +84,12 @@ class ImageReportService {
         'reason': reason,
         'details': details,
         'escalate': escalate,
+        'contextMessages': contextMessages,
+        'reporterIdSha256': reporterIdSha256,
+        // Lokales On-Device-Ergebnis (v0.8.0): nur Hinweis für das
+        // manuelle Team-Review - KEINE automatischen Kontosperren.
+        if (localScore != null)
+          'localAi': {'score': localScore},
       },
     );
 
@@ -110,6 +128,7 @@ Future<void> showImageReportDialog({
   required Message message,
   required String reportedUserId,
   required String reportedUserName,
+  List<String> contextMessages = const [],
 }) async {
   // Bild-Bytes aus der Data-URL extrahieren (mediaUrl = data:image/...;base64,<bytes>).
   final mediaUrl = message.mediaUrl ?? '';
@@ -133,9 +152,17 @@ Future<void> showImageReportDialog({
     );
     return;
   }
+  Uint8List localBytes = Uint8List(0);
+  try {
+    localBytes = Uint8List.fromList(base64Decode(imageBase64));
+  } catch (_) {
+    // Dekodierung fehlgeschlagen: lokale Prüfung überspringen, die
+    // Meldung selbst bleibt weiterhin möglich.
+  }
 
   ReportType? selectedType;
   final descriptionController = TextEditingController();
+  ImageSafetyResult? localResult;
 
   await showDialog<void>(
     context: context,
@@ -156,6 +183,14 @@ Future<void> showImageReportDialog({
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // LOKALE PRÜFUNG (v0.8.0): läuft auf dem Gerät, das Bild
+                // verlässt dafür NICHT das Gerät. Startet automatisch mit
+                // dem Öffnen dieses Meldedialogs (manueller Meldungs-Tap).
+                _LocalSafetyCheckSection(
+                  imageBytes: localBytes,
+                  onDone: (r) => localResult = r,
+                ),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -169,18 +204,17 @@ Future<void> showImageReportDialog({
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        Icons.smart_toy_outlined,
+                        Icons.info_outline,
                         size: 20,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Dieses Bild wird bei einer Meldung automatisch '
-                          'von einer KI auf unangemessene Inhalte geprüft. '
-                          'Du siehst das Ergebnis sofort. Das Bild, dein '
-                          'Report und das KI-Ergebnis gehen an unser Team. '
-                          'Chats sind sonst Ende-zu-Ende-verschlüsselt.',
+                          'Erst wenn du unten auf "Meldung absenden" tippst, '
+                          'wird dieses Bild zur manuellen Prüfung an unser '
+                          'Team übertragen. Bricht du ab, wird das Bild '
+                          'sofort verworfen und nichts gesendet.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
@@ -215,7 +249,7 @@ Future<void> showImageReportDialog({
                   controller: descriptionController,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    labelText: 'Zusätzliche Details (optional)',
+                    labelText: L10n.t(context, 'report.detailsOptional'),
                     hintText: 'Was ist passiert?',
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16)),
@@ -243,17 +277,162 @@ Future<void> showImageReportDialog({
                       reportedUserName: reportedUserName,
                       reason: selectedType!.label,
                       details: descriptionController.text.trim(),
+                      contextMessages: contextMessages,
+                      localScore: localResult?.criticalScore,
                     );
                   },
-            child: const Text('Absenden'),
+            child: const Text('Meldung absenden'),
           ),
         ],
       ),
     ),
   );
+  // Dialog geschlossen: Bild-Bytes aus dem Speicher verwerfen (Abbruch
+  // oder Versand - in beiden Fällen hält nichts mehr eine Referenz).
+  localBytes.fillByZero();
+  descriptionController.dispose();
+}
+
+extension _ZeroFill on Uint8List {
+  void fillByZero() {
+    for (var i = 0; i < length; i++) {
+      this[i] = 0;
+    }
+  }
+}
+
+/// Lokale Prüf-Sektion im Meldedialog (v0.8.0): Klassifiziert das Bild
+/// ON-DEVICE (das Bild verlässt dafür nicht das Gerät) und zeigt das
+/// Ergebnis transparent an. Startet automatisch mit dem Öffnen des
+/// Dialogs (der Meldungs-Tap ist die manuelle Auslösung).
+class _LocalSafetyCheckSection extends StatefulWidget {
+  const _LocalSafetyCheckSection({
+    required this.imageBytes,
+    required this.onDone,
+  });
+
+  final Uint8List imageBytes;
+  final ValueChanged<ImageSafetyResult?> onDone;
+
+  @override
+  State<_LocalSafetyCheckSection> createState() =>
+      _LocalSafetyCheckSectionState();
+}
+
+class _LocalSafetyCheckSectionState extends State<_LocalSafetyCheckSection> {
+  bool _checking = true;
+  ImageSafetyResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    final result =
+        await ImageSafetyService.instance.classifyImage(widget.imageBytes);
+    if (!mounted) return;
+    setState(() {
+      _result = result;
+      _checking = false;
+    });
+    widget.onDone(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.phone_iphone,
+                  size: 20, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Lokale Prüfung (auf diesem Gerät)',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_checking)
+            const Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Bild wird lokal analysiert…'),
+                ),
+              ],
+            )
+          else if (_result == null)
+            Text(
+              'Lokale Prüfung nicht verfügbar (Modell fehlt). Die Meldung '
+              'läuft über den serverseitigen Fallback.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else if (_result!.isFlagged)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    size: 20, color: scheme.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Dieses Bild wurde lokal als potenziell anstößig '
+                    'eingestuft (Score ${(_result!.criticalScore * 100).toStringAsFixed(0)} %).',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: scheme.error),
+                  ),
+                ),
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.check_circle_outline,
+                    size: 20, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Keine eindeutigen Verstöße lokal erkannt '
+                    '(Score ${(_result!.criticalScore * 100).toStringAsFixed(0)} %).',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Führt den KI-Check durch und zeigt das Ergebnis/Eskalations-Dialoge.
+/// [contextMessages]: letzte 3 Textnachrichten als Kontext für das Team.
+/// [localScore]: lokales On-Device-Ergebnis (falls verfügbar).
 Future<void> _runAiCheck({
   required BuildContext context,
   required WidgetRef ref,
@@ -262,6 +441,8 @@ Future<void> _runAiCheck({
   required String reportedUserName,
   required String reason,
   required String details,
+  List<String> contextMessages = const [],
+  double? localScore,
 }) async {
   // Parallel: Klassischen Report-Eintrag erzeugen (Admin-Sicht
   // „Meldungen"), damit die Bild-Meldung dort ebenfalls auftaucht.
@@ -283,16 +464,16 @@ Future<void> _runAiCheck({
   unawaited(showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => const PopScope(
+    builder: (ctx) => PopScope(
       canPop: false,
       child: AlertDialog(
-        title: Text('Bild wird geprüft…'),
+        title: Text(L10n.t(context, 'report.checkingTitle')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Die KI prüft das gemeldete Bild.'),
+            Text(L10n.t(context, 'report.checkingSub')),
           ],
         ),
       ),
@@ -306,6 +487,8 @@ Future<void> _runAiCheck({
           reportedUserId: reportedUserId,
           reason: reason,
           details: details,
+          contextMessages: contextMessages,
+          localScore: localScore,
         );
   } catch (e) {
     if (context.mounted && Navigator.of(context).canPop()) {
@@ -317,7 +500,7 @@ Future<void> _runAiCheck({
         builder: (ctx) => AlertDialog(
           title: const Text('Meldung fehlgeschlagen'),
           content: Text(
-            e is StateError ? e.message : 'Bitte später erneut versuchen.',
+            e is StateError ? e.message : L10n.t(context, 'report.retryLater'),
           ),
           actions: [
             TextButton(
@@ -344,7 +527,7 @@ Future<void> _runAiCheck({
             Icon(Icons.verified_user_outlined,
                 color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
-            const Expanded(child: Text('Meldung bestätigt')),
+            Expanded(child: Text(L10n.t(context, 'report.confirmed'))),
           ],
         ),
         content: Text(
@@ -392,7 +575,7 @@ Future<void> _runAiCheck({
         ),
         FilledButton(
           onPressed: () => Navigator.of(ctx).pop(true),
-          child: const Text('Zur manuellen Prüfung'),
+          child: Text(L10n.t(context, 'report.forwardBtn')),
         ),
       ],
     ),
@@ -409,6 +592,8 @@ Future<void> _runAiCheck({
           reason: reason,
           details: details,
           escalate: true,
+          contextMessages: contextMessages,
+          localScore: localScore,
         );
     if (context.mounted) {
       await showDialog<void>(
@@ -433,9 +618,9 @@ Future<void> _runAiCheck({
     if (kDebugMode) debugPrint('[ImageReport] Eskalation fehlgeschlagen: $e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content:
-              Text('Weiterleitung fehlgeschlagen. Bitte später erneut versuchen.'),
+              Text(L10n.t(context, 'report.forwardFailed')),
           behavior: SnackBarBehavior.floating,
         ),
       );

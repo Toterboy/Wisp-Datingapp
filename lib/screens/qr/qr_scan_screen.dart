@@ -11,6 +11,7 @@ import 'package:wisp/utils/peer_id.dart';
 // mobile_scanner: Kamera auf Mobile, Stub auf Web/Desktop.
 import 'package:mobile_scanner/mobile_scanner.dart'
     if (dart.library.html) 'package:wisp/utils/mobile_scanner_stub.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 enum _QrMode { choice, camera, manual }
 
@@ -65,7 +66,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
     if (profile != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Chat mit ${profile.name} wird geöffnet...'),
+          content: Text(L10n.tf(context, 'qr.openingChat', {'name': profile.name})),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -85,8 +86,8 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
     final code = _codeCtrl.text.replaceAll(' ', '').trim().toUpperCase();
     if (code.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bitte gib den vollständigen 8 stelligen Code ein.'),
+        SnackBar(
+          content: Text(L10n.t(context, 'qr.enterFullCode')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -118,8 +119,8 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
       debugPrint('[QrScan] Code-Auflösung fehlgeschlagen: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Code konnte nicht aufgelöst werden.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'qr.resolveFailed')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -159,7 +160,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
               child: ListTile(
                 leading: const Icon(Icons.qr_code_2),
                 title: const Text('Meinen QR Code zeigen'),
-                subtitle: const Text('Damit andere dich finden können'),
+                subtitle: Text(L10n.t(context, 'qr.shareSub')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push(AppRoutes.qrProfile),
               ),
@@ -169,7 +170,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
               child: ListTile(
                 leading: const Icon(Icons.qr_code_scanner),
                 title: const Text('QR Code scannen'),
-                subtitle: const Text('Kamera öffnen und Code einscannen'),
+                subtitle: Text(L10n.t(context, 'qr.scanSub')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => setState(() => _mode = _QrMode.camera),
               ),

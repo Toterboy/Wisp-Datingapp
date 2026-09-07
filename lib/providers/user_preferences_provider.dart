@@ -1,3 +1,4 @@
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -152,6 +153,25 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
 
   static const _prefsKey = 'user_preferences';
 
+  /// Debounce-Timer für den automatischen Präferenz-Sync: Regler feuern
+  /// beim Ziehen kontinuierlich - erst wenn 1,5 s Ruhe ist, geht EIN
+  /// Schreibvorgang an den Server ("Suchradius gespeichert wie der Name",
+  /// auch ohne Speichern-Knopf).
+  Timer? _serverSyncDebounce;
+
+  /// Plant den serverseitigen Präferenz-Sync (entprellt). Optionale
+  /// [ageRangeMin]/[ageRangeMax] werden mitgeschickt, wenn der Aufrufer
+  /// (z. B. Altersspannen-Regler) gerade auch die Spanne geändert hat.
+  void queueServerSync({int? ageRangeMin, int? ageRangeMax}) {
+    _serverSyncDebounce?.cancel();
+    _serverSyncDebounce = Timer(const Duration(milliseconds: 1500), () {
+      unawaited(savePreferencesToServer(
+        ageRangeMin: ageRangeMin,
+        ageRangeMax: ageRangeMax,
+      ));
+    });
+  }
+
   Future<void> _load() async {
     // Migration: alten Klartext-Eintrag in den sicheren Speicher übernehmen.
     final storage = _storage;
@@ -193,6 +213,7 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
   Future<void> setGenderPreferences(List<String> values) async {
     state = state.copyWith(genderPreferences: values);
     await _persist();
+    queueServerSync();
   }
 
   /// Schaltet ein einzelnes Geschlecht um.
@@ -232,26 +253,34 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
   Future<void> setDistanceFilterMode(DistanceFilterMode mode) async {
     state = state.copyWith(distanceFilterMode: mode);
     await _persist();
+    queueServerSync();
   }
 
   Future<void> setMaxDistanceKm(int km) async {
     state = state.copyWith(maxDistanceKm: km);
     await _persist();
+    // Suchradius sofort (entprellt) serverseitig sichern - der Nutzer
+    // erwartet, dass die Entfernung wie der Name dauerhaft gespeichert
+    // wird.
+    queueServerSync();
   }
 
   Future<void> setPreferredState(String? stateCode) async {
     state = state.copyWith(preferredState: stateCode);
     await _persist();
+    queueServerSync();
   }
 
   Future<void> setLocation(String? location) async {
     state = state.copyWith(location: location);
     await _persist();
+    queueServerSync();
   }
 
   Future<void> setRelationshipType(RelationshipType? type) async {
     state = state.copyWith(relationshipType: type);
     await _persist();
+    queueServerSync();
   }
 
   /// Übernimmt Präferenzen aus dem Server-Profil (nach Login/Neuinstallation).

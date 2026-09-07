@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisp/services/auth_exception.dart';
+import 'package:wisp/services/avatar_crypto.dart';
 import 'package:wisp/services/supabase_service.dart';
 
 /// Service für private Avatar-Speicherung in Supabase Storage.
@@ -12,8 +13,11 @@ import 'package:wisp/services/supabase_service.dart';
 /// - Der Bucket `avatars` ist privat (public = false).
 /// - Clientseitig wird NUR der Pfad `{userId}/avatar.jpg` verwendet.
 /// - Der Upload nutzt die standard PostgREST-Insert-Route auf `storage.objects`.
-/// - Anzeige erfolgt AUSSCHLIESSLICH über temporäre signierte URLs
-///   (`createSignedUrl`), nie über öffentliche URLs.
+/// - Anzeige erfolgt über signierte URLs ODER (v0.8.1) verschlüsselt:
+///   Profilbilder werden clientseitig AES-256-GCM verschlüsselt, bevor
+///   sie den Server erreichen. Der Schlüssel steckt im `photos`-Eintrag
+///   (`path|key|iv`), der Download läuft über [loadAvatarBytes] mit
+///   lokaler Entschlüsselung.
 class SupabaseStorageService {
   SupabaseStorageService(this._client);
 
@@ -64,36 +68,65 @@ class SupabaseStorageService {
   /// Pfad für den aktuellen Nutzer: `{userId}/avatar.jpg`.
   String _avatarPathForUser(String userId) => '$userId/$_fileName';
 
-  /// Lädt ein Avatar-Bild hoch.
+  /// Lädt ein Avatar-Bild hoch (v0.8.1: AES-256-GCM-verschlüsselt).
   ///
-  /// [data] sind die rohen Bild-Bytes.
-  /// Der Pfad wird immer auf `{userId}/avatar.jpg` festgelegt.
-  /// Gibt den Storage-Pfad zurück, unter dem das Bild gespeichert wurde.
+  /// [data] sind die rohen Bild-Bytes. Sie werden VOR dem Upload
+  /// verschlüsselt - der Server sieht nie das Klartext-Bild. Der Pfad
+  /// bleibt `{userId}/avatar.jpg`; der Zufalls-Schlüssel wird im
+  /// Rückgabewert (`path|key|iv`) mitgeführt und landet in
+  /// `profiles.photos`. Alte (Klartext-)Avatare bleiben mit
+  /// [loadAvatarBytes] lesbar (Fallback).
   Future<String> uploadAvatar(List<int> data) async {
     final userId = _currentUser?.id;
     if (userId == null) {
       throw AppException('Nicht eingeloggt.');
     }
 
+    final enc = AvatarCrypto.encrypt(Uint8List.fromList(data));
     final path = _avatarPathForUser(userId);
     if (kDebugMode) {
-      log('[SupabaseStorageService] Upload avatar: bucket=$_bucket size=${data.length}');
+      log('[SupabaseStorageService] Upload avatar (verschlüsselt): '
+          'bucket=$_bucket size=${enc.cipher.length}');
     }
 
     // upsert: Erneutes Hochladen (neues Bild) ueberschreibt das alte -
     // ohne upsert wuerde der zweite Upload mit 409 scheitern.
     await _client.storage.from(_bucket).uploadBinary(
           path,
-          Uint8List.fromList(data),
+          enc.cipher,
           fileOptions: const FileOptions(upsert: true),
         );
 
-    return path;
+    return AvatarCrypto.encodeRef(path, enc.keyB64, enc.ivB64);
+  }
+
+  /// Lädt ein Avatar herunter und entschlüsselt es lokal (v0.8.1).
+  ///
+  /// Akzeptiert sowohl verschlüsselte Einträge (`path|key|iv`) als auch
+  /// Legacy-Klartext-Pfade. Liefert die BILD-BYTES (keine URL!) - der
+  /// Aufrufer zeigt sie mit `Image.memory`/`MemoryImage` an.
+  Future<Uint8List?> loadAvatarBytes(String ref) async {
+    try {
+      final parsed = AvatarCrypto.parseRef(ref);
+      final path = parsed?.path ?? AvatarCrypto.pathOf(ref);
+      final data =
+          await _client.storage.from(_bucket).download(path);
+      if (parsed == null) return data; // Legacy: Klartext.
+      return AvatarCrypto.decrypt(data, parsed.key, parsed.iv);
+    } catch (e) {
+      if (kDebugMode) {
+        log('[SupabaseStorageService] Avatar-Download/Entschlüsselung '
+            'fehlgeschlagen: $e');
+      }
+      return null;
+    }
   }
 
   /// Erzeugt eine temporäre signierte URL für den angegebenen Storage-Pfad.
   ///
   /// Gültigkeit: 3600 Sekunden. Die URL ist nur mit aktiver Session gültig.
+  /// (NUR noch für Intro-Audio u. ä. - Profilbilder laufen über
+  /// [loadAvatarBytes], weil sie verschlüsselt sind.)
   Future<String?> getSignedAvatarUrl(String path) async {
     if (kDebugMode) {
       log('[SupabaseStorageService] Request signed URL: bucket=$_bucket');

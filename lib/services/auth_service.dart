@@ -169,6 +169,14 @@ class AuthService implements AppAuthService {
     return _hash(salt, email, password) == parts[1];
   }
 
+  /// Passkey-Anmeldung ist im Demo-Modus (lokaler Mock) nicht verfügbar -
+  /// WebAuthn benötigt einen Server für Challenge/Verifikation.
+  @override
+  Future<void> loginWithPasskey({String? captchaToken}) async {
+    throw AppException(
+        'Passkey-Anmeldung ist im Demo-Modus nicht verfügbar.');
+  }
+
   /// Logout - entfernt die Session lokal.
   @override
   Future<void> logout() async {

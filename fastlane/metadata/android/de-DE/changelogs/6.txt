@@ -1,0 +1,11 @@
+Neu:
+- Angemeldete Geraete einsehen und sich ueberall ausloggen (Einstellungen)
+- Themefarbe bleibt am Konto gespeichert (ueberlebt Neuinstallation)
+- Entfernung und Altersspanne werden nach Login/Neuinstallation wiederhergestellt
+
+Behoben:
+- Altersspannen-Regler bei 18-18 eingefroren (bewegten sich nicht)
+- Speichern-Nachfrage im Profil-Editor kam bei Reglern/Dropdowns nie
+- Weisses Viereck bei Benachrichtigungen (Icon-Alpha)
+- Passkey-Erstellen ("Anfrage abgebrochen" / "credential verification failed")
+- Dating-Hour-Regeln erscheinen nur noch einmal pro Konto

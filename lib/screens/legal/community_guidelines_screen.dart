@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// Screen mit den Community-Regeln (Netiquette) der App.
 class CommunityGuidelinesScreen extends StatelessWidget {
@@ -57,7 +58,7 @@ class CommunityGuidelinesScreen extends StatelessWidget {
               context.go(AppRoutes.settings);
             }
           },
-          tooltip: 'Zurück',
+          tooltip: L10n.t(context, 'common.back'),
         ),
         title: const Text('Community Regeln'),
       ),

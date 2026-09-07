@@ -16,6 +16,7 @@ import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/widgets/funke_overlay.dart';
 import 'package:wisp/utils/constants.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// Zufallschat: echtes Matching über die Supabase-Warteschlange
 /// (Migration 032) und E2E-verschlüsselter Chat über den P2P-DataChannel.
@@ -304,14 +305,14 @@ class _RandomChatScreenState extends ConsumerState<RandomChatScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text('Chat beendet'),
-        content: const Text('Dein Gesprächspartner hat den Zufallschat verlassen.'),
+        content: Text(L10n.t(context, 'random.partnerLeft')),
         actions: [
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               if (mounted) context.go(AppRoutes.swipeModeSelection);
             },
-            child: const Text('Zurück zu Entdecken'),
+            child: Text(L10n.t(context, 'random.backToDiscover')),
           ),
         ],
       ),
@@ -537,15 +538,15 @@ class _ConnectingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 24),
-            Text('Partner gefunden! Verbinde verschlüsselt…'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 24),
+            Text(L10n.t(context, 'random.connecting')),
           ],
         ),
       ),

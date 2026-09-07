@@ -30,12 +30,36 @@ void main(List<String> args) {
       interpolation: img.Interpolation.average,
     );
   }
+  // WICHTIG: Sicherstellen, dass das Bild einen Alpha-Kanal hat. Ohne
+  // numChannels: 4 (bzw. bei opaken Quellen) entstaende ein volles 96x96
+  // weisses Quadrat -> Statusleiste zeigt ein weisses VIERECK.
+  if (work.numChannels < 4) {
+    work = work.convert(numChannels: 4);
+  }
 
-  // Alle Pixel auf weiss stellen, Alpha-Maske behalten => Silhouette.
+  // Vollstaendig opake Quelle (alpha ueberall 255)? Dann gibt es keine
+  // Silhouette - Alpha aus der Luminanz ableiten: dunkle Pixel (Badge/
+  // Schriftzug) werden opak weiss, helle Flaechen transparent.
+  var hasTransparency = false;
+  for (final p in work) {
+    if (p.a < 250) {
+      hasTransparency = true;
+      break;
+    }
+  }
   for (var y = 0; y < work.height; y++) {
     for (var x = 0; x < work.width; x++) {
       final p = work.getPixel(x, y);
-      work.setPixelRgba(x, y, 255, 255, 255, p.a);
+      if (hasTransparency) {
+        // Alpha-Maske behalten => Silhouette.
+        work.setPixelRgba(x, y, 255, 255, 255, p.a);
+      } else {
+        // Luminanz-Fallback: 0.2126 R + 0.7152 G + 0.0722 B.
+        final lum =
+            0.2126 * p.r + 0.7152 * p.g + 0.0722 * p.b;
+        final alpha = (255 - lum).round().clamp(0, 255);
+        work.setPixelRgba(x, y, 255, 255, 255, alpha);
+      }
     }
   }
 

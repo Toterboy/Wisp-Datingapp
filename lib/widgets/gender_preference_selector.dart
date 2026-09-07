@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisp/models/gender.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
@@ -66,7 +67,7 @@ class GenderPreferenceSelector extends ConsumerWidget {
         ),
         for (final gender in Gender.values)
           FilterChip(
-            label: Text(gender.label),
+            label: Text(L10n.t(context, gender.labelKey)),
             selected: selected.contains(gender.value),
             onSelected: (_) {
               final current = List<String>.from(selected);

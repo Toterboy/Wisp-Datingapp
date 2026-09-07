@@ -91,6 +91,8 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
     HabitudeLevel? smoking,
     HabitudeLevel? alcohol,
     HabitudeLevel? drugs,
+    List<String>? musicLiked,
+    List<String>? musicDisliked,
     bool clearIntroAudio = false,
   }) async {
     state = state.copyWith(
@@ -112,6 +114,8 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
       smoking: smoking,
       alcohol: alcohol,
       drugs: drugs,
+      musicLiked: musicLiked,
+      musicDisliked: musicDisliked,
       clearIntroAudio: clearIntroAudio,
     );
     await _persist();

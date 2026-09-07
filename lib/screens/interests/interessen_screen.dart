@@ -13,6 +13,7 @@ import 'package:wisp/widgets/funke_overlay.dart';
 import 'package:wisp/widgets/funke_streak.dart';
 import 'package:wisp/widgets/intro_audio_player.dart';
 import 'package:wisp/widgets/states.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// Reiter "Interessen" mit drei Bereichen:
 ///   1. Eigene Likes (noch kein Match)
@@ -49,6 +50,8 @@ class _InteressenScreenState extends ConsumerState<InteressenScreen>
         title: const Text('Interessen'),
         bottom: TabBar(
           controller: _tabController,
+          // Abgerundete Klick-Animation (kein eckiger Aufblitzer).
+          splashBorderRadius: const BorderRadius.all(Radius.circular(24)),
           tabs: const [
             Tab(text: 'Eigene Likes'),
             Tab(text: 'Erhaltene Likes'),
@@ -113,7 +116,7 @@ class _OwnLikesTabState extends ConsumerState<_OwnLikesTab> {
       if (mounted) {
         setState(() => _likes.removeWhere((l) => l.likeId == like.likeId));
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Like zurückgezogen.')),
+          SnackBar(content: Text(L10n.t(context, 'interests.likeWithdrawn'))),
         );
       }
     } catch (e) {
@@ -166,7 +169,7 @@ class _OwnLikesTabState extends ConsumerState<_OwnLikesTab> {
                     ].join(' · ')),
                     trailing: IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
-                      tooltip: 'Like zurückziehen',
+                      tooltip: L10n.t(context, 'interests.likeWithdrawTooltip'),
                       onPressed: () => _removeLike(like),
                     ),
                   ),
@@ -264,7 +267,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
         title: 'Noch keine erhaltenen Likes',
         message:
             'Sobald dich jemand über seine Vorstellung mag, erscheint er hier '
-            'und du entscheidest über Match oder Ablehnung.',
+            'und du entscheidest über Funke oder Ablehnung.',
       );
     }
     return RefreshIndicator(
@@ -334,7 +337,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
                                       strokeWidth: 2),
                                 )
                               : const Icon(Icons.favorite),
-                          label: const Text('Match bestätigen'),
+                          label: Text(L10n.t(context, 'interests.sparkConfirmBtn')),
                         ),
                       ),
                     ],
@@ -364,6 +367,10 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
   List<MatchWithState> _serverMatches = [];
   bool _loading = true;
 
+  /// Chats verwalten (v0.8.0): Mehrfachauswahl + "Aus Liste entfernen".
+  bool _selectMode = false;
+  final Set<int> _selected = {};
+
   @override
   void initState() {
     super.initState();
@@ -382,11 +389,82 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
     }
   }
 
+  void _toggleSelect(int matchId) {
+    setState(() {
+      if (!_selected.add(matchId)) {
+        _selected.remove(matchId);
+      }
+      if (_selected.isEmpty) _selectMode = false;
+    });
+  }
+
+  Future<void> _hideSelected() async {
+    final service = ref.read(findYourMatchServiceProvider);
+    var failed = 0;
+    for (final id in _selected) {
+      try {
+        await service.hideMatch(id);
+      } catch (e) {
+        debugPrint('[Interessen] hide fehlgeschlagen ($id): $e');
+        failed++;
+      }
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(failed == 0
+              ? '${_selected.length} Chat(s) aus der Liste entfernt.'
+              : '$failed von ${_selected.length} konnten nicht entfernt '
+                  'werden. Bitte erneut versuchen.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    setState(() {
+      _selected.clear();
+      _selectMode = false;
+    });
+    _load();
+  }
+
+  /// "Re-Funke ohne Druck": gekühlte Verbindung mit einem Tap reaktivieren.
+  Future<void> _respark(MatchWithState match) async {
+    try {
+      await ref.read(findYourMatchServiceProvider).resparkMatch(match.matchId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(L10n.tf(context, 'interests.resparkDone', {'name': match.partner.name})),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Re-Funke fehlgeschlagen. Bitte erneut versuchen.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // QR-Kontakte sind nur lokal gespeichert (kein DB-Match).
     final qrContacts =
         ref.watch(chatProvider).where((m) => m.isQrContact).toList();
+
+    // v0.8.0: aktive Funken oben, gekühlte ("Erschlossene Funken") unten -
+    // ohne Countdown, ohne Ablauf-Benachrichtigung, ohne Verlängerungsdruck.
+    final activeMatches =
+        _serverMatches.where((m) => m.status == 'active').toList();
+    final cooledMatches =
+        _serverMatches.where((m) => m.status == 'cooled').toList();
 
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -406,6 +484,40 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
+          if (_serverMatches.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Row(
+                children: [
+                  if (_selectMode) ...[
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _selected.clear();
+                          _selectMode = false;
+                        });
+                      },
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Abbrechen'),
+                    ),
+                    const Spacer(),
+                    FilledButton.icon(
+                      onPressed: _selected.isEmpty ? null : _hideSelected,
+                      icon: const Icon(Icons.visibility_off, size: 18),
+                      label: Text('Ausblenden (${_selected.length})'),
+                    ),
+                  ] else ...[
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _selectMode = true),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Verwalten'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           if (qrContacts.isNotEmpty) ...[
             const _SectionHeader(
               icon: Icons.qr_code_2,
@@ -428,24 +540,94 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
             const SizedBox(height: 8),
             const Divider(indent: 16, endIndent: 16),
           ],
-          if (_serverMatches.isNotEmpty) ...[
+          if (activeMatches.isNotEmpty) ...[
+_SectionHeader(
+icon: Icons.favorite,
+title: L10n.t(context, 'interests.sparksTitle'),
+subtitle: L10n.t(context, 'interests.matchesSub'),
+),
+            ...activeMatches.map((m) {
+              if (_selectMode) {
+                return CheckboxListTile(
+                  value: _selected.contains(m.matchId),
+                  onChanged: (_) => _toggleSelect(m.matchId),
+                  title: Text('${m.partner.name}, ${m.partner.age ?? '?'}'),
+                  secondary: const Icon(Icons.chat_bubble_outline),
+                );
+              }
+              return _MatchTile(
+                match: m,
+                onTap: () {
+                  if (m.quizGated) {
+                    context.go(AppRoutes.quizPath(m.matchId));
+                  } else {
+                    context.go(AppRoutes.chatDetailPath(m.matchId.toString()));
+                  }
+                },
+              );
+            }),
+          ],
+          // "Erschlossene Funken" (v0.8.0): gekühlte Verbindungen, ganz
+          // unten. KEIN Countdown, KEINE Ablauf-Benachrichtigung, KEINE
+          // "jetzt verlängern!"-Aktion - nur der freiwillige Re-Funke.
+          if (cooledMatches.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Divider(indent: 16, endIndent: 16),
             const _SectionHeader(
-              icon: Icons.favorite,
-              title: 'Funken',
-              subtitle: 'Bestätigte gegenseitige Likes',
+              icon: Icons.archive_outlined,
+              title: 'Erschlossene Funken',
+              subtitle:
+                  'Ruhig beendet - ohne Druck, jederzeit wieder entzündbar',
             ),
-            ..._serverMatches.map((m) => _MatchTile(
+            ...cooledMatches.map((m) => _CooledMatchTile(
                   match: m,
-                  onTap: () {
-                    if (m.quizGated) {
-                      context.go(AppRoutes.quizPath(m.matchId));
-                    } else {
-                      context.go(AppRoutes.chatDetailPath(m.matchId.toString()));
-                    }
-                  },
+                  onOpen: m.quizGated
+                      ? () => context.go(AppRoutes.quizPath(m.matchId))
+                      : () =>
+                          context.go(AppRoutes.chatDetailPath(m.matchId.toString())),
+                  onRespark: () => _respark(m),
                 )),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Kachel für "Erschlossene Funken" (status = cooled): gedimmt, mit
+/// Re-Funke-Button (ein Tap, ohne Frist, ohne Benachrichtigung).
+class _CooledMatchTile extends StatelessWidget {
+  const _CooledMatchTile({
+    required this.match,
+    required this.onOpen,
+    required this.onRespark,
+  });
+
+  final MatchWithState match;
+  final VoidCallback onOpen;
+  final VoidCallback onRespark;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = match.partner;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest
+          .withValues(alpha: 0.5),
+      child: ListTile(
+        onTap: onOpen,
+        leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+        title: Text('${p.name}, ${p.age ?? '?'}'),
+        subtitle: Text(
+          p.bio.isNotEmpty ? p.bio : 'Keine Bio',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: FilledButton.tonalIcon(
+          onPressed: onRespark,
+          icon: const Icon(Icons.local_fire_department, size: 18),
+          label: const Text('Re-Funke'),
+        ),
       ),
     );
   }

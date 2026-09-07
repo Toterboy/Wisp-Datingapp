@@ -27,6 +27,7 @@ import 'package:wisp/screens/onboarding/personality_test_screen.dart';
 import 'package:wisp/screens/onboarding/settings_privacy_once_screen.dart';
 import 'package:wisp/screens/mood/mood_picker_screen.dart';
 import 'package:wisp/screens/privacy/privacy_screen.dart';
+import 'package:wisp/screens/settings/devices_screen.dart';
 import 'package:wisp/screens/profile/profile_edit_screen.dart';
 import 'package:wisp/screens/profile/profile_screen.dart';
 import 'package:wisp/screens/settings/settings_screen.dart';
@@ -88,6 +89,8 @@ class AppRoutes {
   // Datenschutz & Account (DSGVO)
   static const String privacy = '/privacy';
   static const String safetyCenter = '/safety-center';
+  // Geräte & Sitzungen ("Wo bin ich eingeloggt?")
+  static const String devices = '/devices';
   // Dating Hour (Event-Modus)
   static const String datingHourEvent = '/dating-hour';
   static const String datingHourPreferences = '/dating-hour/preferences';
@@ -541,6 +544,11 @@ routes: [
       GoRoute(
         path: AppRoutes.safetyCenter,
         builder: (context, state) => const SafetyCenterScreen(),
+      ),
+      // Geräte & Sitzungen ("Wo bin ich eingeloggt?" + Überall-Abmelden)
+      GoRoute(
+        path: AppRoutes.devices,
+        builder: (context, state) => const DevicesScreen(),
       ),
       // Dating Hour (Event-Modus) - Vollbild-Routen ohne Navigator-Stack:
       // Zurück-Geste führt jeweils zur Seite davor statt App-Exit.

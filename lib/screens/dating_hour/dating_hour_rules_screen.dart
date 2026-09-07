@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/notification_service.dart';
 
@@ -12,44 +13,40 @@ import 'package:wisp/services/notification_service.dart';
 class DatingHourRulesScreen extends ConsumerWidget {
   const DatingHourRulesScreen({super.key});
 
-  static const _rules = <_RuleItem>[
-    _RuleItem(
-      'Respektvoll bleiben',
-      'Behandele deinen Gegenüber mit Respekt. Keine Beleidigungen, '
-      'Diskriminierung oder unerwünschte Nachrichten.',
-    ),
-    _RuleItem(
-      'Keine persönlichen Daten teilen',
-      'Gib keine Adressen, Telefonnummern oder Kontodetails preis. '
-      'Bleibt zunächst in der App.',
-    ),
-    _RuleItem(
-      'Ehrliches Profil',
-      'Nutze nur echte Angaben und aktuelle Bilder. Fake Profile oder '
-      'Identitätsdiebstahl werden gemeldet.',
-    ),
-    _RuleItem(
-      '5 Minuten Regel',
-      'Jeder Chat dauert maximal 5 Minuten. Danach entscheidest du, ob '
-      'du das Match verlängern möchtest.',
-    ),
-    _RuleItem(
-      'Keine unerwünschten Bilder',
-      'Sende keine intimen Bilder oder unerwünschten Content. '
-      'Verstöße führen zur sofortigen Sperrung.',
-    ),
-    _RuleItem(
-      'Minderjährigenschutz',
-      'Die Dating Hour ist erst ab 16 Jahren freigegeben. '
-      'Jüngere Nutzer werden automatisch ausgeschlossen.',
-    ),
-  ];
+  /// Die 6 Kernregeln (v0.8.0 zweisprachig über L10n-Keys).
+  List<_RuleItem> _rules(BuildContext context) => [
+        _RuleItem(
+          L10n.t(context, 'dh.rules.1.title'),
+          L10n.t(context, 'dh.rules.1.body'),
+        ),
+        _RuleItem(
+          L10n.t(context, 'dh.rules.2.title'),
+          L10n.t(context, 'dh.rules.2.body'),
+        ),
+        _RuleItem(
+          L10n.t(context, 'dh.rules.3.title'),
+          L10n.t(context, 'dh.rules.3.body'),
+        ),
+        _RuleItem(
+          L10n.t(context, 'dh.rules.4.title'),
+          L10n.t(context, 'dh.rules.4.body'),
+        ),
+        _RuleItem(
+          L10n.t(context, 'dh.rules.5.title'),
+          L10n.t(context, 'dh.rules.5.body'),
+        ),
+        _RuleItem(
+          L10n.t(context, 'dh.rules.6.title'),
+          L10n.t(context, 'dh.rules.6.body'),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final rules = _rules(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dating Hour Regeln'),
+        title: Text(L10n.t(context, 'dh.rules.title')),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -57,12 +54,11 @@ class DatingHourRulesScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Bitte lies diese Regeln aufmerksam durch, bevor du '
-              'an der Dating Hour teilnimmst.',
+              L10n.t(context, 'dh.rules.introLong'),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
-            ..._rules.map(
+            ...rules.map(
               (rule) => _RuleExpansion(rule: rule),
             ),
             const SizedBox(height: 24),
@@ -70,14 +66,14 @@ class DatingHourRulesScreen extends ConsumerWidget {
               onPressed: () {
                 NotificationService.instance.show(
                   id: 999,
-                  title: 'Regeln akzeptiert',
-                  body: 'Viel Spaß bei der Dating Hour!',
+                  title: L10n.t(context, 'dh.rules.acceptedTitle'),
+                  body: L10n.t(context, 'dh.rules.bodyFun'),
                   ref: ref,
                   type: NotificationType.datingHour,
                 );
                 context.go(AppRoutes.datingHourHowItWorks);
               },
-              child: const Text('Weiter'),
+              child: Text(L10n.t(context, 'dh.rules.next')),
             ),
           ],
         ),

@@ -114,6 +114,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
           title: const Text('Admin Bereich'),
           bottom: const TabBar(
             isScrollable: true,
+            // Abgerundete Klick-Animation (kein eckiger Aufblitzer).
+            splashBorderRadius: BorderRadius.all(Radius.circular(24)),
             tabs: [
               Tab(text: 'Meldungen', icon: Icon(Icons.flag)),
               Tab(text: 'Bug Reports', icon: Icon(Icons.bug_report)),

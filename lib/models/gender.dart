@@ -1,19 +1,22 @@
 /// Geschlecht des eigenen Nutzers.
 enum Gender {
-  male('male', 'Männlich'),
-  female('female', 'Weiblich'),
-  maleTrans('male_trans', 'Männlich (F to M)'),
-  femaleTrans('female_trans', 'Weiblich (M to F)'),
-  diverse('diverse', 'Divers'),
-  other('other', 'Eigenes / Anderes');
+  male('male', 'Männlich', 'gender.male'),
+  female('female', 'Weiblich', 'gender.female'),
+  maleTrans('male_trans', 'Männlich (F to M)', 'gender.maleTrans'),
+  femaleTrans('female_trans', 'Weiblich (M to F)', 'gender.femaleTrans'),
+  diverse('diverse', 'Divers', 'gender.diverse'),
+  other('other', 'Eigenes / Anderes', 'gender.other');
 
-  const Gender(this.value, this.label);
+  const Gender(this.value, this.label, this.labelKey);
 
   /// Technischer Schlüssel für die Speicherung.
   final String value;
 
-  /// Anzeige-Name in der UI.
+  /// Fallback-Anzeige (deutsch) - Anzeige bevorzugt über [labelKey] via L10n.
   final String label;
+
+  /// L10n-Schlüssel (v0.8.1: EN-Übersetzung).
+  final String labelKey;
 
   /// Findet das Geschlecht anhand des gespeicherten Schlüssels.
   static Gender? fromValue(String? value) {
@@ -30,21 +33,24 @@ enum Gender {
 /// Die Optionen entsprechen der Geschlechtsauswahl, damit die Präferenz
 /// konsistent mit der eigenen Identität gewählt werden kann.
 enum GenderPreference {
-  male('male', 'Männlich'),
-  female('female', 'Weiblich'),
-  maleTrans('male_trans', 'Männlich (F to M)'),
-  femaleTrans('female_trans', 'Weiblich (M to F)'),
-  diverse('diverse', 'Divers'),
-  other('other', 'Eigenes / Anderes'),
-  all('all', 'Alle');
+  male('male', 'Männlich', 'gender.male'),
+  female('female', 'Weiblich', 'gender.female'),
+  maleTrans('male_trans', 'Männlich (F to M)', 'gender.maleTrans'),
+  femaleTrans('female_trans', 'Weiblich (M to F)', 'gender.femaleTrans'),
+  diverse('diverse', 'Divers', 'gender.diverse'),
+  other('other', 'Eigenes / Anderes', 'gender.other'),
+  all('all', 'Alle', 'genderpref.all');
 
-  const GenderPreference(this.value, this.label);
+  const GenderPreference(this.value, this.label, this.labelKey);
 
   /// Technischer Schlüssel für die Speicherung.
   final String value;
 
-  /// Anzeige-Name in der UI.
+  /// Fallback-Anzeige (deutsch) - Anzeige bevorzugt über [labelKey].
   final String label;
+
+  /// L10n-Schlüssel (v0.8.1: EN-Übersetzung).
+  final String labelKey;
 
   /// Findet die Präferenz anhand des gespeicherten Schlüssels.
   static GenderPreference fromValue(String? value) {

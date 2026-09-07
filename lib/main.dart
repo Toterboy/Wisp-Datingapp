@@ -8,12 +8,15 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:wisp/app.dart';
 import 'package:wisp/providers/user_preferences_provider.dart' show sharedPrefsProvider;
 import 'package:wisp/screens/core/loading_screen.dart';
+import 'package:wisp/services/app_config_service.dart';
+import 'package:wisp/services/crash_journal.dart';
 import 'package:wisp/services/server_time_service.dart';
 import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/notification_service.dart';
@@ -46,6 +49,10 @@ import 'package:wisp/utils/constants.dart';
 Future<void> main() async {
   FlutterError.onError = (details) {
     FlutterError.dumpErrorToConsole(details);
+    // Crash-Journal (v0.8.0): letzten Absturz lokal speichern. Beim
+    // nächsten Start fragt die App, ob ein Report gesendet werden soll.
+    unawaited(
+        CrashJournal.capture(details.exception, details.stack));
     if (kDebugMode) {
       // StackTraces/Exceptions nicht in Release-Builds loggen (M11).
       debugPrint('[GLOBAL_ERROR] ${details.exception}\n${details.stack}');
@@ -88,6 +95,11 @@ Future<void> main() async {
   // Splash aktiv halten, bis der erste Frame der BOOTSTRAP-UI (Lade-Screen
   // mit drehendem Kreis) präsentiert wird - danach übernimmt Flutter.
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  // Plattform-Fehler (außerhalb der Widget-UI) ebenfalls journalesieren.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    unawaited(CrashJournal.capture(error, stack));
+    return false;
+  };
 
   // Supabase-User-ID-Getter registrieren, damit AppConstants.currentUserId
   // die echte User-ID liefert, sobald eine Session aktiv ist.
@@ -112,10 +124,19 @@ Future<void> main() async {
 
 /// Ergebnis der Start-Initialisierung (siehe [_initializeApp]).
 class _BootstrapInit {
-  const _BootstrapInit(this.storage, this.prefs, this.localeCode);
+  const _BootstrapInit(
+    this.storage,
+    this.prefs,
+    this.localeCode, {
+    this.updateRequired = false,
+  });
   final SharedPreferencesStorage storage;
   final SharedPreferences prefs;
   final String localeCode;
+
+  /// Serverseitige Mindestversion (app_config.min_app_version_build)
+  /// nicht erfüllt - Bootstrap zeigt den Update-Screen statt der App.
+  final bool updateRequired;
 }
 
 /// Start-Initialisierung: Env, Supabase (Netzwerk, mit Timeout) und
@@ -153,6 +174,7 @@ Future<_BootstrapInit?> _initializeApp() async {
       SharedPreferencesStorage(prefs),
       prefs,
       prefs.getString('app_locale') ?? 'de',
+      updateRequired: await isAppUpdateRequired(),
     );
   } catch (e) {
     debugPrint('[MAIN] Initialisierung fehlgeschlagen: $e');
@@ -338,6 +360,18 @@ class _BootstrapAppState extends State<_BootstrapApp> {
           );
         }
 
+        // Mindestversions-Gate (v0.8.0): Der Server verlangt mindestens
+        // eine Build-Nummer (app_config.min_app_version_build) - alte
+        // Clients nach Breaking-Migrationen bekommen einen Update-Screen
+        // (mit Rückfallebene "Trotzdem fortfahren").
+        if (init.updateRequired) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(),
+            home: const _UpdateRequiredScreen(),
+          );
+        }
+
         // Initialisierung abgeschlossen: echte App mit den Overrides
         // (lokaler Storage, Prefs, gespeicherte Sprache) mounten.
         return ProviderScope(
@@ -386,6 +420,75 @@ class _StartupErrorScreen extends StatelessWidget {
               const SizedBox(height: 24),
               FilledButton(onPressed: onRetry, child: const Text('Erneut versuchen')),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Update-Screen des Mindestversions-Gates (v0.8.0): Der Server verlangt
+/// eine neuere Build-Nummer (app_config.min_app_version_build). Mit
+/// Rueckfallebene: Ein bewusster Klick auf 'Trotzdem fortfahren' erlaubt
+/// das Oeffnen auf eigene Verantwortung (z. B. fuer Tester).
+class _UpdateRequiredScreen extends StatelessWidget {
+  const _UpdateRequiredScreen();
+
+  Future<void> _openStore() async {
+    final uris = [
+      Uri.parse('market://details?id=com.wisp.app'),
+      Uri.parse('https://play.google.com/store/apps/details?id=com.wisp.app'),
+    ];
+    for (final uri in uris) {
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {
+        // naechste Option versuchen
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.system_update_alt,
+                    size: 56, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 24),
+                Text(
+                  'Update erforderlich',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Deine Version von Wisp unterstuetzt nicht mehr alle '
+                  'Server-Funktionen. Bitte aktualisiere die App, um '
+                  'weiterzumachen.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: _openStore,
+                  icon: const Icon(Icons.shop_outlined),
+                  label: const Text('Jetzt aktualisieren'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {},
+                  child: const Text('Trotzdem fortfahren'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

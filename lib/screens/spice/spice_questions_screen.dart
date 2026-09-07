@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:wisp/models/spice_question.dart';
 import 'package:wisp/providers/spice_question_provider.dart';
 import 'package:wisp/services/spice_question_service.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// "Spice Questions": Eisbrecher-Fragen für ein Match (Feature A).
 ///
@@ -89,8 +90,8 @@ class _SpiceQuestionsScreenState extends ConsumerState<SpiceQuestionsScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Antwort gesendet. Dein Gegenüber antwortet bald.'),
+        SnackBar(
+          content: Text(L10n.t(context, 'spice.answerSent')),
         ),
       );
     }
@@ -244,7 +245,7 @@ class _QuestionCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: FilledButton.tonal(
                 onPressed: onAnswer,
-                child: Text(question.answeredByMe ? 'Antwort ändern' : 'Antworten'),
+                child: Text(question.answeredByMe ? L10n.t(context, 'spice.answerEdit') : L10n.t(context, 'spice.answer')),
               ),
             ),
           ],

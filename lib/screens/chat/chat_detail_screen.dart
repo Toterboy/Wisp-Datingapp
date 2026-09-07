@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' show ImageFilter;
 
 import 'package:crypto/crypto.dart';
@@ -13,9 +14,12 @@ import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
 
 import 'package:wisp/models/match.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/models/message.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
+import 'package:wisp/services/find_your_match_service.dart'
+    show findYourMatchServiceProvider;
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/screens/chat/call_screen.dart';
@@ -91,6 +95,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     super.initState();
     _initP2P();
     unawaited(_loadQuizGate());
+    // Opt-in-Verlauf (v0.8.0): gespeicherte Nachrichten laden, sobald der
+    // Nutzer den verschlüsselten lokalen Verlauf aktiviert hat.
+    unawaited(ref
+        .read(chatProvider.notifier)
+        .hydrateHistory(widget.matchId));
   }
 
   /// Prüft serverseitig, ob dieses Match noch quiz-gesperrt ist.
@@ -233,22 +242,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sicherheitsnummer hat sich geändert'),
-        content: const Text(
-          'Der Verschlüsselungsschlüssel deines Kontakts hat sich geändert. '
-          'Das kann nach einer Neuinstallation passieren - oder darauf '
-          'hindeuten, dass sich jemand in die Verbindung einschleichen will.\n\n'
-          'Vergleiche die Sicherheitsnummer über einen zweiten Kanal (z. B. '
-          'Anruf oder persönlich), bevor du fortfährst.',
+        title: Text(L10n.t(context, 'chat.safetyChangedTitle')),
+        content: Text(
+          L10n.t(context, 'chat.safetyChangedBody'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
+            child: Text(L10n.t(context, 'chat.safetyChangedCancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Nummer geprüft: akzeptieren'),
+            child: Text(L10n.t(context, 'chat.safetyChangedAccept')),
           ),
         ],
       ),
@@ -263,7 +268,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verbindung weiterhin fehlgeschlagen.')),
+          SnackBar(
+              content:
+                  Text(L10n.t(context, 'chat.reconnectStillFailing'))),
         );
       }
     }
@@ -368,7 +375,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Bild senden'),
-        content: const Text('Wähle eine Quelle für das zu sendende Bild.'),
+        content: Text(L10n.t(context, 'chat.imageSourcePrompt')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(null),
@@ -724,11 +731,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.verified_user_outlined),
-              SizedBox(width: 8),
-              Expanded(child: Text('Sicherheitsnummer')),
+              const Icon(Icons.verified_user_outlined),
+              const SizedBox(width: 8),
+              Expanded(child: Text(L10n.t(context, 'chat.safetyNumber'))),
             ],
           ),
           content: Column(
@@ -766,7 +773,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Identität bestätigt'),
+                  title: Text(L10n.t(context, 'chat.identityVerifiedTitle')),
                   subtitle: const Text(
                     'Nur aktivieren, wenn die Nummern übereinstimmen.',
                   ),
@@ -782,7 +789,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Schließen'),
+              child: Text(L10n.t(context, 'chat.close')),
             ),
           ],
         ),
@@ -801,12 +808,29 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   void _reportImage(Message msg) {
     final match = _match;
     if (match == null) return;
+    // Letzte 3 Textnachrichten als Kontext für das Moderations-Team
+    // (v0.8.0). Das gemeldete Bild selbst wird separat übertragen.
+    final contextMessages = ref
+        .read(chatProvider.notifier)
+        .messagesFor(match.id)
+        .where((m) =>
+            m.id != msg.id &&
+            m.text.trim().isNotEmpty &&
+            m.type == MessageType.text)
+        .map((m) => m.text.trim())
+        .toList()
+        .reversed
+        .take(3)
+        .toList()
+        .reversed
+        .toList();
     showImageReportDialog(
       context: context,
       ref: ref,
       message: msg,
       reportedUserId: match.partner.id,
       reportedUserName: match.partner.name,
+      contextMessages: contextMessages,
     );
   }
 
@@ -876,46 +900,227 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     }
   }
 
-  /// Zeigt den Bestätigungsdialog zum Auflösen des Matches.
-  Future<void> _showDissolveMatchDialog() async {
+  /// Gemeinsame Interessen mit dem Chat-Partner (für den
+  /// Kontext-Icebreaker-Chip, v0.8.0).
+  List<String> _commonInterests() {
+    final match = _match;
+    if (match == null) return const [];
+    final mine = ref.read(profileProvider).interests.toSet();
+    return match.partner.interests.where(mine.contains).toList();
+  }
+
+  /// Sendet eine E2E-Nachricht auf Basis der gemeinsamen Interessen.
+  Future<void> _sendContextIcebreaker(String interest) async {
+    final match = _match;
+    if (match == null || _myUserId == null) return;
+    final text = 'Wir teilen das Interesse "$interest". Erzähl mir davon: '
+        'was war dein Highlight dazu? 😊';
+    final localMsg = Message(
+      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      senderId: _myUserId!,
+      receiverId: match.partner.id,
+      text: text,
+      timestamp: DateTime.now(),
+    );
+    ref.read(chatProvider.notifier).addMessage(match.id, localMsg, ref: ref);
+    try {
+      await _p2p?.sendText(text);
+      unawaited(_notifyPeerAboutMessage(match));
+    } catch (_) {
+      // Best-effort.
+    }
+  }
+
+  // Ideen-Rad (v0.8.0): die bestehenden Date-Kategorien des Meet-Intents.
+  static const _meetIdeaCategories = <String>[
+    'Kaffee & Kuchen',
+    'Gemeinsam spazieren gehen',
+    'Eis essen',
+    'Museum oder Ausstellung',
+    'Minigolf',
+    'Kinoabend',
+    'Markt bummeln',
+    'Bowling oder Billard',
+    'Live-Musik',
+    'Sterne beobachten',
+  ];
+
+  /// Ideen-Rad: dreht (animiert über abnehmende Zyklen), landet auf einer
+  /// Kategorie und bietet an, den Vorschlag als E2E-Nachricht zu senden.
+  Future<void> _showMeetIdeaWheel() async {
+    final match = _match;
+    if (match == null) return;
+
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const _MeetIdeaWheelDialog(categories: _meetIdeaCategories),
+    );
+    if (picked == null || !mounted) return;
+
+    // Vorschlag als E2E-Nachricht senden (gleicher Weg wie _send()).
+    final text = 'Idee für ein Date: $picked ✨ Was meinst du?';
+    final localMsg = Message(
+      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      senderId: _myUserId ?? AppConstants.currentUserId,
+      receiverId: match.partner.id,
+      text: text,
+      timestamp: DateTime.now(),
+    );
+    ref.read(chatProvider.notifier).addMessage(match.id, localMsg, ref: ref);
+    try {
+      await _p2p?.sendText(text);
+      unawaited(_notifyPeerAboutMessage(match));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vorschlag konnte nicht gesendet werden.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Vorbereitete, freundliche Absage-Texte ("Ehrliches Beenden", v0.8.0):  /// Ghosting aktiv erschweren, ohne den Nutzer mit Formulierungen allein
+  /// zu lassen.
+  static const _goodbyeTexts = <String>[
+    'Hey, ich hatte wirklich schöne Gespräche mit dir, spüre aber '
+        'selbst, dass es nicht das wird, was wir beide verdienen. Ich '
+        'lasse den Funken jetzt ruhen – danke dir und alles Gute! 🌿',
+    'Ich mag dich, aber ich merke, dass ich gerade nicht dasselbe '
+        'investieren kann wie du. Ehrlicher finde ich, das klar zu sagen, '
+        'statt mich zu verziehen. Mach\'s gut! 🙏',
+    'Wir passen für mich gerade nicht zusammen – das sagt nichts über '
+        'dich aus. Ich wünsche dir von Herzen alles Gute! ✨',
+    'Meine Gefühle haben sich verändert. Statt dich im Ungewissen zu '
+        'lassen, lasse ich den Funken jetzt sanft ruhen. Danke für die '
+        'schönen Momente! 🕊️',
+  ];
+
+  /// "Ehrliches Beenden" (v0.8.0) statt hartem Auflösen: Entweder den
+  /// Funken RUHIG enden lassen (status -> cooled, landet bei beiden unter
+  /// "Erschlossene Funken", Re-Funke jederzeit) oder vorher einen der
+  /// vorbereiteten, freundlichen Absage-Texte senden.
+  Future<void> _showEndSparkDialog() async {
+    var choice = 'silent';
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Funke beenden?'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Funke beenden – ehrlich & freundlich'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Der Funke wandert bei euch beiden in "Erschlossene '
+                  'Funken" – ohne Countdown, ohne Benachrichtigung. Ein '
+                  'Re-Funke ist jederzeit mit einem Tap möglich.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                RadioGroup<String>(
+                  groupValue: choice,
+                  onChanged: (v) =>
+                      setDialogState(() => choice = v ?? 'silent'),
+                  child: Column(
+                    children: [
+                      const RadioListTile<String>(
+                        value: 'silent',
+                        title: Text('Ruhig enden lassen'),
+                        subtitle: Text('Ohne Nachricht'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      for (var i = 0; i < _goodbyeTexts.length; i++)
+                        RadioListTile<String>(
+                          value: 'msg_$i',
+                          title: Text(
+                            _goodbyeTexts[i],
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(L10n.t(context, 'chat.coolSpark')),
+            ),
           ],
         ),
-        content: const Text(
-          'Möchtest du diesen Funke wirklich beenden? '
-          'Der Chat wird dauerhaft gelöscht und kann nicht wiederhergestellt werden.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Auflösen'),
-          ),
-        ],
       ),
     );
 
-    if (confirmed == true && mounted) {
-      final match = _match;
-      if (match == null) return;
-      final success = ref.read(chatProvider.notifier).dissolveMatch(match.id);
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Funke beendet')),
-        );
-        if (mounted) context.go(AppRoutes.interessen);
+    if (confirmed != true || !mounted) return;
+
+    // Optional: gewählten Absage-Text zuerst E2E senden (gleicher Weg wie
+    // normale Nachrichten).
+    if (choice.startsWith('msg_')) {
+      final index = int.tryParse(choice.substring(4)) ?? 0;
+      if (index >= 0 && index < _goodbyeTexts.length) {
+        final match = _match;
+        if (match != null && _myUserId != null) {
+          final localMsg = Message(
+            id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+            senderId: _myUserId!,
+            receiverId: match.partner.id,
+            text: _goodbyeTexts[index],
+            timestamp: DateTime.now(),
+          );
+          ref.read(chatProvider.notifier).addMessage(match.id, localMsg,
+              ref: ref);
+          try {
+            await _p2p?.sendText(_goodbyeTexts[index]);
+            unawaited(_notifyPeerAboutMessage(match));
+          } catch (_) {
+            // Best-Effort: Die Verbindung kühlt trotzdem.
+          }
+        }
       }
+    }
+
+    // Serverseitig kühlen (Migration 074): status -> cooled. Die Match-ID
+    // kommt aus der Route als String, der Server erwartet BIGINT.
+    final matchId = int.tryParse(_match?.id ?? '');
+    if (matchId != null) {
+      try {
+        await ref
+            .read(findYourMatchServiceProvider)
+            .coolMatch(matchId);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(L10n.tf(context, 'chat.coolSparkError', {'error': e.toString()})),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'chat.coolSparkDone')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.go(AppRoutes.interessen);
     }
   }
 
@@ -954,6 +1159,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Kontext-Icebreaker ein-/ausschaltbar (v0.8.0).
+    final icebreakerEnabled =
+        ref.watch(settingsProvider).contextIcebreakerEnabled;
     _match = ref.watch(chatProvider.notifier).getMatchById(widget.matchId);
     final settings = ref.watch(settingsProvider);
 
@@ -963,7 +1171,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Zurück zu den Funken',
+            tooltip: L10n.t(context, 'chat.backToSparks'),
             onPressed: () => context.go(AppRoutes.interessen),
           ),
           title: const Text('Chat'),
@@ -978,7 +1186,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () => context.go(AppRoutes.interessen),
-                child: const Text('Zurück zu den Funken'),
+                child: Text(L10n.t(context, 'chat.backToSparks')),
               ),
             ],
           ),
@@ -1005,7 +1213,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Zurück zu den Funken',
+            tooltip: L10n.t(context, 'chat.backToSparks'),
             onPressed: () => context.go(AppRoutes.interessen),
           ),
         // G/H: Tap auf Name/Avatar -> Profil des Gegenübers.
@@ -1081,7 +1289,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.verified_user_outlined),
-            tooltip: 'Sicherheitsnummer (E2E-Verifikation)',
+            tooltip: L10n.t(context, 'chat.safetyNumberTooltip'),
             onPressed: () => _showSafetyNumberDialog(partner.id, partner.name),
           ),
           IconButton(
@@ -1113,36 +1321,56 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.call),
-                      tooltip: 'Audio Anruf',
+                      tooltip: L10n.t(context, 'chat.call'),
             onPressed: _call,
           ),          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            tooltip: 'Weitere Optionen',
+            tooltip: L10n.t(context, 'chat.more'),
             onSelected: (value) {
               switch (value) {
+                case 'toggleIcebreaker':
+                  final current =
+                      ref.read(settingsProvider).contextIcebreakerEnabled;
+                  ref
+                      .read(settingsProvider.notifier)
+                      .setContextIcebreaker(!current);
                 case 'block':
                   _showBlockUserDialog(partner.id, partner.name);
                 case 'dissolve':
-                  _showDissolveMatchDialog();
+                  _showEndSparkDialog();
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(
+              PopupMenuItem(
+                value: 'toggleIcebreaker',
+                child: ListTile(
+                  leading: Icon(ref.watch(settingsProvider)
+                          .contextIcebreakerEnabled
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined),
+                  title: Text(ref.watch(settingsProvider)
+                          .contextIcebreakerEnabled
+                      ? 'Interessen-Vorschläge ausblenden'
+                      : 'Interessen-Vorschläge anzeigen'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
                 value: 'block',
                 child: ListTile(
-                  leading: Icon(Icons.block),
-                  title: Text('Nutzer blockieren'),
-                  subtitle: Text(
+                  leading: const Icon(Icons.block),
+                  title: Text(L10n.t(context, 'chat.block')),
+                  subtitle: const Text(
                     'Keine Nachrichten, Likes oder Funken mehr von dieser Person.',
                   ),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'dissolve',
                 child: ListTile(
-                  leading: Icon(Icons.link_off),
-                  title: Text('Funke beenden'),
+                  leading: const Icon(Icons.link_off),
+                  title: Text(L10n.t(context, 'chat.end')),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -1158,10 +1386,43 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             matchId: widget.matchId,
             partnerName: partner.name,
           ),
+          // Ideen-Rad (v0.8.0, Test): wählt aus den bestehenden Date-
+          // Kategorien einen Vorschlag, der als Nachricht gesendet wird -
+          // beide bestätigen im Chat.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _showMeetIdeaWheel,
+                icon: const Icon(Icons.casino_outlined, size: 18),
+                label: const Text('Dreh das Rad - Date-Idee finden'),
+              ),
+            ),
+          ),
+          // Kontext-Icebreaker (v0.8.0): gemeinsame Interessen als
+          // Gesprächseinstieg. Im Menü deaktivierbar.
+          if (icebreakerEnabled &&
+              _commonInterests().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ActionChip(
+                  avatar: const Icon(Icons.lightbulb_outline, size: 18),
+                  label: Text(
+                    'Gemeinsam: ${_commonInterests().first}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onPressed: () => _sendContextIcebreaker(
+                      _commonInterests().first),
+                ),
+              ),
+            ),
           Expanded(
             child: messages.isEmpty
-                ? const Center(
-                     child: Text('Schreib die erste Nachricht! 😊'),
+                ? Center(
+                     child: Text(L10n.t(context, 'chat.empty')),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(12),
@@ -1172,8 +1433,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       // J: Einmalige System-Nachricht zu freigeschalteten
                       // Fotos als erstes (unterstes) Element des Verlaufs.
                       if (_match!.photosUnlocked && i == 0) {
-                        return const _SystemNotice(
-                           text: '🔓 Fotos wurden freigeschaltet',
+                        return _SystemNotice(
+                           text: L10n.t(context, 'chat.photosUnlocked'),
                         );
                       }
                       final msgIndex = _match!.photosUnlocked ? i - 1 : i;
@@ -1698,7 +1959,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 right: 8,
                 child: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
-                  tooltip: 'Schließen (Bild kann danach nicht mehr angesehen werden)',
+                  tooltip: L10n.t(context, 'chat.closeImageHint'),
                   onPressed: () {
                     _markViewed();
                     Navigator.of(ctx).pop();
@@ -1768,15 +2029,132 @@ class _SystemNotice extends StatelessWidget {
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-            textAlign: TextAlign.center,
-          ),
+           child: Text(
+             text,
+             style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                   color: Theme.of(context).colorScheme.onSurfaceVariant,
+                 ),
+             textAlign: TextAlign.center,
+           ),
+         ),
+       ),
+     );
+   }
+ }
+
+/// Das Ideen-Rad (v0.8.0): dreht mit abnehmender Geschwindigkeit und
+/// landet auf einer zufälligen Date-Kategorie. Rückgabe via Navigator.pop
+/// (gewählter Vorschlag) oder null (Abbruch).
+class _MeetIdeaWheelDialog extends StatefulWidget {
+  const _MeetIdeaWheelDialog({required this.categories});
+
+  final List<String> categories;
+
+  @override
+  State<_MeetIdeaWheelDialog> createState() => _MeetIdeaWheelDialogState();
+}
+
+class _MeetIdeaWheelDialogState extends State<_MeetIdeaWheelDialog> {
+  bool _spinning = false;
+  String? _result;
+  int _index = 0;
+
+  Future<void> _spin() async {
+    if (_spinning) return;
+    setState(() => _spinning = true);
+    final rng = Random();
+    final target = rng.nextInt(widget.categories.length);
+    // Abnehmende Zyklen: wirkt wie ein echtes Rad, das ausläuft.
+    var delay = 60;
+    var rounds = 24 + rng.nextInt(8);
+    var i = 0;
+    while (rounds > 0) {
+      await Future<void>.delayed(Duration(milliseconds: delay));
+      if (!mounted) return;
+      setState(() {
+        _index = (_index + 1) % widget.categories.length;
+      });
+      rounds--;
+      i++;
+      if (i % 6 == 0) delay += 25; // auslaufen
+    }
+    // Landen auf dem Ziel.
+    while (_index != target) {
+      await Future<void>.delayed(Duration(milliseconds: delay));
+      if (!mounted) return;
+      setState(() {
+        _index = (_index + 1) % widget.categories.length;
+      });
+    }
+    if (!mounted) return;
+    setState(() {
+      _result = widget.categories[target];
+      _spinning = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: Icon(Icons.casino_outlined,
+          color: Theme.of(context).colorScheme.primary, size: 36),
+      title: const Text('Dreh das Rad'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 96,
+              width: double.infinity,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                _result ??
+                    widget.categories[_index % widget.categories.length],
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_result == null)
+              FilledButton.icon(
+                onPressed: _spin,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Drehen'),
+              )
+            else ...[
+              const Text(
+                'Passt das? Schick den Vorschlag – deine Gegenstelle '
+                'kann einfach antworten.',
+                style: TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
         ),
       ),
+      actions: [
+        if (_result != null)
+          TextButton(
+            onPressed: _spin,
+            child: const Text('Nochmal drehen'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Abbrechen'),
+        ),
+        if (_result != null)
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_result),
+            child: const Text('Vorschlag senden'),
+          ),
+      ],
     );
   }
 }

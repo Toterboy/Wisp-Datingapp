@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/providers/settings_provider.dart';
+import 'package:wisp/services/supabase_database_service.dart';
+import 'package:wisp/services/supabase_service.dart';
 
 /// Screen, der erklärt, wie die Dating Hour funktioniert.
 ///
@@ -12,39 +17,36 @@ import 'package:wisp/providers/settings_provider.dart';
 class DatingHourHowItWorksScreen extends ConsumerWidget {
   const DatingHourHowItWorksScreen({super.key});
 
-  static const _steps = <_HowItWorksItem>[
-    _HowItWorksItem(
-      'Beitreten',
-      'Wähle deine Präferenzen und trete dem samstäglichen Event bei. '
-      'Du kannst jederzeit wieder austreten.',
-    ),
-    _HowItWorksItem(
-      'Warten auf eine Zuordnung',
-      'Die App verbindet dich mit einer passenden Person. '
-      'Sobald beide bereit sind, startet der 5 Minuten Chat.',
-    ),
-    _HowItWorksItem(
-      '5 Minuten chatten',
-      'Lerne die Person in einem kurzen, zeitlich begrenzten Gespräch kennen. '
-      'Fotos werden je nach Einstellung angezeigt.',
-    ),
-    _HowItWorksItem(
-      'Entscheidung',
-      'Nach dem Gespräch entscheidest du, ob du den Kontakt verlängern '
-      'oder beenden möchtest.',
-    ),
-    _HowItWorksItem(
-      'Funken',
-      'Wenn beide sich für eine Verlängerung entscheiden, entsteht ein Funke '
-      'erstellt und ihr könnt weiter chatten.',
-    ),
-  ];
+  /// Die 5 Schritte (v0.8.0 zweisprachig über L10n-Keys).
+  List<_HowItWorksItem> _steps(BuildContext context) => [
+        _HowItWorksItem(
+          L10n.t(context, 'dh.how.step1.title'),
+          L10n.t(context, 'dh.how.step1.body'),
+        ),
+        _HowItWorksItem(
+          L10n.t(context, 'dh.how.step2.title'),
+          L10n.t(context, 'dh.how.step2.body'),
+        ),
+        _HowItWorksItem(
+          L10n.t(context, 'dh.how.step3.title'),
+          L10n.t(context, 'dh.how.step3.body'),
+        ),
+        _HowItWorksItem(
+          L10n.t(context, 'dh.how.step4.title'),
+          L10n.t(context, 'dh.how.step4.body'),
+        ),
+        _HowItWorksItem(
+          L10n.t(context, 'dh.how.step5.title'),
+          L10n.t(context, 'dh.how.step5.body'),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final steps = _steps(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Wie funktioniert Dating Hour?'),
+        title: Text(L10n.t(context, 'dh.how.title')),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -52,12 +54,11 @@ class DatingHourHowItWorksScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Die Dating Hour läuft jeden Samstag von 20:00 bis 21:00 Uhr. '
-              'Hier ist der Ablauf im Überblick:',
+              L10n.t(context, 'dh.how.intro'),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
-            ..._steps.map(
+            ...steps.map(
               (step) => _StepExpansion(step: step),
             ),
             const SizedBox(height: 24),
@@ -65,11 +66,27 @@ class DatingHourHowItWorksScreen extends ConsumerWidget {
               onPressed: () async {
                 final settingsNotifier = ref.read(settingsProvider.notifier);
                 await settingsNotifier.markDatingHourIntroSeen();
+                // Intro-Stand serverseitig merken (Migration 071), damit
+                // die Regeln/Erklärung pro Konto nur EINMAL erscheinen -
+                // nicht bei jeder Neuinstallation erneut. Best effort.
+                if (SupabaseService.isInitialized) {
+                  unawaited(() async {
+                    try {
+                      await SupabaseDatabaseService(SupabaseService.client)
+                          .updateOwnProfile({
+                        'dating_hour_intro_seen': true,
+                      });
+                    } catch (e) {
+                      debugPrint('[DatingHour] Intro-Flag-Sync fehlgeschlagen:'
+                          ' $e');
+                    }
+                  }());
+                }
                 if (context.mounted) {
                   context.go(AppRoutes.datingHourEvent);
                 }
               },
-              child: const Text('Zur Dating Hour'),
+              child: Text(L10n.t(context, 'dh.how.next')),
             ),
           ],
         ),

@@ -85,6 +85,17 @@ class AppSettings {
   /// Gewähltes Farbschema (Name aus WispTheme, Default 'classic').
   final String themeName;
 
+  /// Pausenmodus (v0.8.0): Profil in Discovery/FYM unsichtbar, Funken
+  /// und Chats bleiben bestehen. Serverseitig gespiegelt (profiles.paused).
+  final bool paused;
+
+  /// Habit-Dealbreaker (v0.8.0): nur Kandidaten mit <= eigenem Konsum.
+  final bool habitsDealbreaker;
+
+  /// Kontext-Icebreaker-Chip im Chat (v0.8.0): Vorschläge aus gemeinsamen
+  /// Interessen; vom Nutzer deaktivierbar.
+  final bool contextIcebreakerEnabled;
+
   const AppSettings({
     this.blindModeEnabled = true,
     this.revealPhotosAfterMatch = true,
@@ -109,6 +120,9 @@ class AppSettings {
     this.mfaSetupDismissed = false,
     this.blurChatImages = true,
     this.themeName = 'classic',
+    this.paused = false,
+    this.habitsDealbreaker = false,
+    this.contextIcebreakerEnabled = true,
   });
 
   /// Standard-Einstellungen für einen neuen Nutzer.
@@ -144,6 +158,9 @@ class AppSettings {
       mfaSetupDismissed: json['mfaSetupDismissed'] as bool? ?? false,
       blurChatImages: json['blurChatImages'] as bool? ?? true,
       themeName: json['themeName'] as String? ?? 'classic',
+      paused: json['paused'] as bool? ?? false,
+      habitsDealbreaker: json['habitsDealbreaker'] as bool? ?? false,
+      contextIcebreakerEnabled: json['contextIcebreakerEnabled'] as bool? ?? true,
     );
   }
 
@@ -172,6 +189,9 @@ class AppSettings {
         'mfaSetupDismissed': mfaSetupDismissed,
         'blurChatImages': blurChatImages,
         'themeName': themeName,
+        'paused': paused,
+        'habitsDealbreaker': habitsDealbreaker,
+        'contextIcebreakerEnabled': contextIcebreakerEnabled,
       };
 
   /// Immutabele Kopie mit veränderten Werten.
@@ -199,6 +219,9 @@ class AppSettings {
     bool? mfaSetupDismissed,
     bool? blurChatImages,
     String? themeName,
+    bool? paused,
+    bool? habitsDealbreaker,
+    bool? contextIcebreakerEnabled,
   }) {
     return AppSettings(
       blindModeEnabled: blindModeEnabled ?? this.blindModeEnabled,
@@ -228,6 +251,9 @@ class AppSettings {
       mfaSetupDismissed: mfaSetupDismissed ?? this.mfaSetupDismissed,
       blurChatImages: blurChatImages ?? this.blurChatImages,
       themeName: themeName ?? this.themeName,
+      paused: paused ?? this.paused,
+      habitsDealbreaker: habitsDealbreaker ?? this.habitsDealbreaker,
+      contextIcebreakerEnabled: contextIcebreakerEnabled ?? this.contextIcebreakerEnabled,
     );
   }
 }

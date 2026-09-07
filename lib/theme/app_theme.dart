@@ -5,16 +5,20 @@ import 'package:flutter/material.dart';
 /// Classic ist das ursprüngliche WispDating-Rosa; die anderen sind
 /// gleichwertige Alternativen (Light + Dark aus demselben Seed).
 enum WispTheme {
-  classic('Classic WispDating', Color(0xFFE9457B)),
-  ocean('Ozean', Color(0xFF1E88E5)),
-  forest('Wald', Color(0xFF2E7D32)),
-  sunset('Sonnenuntergang', Color(0xFFF57C00)),
-  lila('Lavendel', Color(0xFF8E6BD0)),
-  mono('Schiefer', Color(0xFF546E7A));
+  classic('Classic WispDating', 'theme.classic', Color(0xFFE9457B)),
+  ocean('Ozean', 'theme.ocean', Color(0xFF1E88E5)),
+  forest('Wald', 'theme.forest', Color(0xFF2E7D32)),
+  sunset('Sonnenuntergang', 'theme.sunset', Color(0xFFF57C00)),
+  lila('Lavendel', 'theme.lavender', Color(0xFF8E6BD0)),
+  mono('Schiefer', 'theme.slate', Color(0xFF546E7A));
 
-  const WispTheme(this.label, this.primaryColor);
+  const WispTheme(this.label, this.labelKey, this.primaryColor);
 
   final String label;
+
+  /// L10n-Schlüssel (v0.8.1: EN-Übersetzung der Farbschemata).
+  final String labelKey;
+
   final Color primaryColor;
 
   /// Kompakter Anzeigename für den Picker (feste Kachelbreite).
@@ -82,6 +86,13 @@ class AppTheme {
         scaffoldBackgroundColor: AppColors.backgroundLight,
         cardTheme: _cardTheme(AppColors.surfaceLight),
         popupMenuTheme: _popupMenuTheme(AppColors.surfaceLight),
+        // Klick-Animation (Ripple) folgt der 24-px-Rundung der Karten -
+        // überall derselbe abgerundete Effekt, auch beim Antippen (v0.8.1).
+        listTileTheme: const ListTileThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(24)),
+          ),
+        ),
         elevatedButtonTheme: _elevatedButtonTheme,
         filledButtonTheme: _filledButtonTheme,
         outlinedButtonTheme: _outlinedButtonTheme,
@@ -123,6 +134,13 @@ class AppTheme {
         scaffoldBackgroundColor: AppColors.backgroundDark,
         cardTheme: _cardTheme(AppColors.surfaceDark),
         popupMenuTheme: _popupMenuTheme(AppColors.surfaceDark),
+        // Klick-Animation (Ripple) folgt der 24-px-Rundung der Karten -
+        // überall derselbe abgerundete Effekt, auch beim Antippen (v0.8.1).
+        listTileTheme: const ListTileThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(24)),
+          ),
+        ),
         elevatedButtonTheme: _elevatedButtonTheme,
         filledButtonTheme: _filledButtonTheme,
         outlinedButtonTheme: _outlinedButtonTheme,

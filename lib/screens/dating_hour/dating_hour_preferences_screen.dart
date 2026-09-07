@@ -7,8 +7,10 @@ import 'package:wisp/models/gender.dart';
 import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/providers/user_preferences_provider.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/dating_hour_service.dart';
+import 'package:wisp/widgets/age_range_sliders.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
 
 /// Screen für Dating-Hour-Präferenzen (vor dem Event-Beitritt).
@@ -21,7 +23,12 @@ class DatingHourPreferencesScreen extends ConsumerStatefulWidget {
 
 class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferencesScreen> {
   final _traitController = TextEditingController();
-  late RangeValues _ageRange;
+
+  // Altersbereich (Dating Hour ist 18+): Zwei gekoppelte Werte statt
+  // RangeValues - der frühere RangeSlider "frohr" bei identischen Werten
+  // (z. B. 18-18) ein, weil sich der End-Regler nicht mehr greifen ließ.
+  int _ageMin = 18;
+  int _ageMax = 99;
   late String _genderPreference;
   String _selectedTrait = 'Humor';
   int _maxDistanceKm = 50;
@@ -43,9 +50,10 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
     // Präferenzen identisch zu den regulären Filter-Einstellungen.
     final settings = ref.read(settingsProvider);
     final userPrefs = ref.read(userPreferencesProvider);
-    final ageMin = settings.ageRangeMin.clamp(18, 99);
-    final ageMax = settings.ageRangeMax.clamp(ageMin, 99);
-    _ageRange = RangeValues(ageMin.toDouble(), ageMax.toDouble());
+    // Eingangswerte in den Dating-Hour-Rahmen (18-99) einrasten; min/max
+    // dabei gekoppelt halten (max >= min).
+    _ageMin = settings.ageRangeMin.clamp(18, 99);
+    _ageMax = settings.ageRangeMax.clamp(_ageMin, 99);
     _genderPreference = genderPrefFromList(userPrefs.genderPreferences);
     _maxDistanceKm = settings.maxDistanceKm;
     // ZULETZT GENUTZTE Dating-Hour-Präferenzen vom Server laden (Migration
@@ -61,11 +69,8 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
       final last = DatingHourPreferences.fromJson(saved);
       setState(() {
         if (last.ageMin >= 18) {
-          final min = last.ageMin.clamp(18, 99);
-          _ageRange = RangeValues(
-            min.toDouble(),
-            last.ageMax.clamp(min, 99).toDouble(),
-          );
+          _ageMin = last.ageMin.clamp(18, 99);
+          _ageMax = last.ageMax.clamp(_ageMin, 99);
         }
         _genderPreference = genderPrefFromList([last.genderPreference]);
         if (last.preferredTrait.isNotEmpty) _selectedTrait = last.preferredTrait;
@@ -89,7 +94,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dating Hour: Präferenzen'),
+        title: Text(L10n.t(context, 'dh.prefs.title')),
         leading: BackButton(
           onPressed: () {
             // Robuster Zurück-Weg: Der Screen kann auch ohne
@@ -130,7 +135,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Deine Dating Hour Präferenzen',
+                          L10n.t(context, 'dh.prefs.header'),
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             color: Theme.of(context).colorScheme.onPrimaryContainer,
                             fontWeight: FontWeight.bold,
@@ -162,24 +167,30 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                      Text(
-                        '${_ageRange.start.round()} bis ${_ageRange.end.round()} Jahre',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    RangeSlider(
-                      values: _ageRange,
-                      min: 18,
-                      max: 99,
-                      divisions: 81,
-                      labels: RangeLabels(
-                        '${_ageRange.start.round()}',
-                        '${_ageRange.end.round()}',
-                      ),
-                      onChanged: (v) => setState(() => _ageRange = v),
-                    ),
+              Text(
+              L10n.tf(context, 'dh.prefs.ageRange',
+                      {'min': '$_ageMin', 'max': '$_ageMax'}),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Zwei gekoppelte Slider: Bei identischen Werten blieb der
+            // RangeSlider "eingefroren" (Regler ausgegraut, keine Bewegung).
+            AgeRangeSliders(
+              minValue: _ageMin,
+              maxValue: _ageMax,
+              boundsMin: 18,
+              boundsMax: 99,
+              minLabelPrefix: 'Mindestalter',
+              maxLabelPrefix: 'Höchstalter',
+              onChanged: (min, max) {
+                setState(() {
+                  _ageMin = min;
+                  _ageMax = max;
+                });
+              },
+            ),
                   ],
                 ),
               ),
@@ -204,7 +215,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: _GenderPreference.values.map((pref) {
                       return RadioListTile<String>(
-                        title: Text(pref.label),
+                        title: Text(L10n.t(context, pref.labelKey)),
                         value: pref.value,
                       );
                     }).toList(),
@@ -220,7 +231,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
             const SizedBox(height: 12),
             Card(
               child: SwitchListTile(
-                title: const Text('Automatisch wieder dabei sein'),
+                title: Text(L10n.t(context, 'dh.prefs.autoJoin')),
                 subtitle: const Text(
                   'Wenn aktiviert, nimmst du am nächsten Dating Hour '
                   'automatisch teil, sobald es läuft.',
@@ -239,7 +250,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
             const SizedBox(height: 8),
             Text(
               'Wähle eine Eigenschaft oder gib deine eigene ein. '
-                     'Dies fließt als weicher Faktor in das Matching ein.',
+                     'Dies fließt als weicher Faktor bei den Funken-Vorschlägen ein.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -264,7 +275,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
               controller: _traitController,
               decoration: InputDecoration(
                 labelText: 'Eigene Eigenschaft eingeben',
-                hintText: 'z. B. "Gute Laune", "Tiefgründige Gespräche"...',
+                hintText: L10n.t(context, 'dh.prefs.traitHintField'),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                 prefixIcon: const Icon(Icons.edit),
               ),
@@ -275,12 +286,12 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
             const SizedBox(height: 32),
 
             // Gewohnheiten als weiche Matching-Präferenz
-            Text('Gewohnheiten (optional)',
+            Text(L10n.t(context, 'dh.prefs.habits'),
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'Personen mit passenden Gewohnheiten werden dir beim Matching '
-                     'zuerst vorgeschlagen, ausgeschlossen wird niemand.',
+              'Personen mit passenden Gewohnheiten werden dir bei den '
+                     'Funken-Vorschlägen zuerst vorgeschlagen, ausgeschlossen wird niemand.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -311,7 +322,7 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
               width: double.infinity,
               child: FilledButton.icon(
                 icon: const Icon(Icons.save),
-                label: const Text('Präferenzen speichern'),
+                label: Text(L10n.t(context, 'dh.prefs.save')),
                 onPressed: _savePreferences,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -339,8 +350,8 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
   Future<void> _savePreferences() async {
     final service = ref.read(datingHourServiceProvider);
     final prefs = DatingHourPreferences(
-      ageMin: _ageRange.start.round(),
-      ageMax: _ageRange.end.round(),
+      ageMin: _ageMin,
+      ageMax: _ageMax,
       genderPreference: _genderPreference,
       preferredTrait: _selectedTrait.isNotEmpty ? _selectedTrait : _suggestedTraits.first,
       maxDistanceKm: _maxDistanceKm.toDouble(), // aus den Einrichtungs-Einstellungen
@@ -360,9 +371,8 @@ class _DatingHourPreferencesScreenState extends ConsumerState<DatingHourPreferen
       await service.savePreferences(event.id, prefs);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Präferenzen gespeichert. Deine Teilnahme meldest '
-                'du über "Ich bin dabei" am Event-Tag an.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'dh.prefs.savedHint')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -395,14 +405,15 @@ String genderPrefFromList(List<String> genderPreferences) {
 
 /// Geschlechts-Präferenz für Dating Hour.
 enum _GenderPreference {
-  all('all', 'Alle Geschlechter'),
-  women('women', 'Frauen'),
-  men('men', 'Männer'),
-  nonBinary('non_binary', 'Nichtbinäre Personen');
+  all('all', 'Alle Geschlechter', 'dh.gender.all'),
+  women('women', 'Frauen', 'dh.gender.women'),
+  men('men', 'Männer', 'dh.gender.men'),
+  nonBinary('non_binary', 'Nichtbinäre Personen', 'dh.gender.nonBinary');
 
-  const _GenderPreference(this.value, this.label);
+  const _GenderPreference(this.value, this.label, this.labelKey);
   final String value;
   final String label;
+  final String labelKey;
 }
 
 /// Section-Title Widget.

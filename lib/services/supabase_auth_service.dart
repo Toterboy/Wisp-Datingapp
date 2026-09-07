@@ -5,6 +5,7 @@ import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/services/app_auth_service.dart';
 import 'package:wisp/services/auth_exception.dart';
 import 'package:wisp/services/encryption_service.dart';
+import 'package:wisp/services/passkey_auth.dart';
 import 'package:wisp/services/secure_storage.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -335,6 +336,46 @@ class SupabaseAuthService implements AppAuthService {
 
     if (kDebugMode) {
       debugPrint('[SupabaseAuthService] login erfolgreich.');
+    }
+  }
+
+  /// Loggt einen Nutzer per Passkey (WebAuthn) ein.
+  ///
+  /// Führt bewusst DIESELBEN Nachlauf-Effekte aus wie [login]: Token-
+  /// Persistenz im [SecureTokenStore] und Setzen der Signal-User-ID. Der
+  /// frühere Passkey-Pfad lief NUR über den GoTrue-Event-Listener - es
+  /// fehlten diese Effekte, und der Profil-/Daten-Sync nach der Anmeldung
+  /// lief nicht zuverlässig (Name & Co. blieben leer).
+  ///
+  /// [captchaToken]: Der Server verlangt es für den Passkey-Flow ebenfalls,
+  /// wenn im Dashboard CAPTCHA aktiviert ist.
+  @override
+  Future<void> loginWithPasskey({String? captchaToken}) async {
+    if (kDebugMode) {
+      debugPrint('[SupabaseAuthService] loginWithPasskey aufgerufen');
+    }
+
+    // Zeremonie (Options holen -> Fingerprint/Gesicht -> Verify) inkl.
+    // Concurrent-Guard über PasskeyAuth.
+    await PasskeyAuth.signIn(captchaToken: captchaToken);
+
+    final user = _supabase.auth.currentUser;
+    final session = _supabase.auth.currentSession;
+    if (user == null || session == null) {
+      throw AppException(
+          'Passkey-Anmeldung fehlgeschlagen. Bitte erneut versuchen.');
+    }
+
+    await _tokens.saveTokens(
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken ?? '',
+      userId: user.id,
+    );
+    // Safety-Numbers (Signal-Fingerprint) benötigen die eigene User-ID.
+    _encryption.localUserId = user.id;
+
+    if (kDebugMode) {
+      debugPrint('[SupabaseAuthService] loginWithPasskey erfolgreich.');
     }
   }
 

@@ -11,6 +11,10 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
   Features, Moderation on-device, i18n-Ausbau
 - **0.9.0** – Nahbereichs-Funke („Transit Spark", BLE): das erste komplett
   neue Kern-Feature
+- **0.10.0** – Emotionaler Rückzugsort (Sanctuary) & lokaler
+  KI-Reflexions-Chat (rein on-device)
+- **0.11.0** – Web-Bridge, Transit-Reachability & Zero-Install
+  Gast-Verbindungen (Flutter Web, Codeberg Pages)
 - Neue Nutzerfunktionen sind immer MINOR-Bumps; nur Fixes gehen in PATCH.
 
 ## Erledigt
@@ -58,6 +62,12 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       Symbol als klare Herz-Silhouette (vorher praktisch leer),
       Reporter-Pseudonymisierung (069), Nachweis-Pflicht für Bild-Meldungen
       (068), 20er-Ziel nur mit Accounts >= 24 h (070)
+      - Nachtrag (+6): angemeldete Geräte einsehen + „Überall abmelden",
+        Themefarbe/Entfernung/Altersspanne überleben Neuinstallationen
+        (Migration 071), Dating-Hour-Regeln nur einmal pro Konto,
+        Altersspannen-Regler-Fix (18-18), Profil-Editor-Speicherdialog,
+        Notification-Icon-Alpha-Fix (weißes Viereck), Passkey-Registrierung
+        robust (Pre-Cancel-Race + Doppel-Tap-Schutz)
 - [x] **Dating-Hour-Zeit: Fallback gehärtet** – Live-Check bestätigte:
       `server-time` antwortet korrekt; die Regression war der transiente
       Fallback auf die lokale Gerätezeit bei fehlgeschlagenem Zeit-Abruf.
@@ -66,6 +76,19 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       Serverzeit, und die harte Prüfung (Beitritt) bleibt serverseitig
       (Event-Status aus der DB). Verbleibend: Bei einem erneuten Vorfall
       Ursache per App-Log bestätigen
+- [x] **0.8.0 Nachtrag 1** (Build 12) – DH über 20 hinaus (echte
+      Teilnehmer-Zahl), Chat-Export/-Import für Gerätewechsel,
+      pro-CPU-APKs + AAB-Build
+- [x] **0.8.0 Nachtrag 2** (2026-09-07) – verschlüsselte Profilbilder
+      (AES-256-GCM, Migration 077), Profilbilder serverseitig persistent,
+      NSFW on-device wirksam (Modell-Ladefix + Inferenz-Test),
+      migrations-robuste Sync-Schicht (Fallback-Laden, selbstheilende
+      Writes, Theme-Restore dreistufig), Pausenmodus in die
+      Sichtbarkeits-Auswahl integriert (Dopplung aufgelöst), Chat-Verlauf
+      in drei Modi (Aus/200/Alles), echtes Gerätemodell in „Angemeldete
+      Geräte" (078), Zweisprachigkeit für Farbschemata/Moods/Entdecken-
+      Modi/Sichtbarkeit, „Funke(n)"-Sprache konsequent, Sync-Fehler
+      sichtbar (SnackBar + check_columns.sql), abgerundete Klick-Animation
 
 ## In Arbeit
 
@@ -74,51 +97,67 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 - [ ] F-Droid-Veröffentlichung (Build-Seite fertig: google-freier Flavor,
       UnifiedPush, Fastlane-Metadaten – Einreichung steht noch aus)
 
-## Geplant für 0.8.0 (Geschmack & Matching)
+## 0.8.0 – Geschmack & Matching (umgesetzt, inkl. Nachträge 1–2)
 
-- [ ] **Musik-Geschmack**: Genres auswählen, die man mag (Mehrfachauswahl,
+> Status nach dem Bau (v0.8.0): Umgesetzt mit Migration 074 (Musik,
+> Match-Status, Score, ui_prefs) + 075 (Quiz-Pool). Die NSFW-on-device-
+> Punkte sind mit Nachtrag 2 (2026-09-07) vollständig wirksam: gebündeltes
+> Modell (image-safety-classifier-xs, ONNX-IR auf 9 gepatcht, echtes
+> Inferenz-Test), Avatar-Upload-Prüfung aktiv.
+
+- [x] **Musik-Geschmack**: Genres auswählen, die man mag (Mehrfachauswahl,
       inkl. „Instrumental") und – freiwillig – Genres, die man gar nicht
       mag; fließt in den Matching-Score ein und ist im Profil sichtbar
-- [ ] **Quiz-Fragen vervollständigen**: Den Fragen-Pool des Kennenlern-
-      Quiz erweitern und final abstimmen (derzeit noch unvollständig)
-- [ ] **Inaktive Funken: eigene Kategorie ganz unten** im Feed
+- [x] **Quiz-Fragen vervollständigen**: 60 echte Fragen ersetzen die 5
+      Platzhalter (Migration 075, idempotent)
+- [x] **Inaktive Funken: eigene Kategorie ganz unten** im Feed
       („Erschlossene Funken"). KEIN Countdown, KEINE Ablauf-Benachrichtigung,
       KEINE „jetzt verlängern!"-Aktion – inaktive Verbindungen rutschen
       still in die Kategorie, es gibt schlicht kein Dingserlebnis
       (bewusst KEIN Streak-/TikTok-Druck)
-- [ ] **Chats verwalten**: Chats einzeln anwählbar (Mehrfachauswahl) und
-      per Button löschbar – einzeln oder alle auf einmal
-- [ ] **Re-Funke ohne Druck**: Beide können eine gekühlte Verbindung
-      jederzeit mit je einem Tap neu anzünden – ohne Frist
-- [ ] **Ideen-Rad im Meet-Intent** (Test): „Dreh das Rad" wählt aus den
-      bestehenden Date-Kategorien einen gemeinsamen Vorschlag (beide
-      bestätigen); die App kennt weiterhin bewusst KEINE Treffpunkte
-- [ ] **Dating Hour ausbauen**: thematische Runden (z. B. Reise, Alltag,
-      Träume) + Frage-Karten für Schüchterne (3 sanfte Vorschläge, 1 Tap
-      übernimmt)
-- [ ] **Verbindungs-Score sichtbar**: Der serverseitig bereits berechnete
-      Matching-Score wird transparent angezeigt (Transparenz statt
-      Dopamin; die App feiert weiterhin nur echte Momente – Funke-Overlay,
-      Streak ohne Schreibzwang – und erzeugt keine Belohnungs-Loops)
-- [ ] **Langsame Enthüllung fein gestuft**: Interesse → Quiz → schrittweise
-      Foto-Freigabe statt alles/nichts (Foto-Blur ist der Anfang)
-- [ ] **Ehrliches Beenden**: vorbereitete, freundliche Absage-Texte und
-      „Funke ruhig enden lassen" – Ghosting aktiv erschweren
-- [ ] **NSFW on-device**: Moderationsmodell läuft vollständig LOKAL in der
-      App (kleines quantisiertes NSFW-Modell als App-Asset, ~5 MB, offline
-      fähig) – bei Bild-Meldungen verlässt das Bild das Gerät vor der
-      Prüfung gar nicht mehr; nur Report + KI-Ergebnis gehen per Mail an
-      das Team (Bild als Mail-Anhang bleibt davon unberührt). Der
-      serverseitige Scan aus 0.7.1 (Edge Function `report-image`) bleibt
-      als Fallback für ältere App-Versionen bestehen
-- [ ] **Profilbild-Prüfung beim Upload** (NSFW, melde-unabhängig)
-- [ ] **i18n-Rest**: verbleibende Screens (Onboarding, Chat, Dating Hour,
-      Profile etc.) zweisprachig
-- [ ] **UI-Einstellungen serverseitig synchronisieren**: Der Rest der
-      lokalen Präferenzen (Farbwelt, Sichtbarkeit, Benachrichtigungs-
-      Schalter usw.) folgt in profiles – nach Neuinstallation ist ALLES
-      wieder da, ganz ohne Export/Import. Sensible Inhalte (Chats,
-      E2E-Identität) bleiben davon ausgenommen
+- [x] **Chats verwalten**: Chats einzeln anwählbar (Mehrfachauswahl) und
+      per Button ausblenden (nur für mich, Migration 074) – einzeln oder
+      alle auf einmal
+- [x] **Re-Funke ohne Druck**: Beide können eine gekühlte Verbindung
+      jederzeit mit je einem Tap neu anzünden – ohne Frist (RPC
+      respark_match, Migration 074)
+- [x] **Ideen-Rad im Meet-Intent** (Test): „Dreh das Rad" wählt aus den
+      bestehenden Date-Kategorien einen gemeinsamen Vorschlag; der
+      Vorschlag wird als E2E-Nachricht geteilt und im Chat bestätigt
+- [x] **Dating Hour ausbauen**: Frage-Karten für Schüchterne (3 sanfte
+      thematische Vorschläge – Reise/Alltag/Träume –, 1 Tap übernimmt;
+      rotieren pro Stunde)
+- [x] **Verbindungs-Score sichtbar**: Der Matching-Score wird serverseitig
+      berechnet (Distanz 40 % + gemeinsame Interessen 30 % + Musik 30 %,
+      Migration 074) und als „Match: X %" im Find-your-Match angezeigt
+      (Transparenz statt Dopamin; die App feiert weiterhin nur echte
+      Momente – Funke-Overlay, Streak ohne Schreibzwang – und erzeugt
+      keine Belohnungs-Loops)
+- [x] **Langsame Enthüllung fein gestuft**: war bereits über die
+      Quiz-Freischaltstufen umgesetzt (0 = unscharf/SW, 1 = scharf/SW,
+      2 = scharf/farbig) – als v0.8.0-Grundlage bestätigt
+- [x] **Ehrliches Beenden**: vorbereitete, freundliche Absage-Texte und
+      „Funke ruhig enden lassen" – Ghosting aktiv erschweren (Dialog im
+      Chat, Migration 074)
+- [x] **NSFW on-device**: vollständig wirksam (Nachtrag 2) – gebündeltes
+      Modell `image-safety-classifier-xs.onnx` via onnxruntime; Ladefehler
+      behoben (ONNX-IR-Version, Batch-Dimension, 0-255-Pixelskalierung)
+      und durch einen permanenten Inferenz-Test abgesichert. Der
+      serverseitige Scan aus 0.7.1 bleibt als Fallback bestehen
+- [x] **Profilbild-Prüfung beim Upload** (NSFW, melde-unabhängig): aktiv –
+      Check vor dem Upload (Bild verlässt bei Nichtbestehen das Gerät
+      nicht), Einspruch-Dialog mit Team-Review; offene Feinjustierung des
+      Schwellwerts an echten Fällen
+- [x] **i18n-Rest**: weitgehend geschlossen – Farbschemata, Stimmungs-Chips,
+      Entdecken-Modi, Sichtbarkeits-Optionen und alle neuen Features sind
+      zweisprachig; Rest: einzelne ältere harte Strings (Altersfilter,
+      Einrichtung)
+- [x] **UI-Einstellungen serverseitig synchronisieren**: Der Rest der
+      lokalen Präferenzen (Blind Mode, Sichtbarkeit, Dark Mode,
+      Benachrichtigungs-Schalter, Blur) folgt in profiles.ui_prefs
+      (Migration 074) – nach Neuinstallation ist ALLES wieder da, ganz
+      ohne Export/Import. Sensible Inhalte (Chats, E2E-Identität) bleiben
+      davon ausgenommen
 
 ## Geplant für 0.9.0 – Nahbereichs-Funke („Transit Spark", BLE)
 
@@ -186,6 +225,147 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       serverseitig
 - [ ] **Native Berechtigungen**: Android (`AndroidManifest.xml`) und iOS
       (`Info.plist`) BLE-Konfiguration
+
+## Geplant für 0.10.0 – Emotionaler Rückzugsort (Sanctuary) & Lokaler KI-Reflexions-Chat
+
+> Vision: Ein vollständig offlinefähiger, geschützter Raum zur
+> Selbstreflexion bei Frust, Zurückweisung oder emotionalen Tiefs –
+> betrieben durch rein lokale On-Device-Sprachmodelle. Kein Server, kein
+> Konto, keine Weitergabe: Was im Sanctuary geschrieben wird, bleibt im
+> RAM (optional lokal AES-verschlüsselt).
+
+### 1. Modell-Management & Download-Pipeline
+
+- [ ] **Stufenbasierte Modellauswahl**:
+      * Stufe 1 (Kompakt / Akkusparend): Gemma 4 E2B, Spark-X2.5-1.7B
+        (Text-only)
+      * Stufe 2 (Erweitert / Tiefgründig): Qwen 3.5-4B, Gemma 4 E4B,
+        Spark-X2.5-4B
+- [ ] **Quantisierungs-Varianten**: Jedes Modell ist wählbar in
+      Q4_K_M (Standard, Balance), Q5_K_M / Q6_K (höhere Qualität) und
+      Q3_K_S / IQ3 (wenig Speicher) – der Downloader zeigt Größe/RAM-
+      Bedarf je Variante und warnt bei zu knappem Speicher
+- [ ] **Multimodal-Kennzeichnung (Vision-Badge)**: Modelle mit
+      Bilderkennung werden optisch gekennzeichnet, um Screenshots von
+      Chats zwecks Interpretation und Formulierungshilfe analysieren zu
+      können
+- [ ] **Hugging-Face-Downloader**: Direkter Download der GGUF-Dateien mit
+      Fortschrittsanzeige, Hash-Prüfung, Abbruch-/Fortsetzungslogik und
+      Speicherwarnung
+- [ ] **Eigener Modell-Import**: Manuelle Eingabe beliebiger
+      Hugging-Face-Repo-URLs oder lokaler Import von GGUF-Dateien aus dem
+      Smartphone-Speicher
+- [ ] **Eigene-Modell-Erkennung**: Wird ein importiertes Modell erkannt,
+      das einem der kuratierten Vorschlagsmodelle entspricht (Datei-Hash
+      bzw. Repo-/Dateiname-Muster), übernimmt die App automatisch dessen
+      geprüfte System-Prompt-Vorlage – der Nutzer muss nichts konfigurieren
+
+### 2. Inferenz-Engine & Prompt-Steuerung
+
+- [ ] **Lokale Ausführung** via llama.cpp (FFI) oder MediaPipe / LiteRT –
+      ohne jede externe Serververbindung
+- [ ] **Fest integrierte, modellspezifisch optimierte System-Prompts** für
+      alle kuratierten Standardmodelle (Fokus auf Empathie, kognitive
+      Umstrukturierung, offene Fragen, keine falschen Diagnosen)
+- [ ] **Editierbarer Standard-System-Prompt** für benutzerdefinierte
+      Fremdmodelle
+
+### 3. Sicherheits- und Qualitätssystem
+
+- [ ] **Prominente Hinweise**: Pflichtbanner („KIs machen Fehler, dienen
+      rein als Reflexionshilfe und ersetzen keine Therapie")
+- [ ] **Modell-Meldung**: Meldefunktion („Modellqualität beanstanden"),
+      um unbrauchbare, halluzinierende oder toxische Antworten strukturiert
+      zur Prüfung an das Team zu senden
+- [ ] **Krisen-Erkennung**: Regex-basierte On-Device-Erkennung suizidaler
+      Begriffe mit sofortiger, unaufdringlicher Einblendung von
+      Notfallkontakten (Telefonseelsorge, Nummer gegen Kummer)
+- [ ] **Datenintegrität**: Chatverläufe verbleiben flüchtig im RAM oder
+      werden optional rein lokal AES-verschlüsselt in Hive abgelegt
+
+## Geplant für 0.11.0 – Web-Bridge, Transit-Reachability & Zero-Install Gast-Verbindungen
+
+> Vision: Nutzer können Menschen im Alltag und im Nahverkehr (z. B. im
+> Zug, Bus oder Café) direkt erreichen – unabhängig davon, ob die andere
+> Person WispDating installiert hat, sich im selben WLAN befindet oder
+> mehrere Waggons entfernt sitzt.
+
+### 1. OS-Level „System-Ping“ (Überbrückung ohne App & ohne Netzwerk)
+
+- [ ] **One-Tap Quick-Share- & AirDrop-Trigger**: Generiert in der App
+      eine grafische Einladungskarte mit Blind-Profil, Vornamen, optischen
+      Merkmalen und verschlüsseltem Web-Link
+- [ ] **Systemweiter Freigabedialog**: Öffnet direkt Android Quick Share /
+      iOS AirDrop zur Übertragung via Wi-Fi Direct und BLE
+- [ ] **Vollbild-Pop-up beim Gegenüber** (sofern für die Umgebung
+      sichtbar): spürbare Vibration + Bildvorschau ohne vorherige
+      App-Installation
+- [ ] **EU-Hosting & Bereitstellung**: Statische Bereitstellung der
+      Flutter-Web-Artefakte über Codeberg Pages (Codeberg e.V., Berlin) –
+      vollkommen trackerfrei, ohne US-Cloud-Abhängigkeit (CLOUD Act) und
+      mit automatischer SSL-Zertifizierung für die eigene Domain
+
+### 2. Passiver Funk-Leuchtturm (Hotspot-SSID-Beacon)
+
+- [ ] **Temporärer Hotspot-Schalter** mit konfigurierbarem Netzwerknamen
+      (SSID), z. B. `wisp.app/RE9-Wagen3` oder `Laecheln_im_Wagen_4`
+- [ ] **Sichtbarer Link in der WLAN-Suche** fremder Smartphones bei
+      Reichweiten von bis zu 30 Metern
+- [ ] **Offline-Captive-Portal**: Verbindet sich die Person mit dem
+      Hotspot, öffnet sich automatisch das Web-Profil direkt vom
+      Smartphone gehostet; alternativ ist die kurze Web-Adresse über
+      mobile Daten im Browser öffnbar
+
+### 3. Fahrplan-Synchronisation & Live-Strecken-Board (`wisp.app/live`)
+
+- [ ] **Exakte Fahrt-Identifikation**: Check-in mit Linie (z. B. RE9),
+      offizieller Zugnummer (z. B. RE 4412), Startbahnhof und
+      fahrplanmäßiger Abfahrtszeit zur eindeutigen Unterscheidung
+      paralleler Fahrten
+- [ ] **Waggon-Ruf**: Optionale Angabe des Sitzbereichs (z. B. „Wagen 3,
+      oberes Deck") und dezenter visueller Merkmale (z. B. „Schwarze
+      Jacke, liest Buch")
+- [ ] **Asynchrones Web-Board**: Fahrgäste können während oder nach der
+      Fahrt auf `wisp.app/live` nach ihrer Zugverbindung suchen und einen
+      anonymen Gast-Chat mit der Person starten
+
+### 4. Same-Train-Matching (für Nutzer mit installierter App)
+
+- [ ] **BSSID- & Gateway-Erkennung**: Erkennt automatisch, wenn zwei
+      Geräte im selben Zug-WLAN (z. B. WIFIonICE) angemeldet sind, und
+      schaltet eine gemeinsame Waggon-Lobby frei
+- [ ] **Vektor- & Geschwindigkeitsabgleich**: Erkennt über grobe
+      GPS-Vektoren und übereinstimmende Fahrgeschwindigkeiten auf
+      Schienensträngen (>80 km/h), dass sich Nutzer im selben Zug
+      befinden – selbst wenn BLE durch Waggontrennwände blockiert ist
+
+### 5. Zero-Install Web-Gastzugang (Flutter Web & Supabase)
+
+- [ ] **Einmalige Einladungslinks** (`wispdating.app/spark/<token>`) mit
+      kryptografisch gesicherten Session-Tokens
+- [ ] **Kein Download, keine Registrierung, keine Telefonnummer und keine
+      E-Mail-Abfrage** für den Gast erforderlich
+- [ ] **E2E-verschlüsselter P2P-Chat** direkt im mobilen Browser (WebRTC
+      via WebAssembly) zur nativen App des Wisp-Nutzers
+- [ ] **Flüchtige Sitzungen**: Chatrooms zerstören sich serverseitig nach
+      24 oder 48 Stunden rückstandslos selbst
+
+### 6. Interaktive Web-Visitenkarte & Vor-Ort-Schnittstellen
+
+- [ ] **Geschützte Profilansicht für Gäste**: Audio-Vorstellung anhören,
+      Hobbys und Mood sehen; Profilfotos bleiben standardmäßig unscharf
+- [ ] **Dynamischer Vollbild-QR-Code** mit automatischer Display-Aufhellung
+      für schnelles Scannen im Nahbereich
+- [ ] **NFC-Unterstützung** für physische Kontaktkarten und Sticker
+
+### 7. Konvertierung & Missbrauchsschutz
+
+- [ ] **Nahtloses Onboarding**: Möglichkeit, den flüchtigen Web-Chat bei
+      nachträglicher App-Installation in ein reguläres Konto zu überführen
+- [ ] **Rate-Limits** für das Erzeugen von Einladungs-Tokens gegen
+      Link-Spam
+- [ ] **Eingehende Gast-Nachrichten** unterliegen denselben
+      Sicherheitsregeln (Bild-Blur, Meldung mit manueller Admin-Prüfung)
 
 ## Irgendwann / Idee
 

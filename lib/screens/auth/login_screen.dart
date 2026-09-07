@@ -11,7 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisp/models/gender.dart';
 import 'package:wisp/providers/auth_provider.dart';
 import 'package:wisp/services/auth_exception.dart';
-import 'package:wisp/services/passkey_auth.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/utils/constants.dart';
@@ -339,14 +338,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// Meldet den Nutzer per Passkey (WebAuthn) an, ohne E-Mail/Passwort.
   ///
-  /// Läuft nur im Supabase-Modus. Nach erfolgreicher Zeremonie setzt der
-  /// AuthNotifier den Status via `onAuthStateChange` (signedIn) und der
-  /// Router leitet automatisch weiter (Home bzw. Setup-Redirect) – daher
-  /// wird hier NICHT explizit navigiert. Eine sofortige `context.go(home)`
-  /// würde den Redirect vor dem Aktualisieren des Auth-Status auslösen und
-  /// den Nutzer kurz zurück zum Login werfen.
+  /// Läuft NUR im Supabase-Modus und über denselben Pfad wie die
+  /// Passwort-Anmeldung ([AuthNotifier.loginWithPasskey]): Ladezustand
+  /// (Ladekreis), Aufräumen und Server-Sync. Nach erfolgreicher Zeremonie
+  /// wird explizit zu Home navigiert - der Router-Redirect leitet je nach
+  /// Setup-Fortschritt weiter.
   Future<void> _signInWithPasskey() async {
     setState(() => _passkeyLoading = true);
+    // Großer, nicht-abwischbarer Ladekreis - wie bei der Passwort-
+    // Anmeldung (Nutzerwunsch: klar sichtbares Feedback direkt nach dem
+    // Tap, der kleine Button-Spinner allein reichte nicht).
+    unawaited(_showBlockingLoader());
     try {
       // Bei aktivierter Dashboard-CAPTCHA verlangt der Server auch für
       // den Passkey-Login ein Token (wie beim normalen Login), sonst
@@ -367,9 +369,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           return;
         }
       }
-      await PasskeyAuth.signIn(captchaToken: captchaToken);
-      // Kein explizites Navigieren: Der Auth-State-Listener setzt den
-      // Status auf "eingeloggt" und der Router übernimmt die Weiterleitung.
+      await ref.read(authProvider.notifier).loginWithPasskey(
+            captchaToken: captchaToken,
+          );
+      // Explizite Navigation nach erfolgreichem Login - wie im
+      // Passwort-Pfad (zuverlässiger als der Router-Redirect allein).
+      debugPrint('[LoginScreen] Passkey-Login erfolgreich, navigiere zu Home');
+      if (mounted) {
+        context.go(AppRoutes.home);
+      }
     } catch (e) {
       if (mounted) {
         final message = e is AppException
@@ -383,6 +391,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     } finally {
+      _dismissBlockingLoader();
       if (mounted) setState(() => _passkeyLoading = false);
     }
   }

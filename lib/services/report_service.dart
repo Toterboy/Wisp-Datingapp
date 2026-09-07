@@ -22,6 +22,59 @@ import 'package:wisp/utils/constants.dart';
 /// ein Brute-Force über den Hash ist praktisch ausgeschlossen.
 String hashPii(String value) => sha256.convert(utf8.encode(value)).toString();
 
+/// Eigene Meldungen mit Status (v0.8.0 Meldungs-Feedback).
+class MyReportEntry {
+  const MyReportEntry({
+    required this.id,
+    required this.reportType,
+    required this.status,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String reportType;
+  final String status;
+  final DateTime? createdAt;
+
+  factory MyReportEntry.fromJson(Map<String, dynamic> json) {
+    return MyReportEntry(
+      id: json['id'] as String,
+      reportType: json['reportType'] as String? ?? '',
+      status: json['status'] as String? ?? 'pending',
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.tryParse(json['createdAt'] as String),
+    );
+  }
+
+  /// Lesbarer Status für die UI (ohne interne Details).
+  String get statusLabel =>
+      status == 'pending' ? 'Wird geprüft' : 'Wurde geprüft';
+}
+
+/// Blockierter Nutzer (v0.8.0 Blockierliste).
+class BlockedUserEntry {
+  const BlockedUserEntry({
+    required this.blockedUserId,
+    required this.name,
+    required this.createdAt,
+  });
+
+  final String blockedUserId;
+  final String name;
+  final DateTime? createdAt;
+
+  factory BlockedUserEntry.fromJson(Map<String, dynamic> json) {
+    return BlockedUserEntry(
+      blockedUserId: json['blockedUserId'] as String,
+      name: json['name'] as String? ?? 'Unbekannt',
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.tryParse(json['createdAt'] as String),
+    );
+  }
+}
+
 /// Service für Nutzer-Reports (Melden-Funktion).
 ///
 /// Speichert Reports lokal in Hive UND übermittelt sie zentral an Supabase
@@ -34,6 +87,34 @@ class ReportService {
 
   late Box<UserReport> _box;
   bool _initialized = false;
+
+  /// Eigene Meldungen inkl. Status (v0.8.0 Meldungs-Feedback, RPC 076).
+  Future<List<MyReportEntry>> listMyReports() async {
+    final response =
+        await SupabaseService.client.rpc('list_my_reports');
+    final rows = (response as List<dynamic>? ?? <dynamic>[]);
+    return rows
+        .map((row) =>
+            MyReportEntry.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Blockierte Nutzer (v0.8.0 Blockierliste, RPC 076).
+  Future<List<BlockedUserEntry>> listBlockedUsers() async {
+    final response =
+        await SupabaseService.client.rpc('list_blocked_users');
+    final rows = (response as List<dynamic>? ?? <dynamic>[]);
+    return rows
+        .map((row) =>
+            BlockedUserEntry.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Blockierung aufheben (RPC unblock_user aus Migration 043).
+  Future<void> unblockUser(String blockedUserId) async {
+    await SupabaseService.client
+        .rpc('unblock_user', params: {'p_blocked': blockedUserId});
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;

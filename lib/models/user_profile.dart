@@ -90,6 +90,17 @@ class UserProfile {
   /// Umgang mit anderen Drogen (beeinflusst den Find-your-Match-Algorithmus).
   final HabitudeLevel? drugs;
 
+  /// Musik-Genres, die der Nutzer mag (Slugs aus dem Katalog, Migration 074).
+  final List<String> musicLiked;
+
+  /// Musik-Genres, die der Nutzer explizit NICHT mag (negativer Score).
+  final List<String> musicDisliked;
+
+  /// Verbindungs-Score (0-100, serverseitig in get_find_match_candidates
+  /// berechnet: Distanz + gemeinsame Interessen + Musik). Nur für
+  /// Kandidaten-Objekte gesetzt, reiner Anzeige-Wert.
+  final int? matchScore;
+
   const UserProfile({
     required this.id,
     required this.name,
@@ -118,6 +129,9 @@ class UserProfile {
     this.smoking,
     this.alcohol,
     this.drugs,
+    this.musicLiked = const <String>[],
+    this.musicDisliked = const <String>[],
+    this.matchScore,
   });
 
   /// Berechnet das Alter dynamisch basierend auf dem aktuellen Datum.
@@ -160,8 +174,15 @@ class UserProfile {
       smoking: HabitudeLevel.fromServer(json['smoking'] as String?),
       alcohol: HabitudeLevel.fromServer(json['alcohol'] as String?),
       drugs: HabitudeLevel.fromServer(json['drugs'] as String?),
+      musicLiked: (json['music_liked'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<String>()
+          .toList(),
+      musicDisliked: (json['music_disliked'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<String>()
+          .toList(),
       // Abgerundete Distanz in km (5-km-Schritte, serverseitig berechnet).
       distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0,
+      matchScore: (json['match_score'] as num?)?.toInt(),
     );
   }
 
@@ -201,11 +222,17 @@ class UserProfile {
       isLocationSuspicious:
           json['is_location_suspicious'] as bool? ?? false,
       mood: json['mood'] as String?,
-      introText: json['introText'] as String? ?? '',
-      introAudioPath: json['introAudioPath'] as String?,
+      introText: json['intro_text'] as String? ?? '',
+      introAudioPath: json['intro_audio_path'] as String?,
       smoking: HabitudeLevel.fromServer(json['smoking'] as String?),
       alcohol: HabitudeLevel.fromServer(json['alcohol'] as String?),
       drugs: HabitudeLevel.fromServer(json['drugs'] as String?),
+      musicLiked: (json['music_liked'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<String>()
+          .toList(),
+      musicDisliked: (json['music_disliked'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<String>()
+          .toList(),
     );
   }
 
@@ -238,6 +265,8 @@ class UserProfile {
         'smoking': smoking?.toServer(),
         'alcohol': alcohol?.toServer(),
         'drugs': drugs?.toServer(),
+        'music_liked': musicLiked,
+        'music_disliked': musicDisliked,
       };
 
   /// Erstellt eine Kopie mit veränderten Feldern (immutabel).
@@ -269,6 +298,9 @@ class UserProfile {
     HabitudeLevel? smoking,
     HabitudeLevel? alcohol,
     HabitudeLevel? drugs,
+    List<String>? musicLiked,
+    List<String>? musicDisliked,
+    int? matchScore,
     bool clearIntroAudio = false,
   }) {
     return UserProfile(
@@ -302,6 +334,9 @@ class UserProfile {
       smoking: smoking ?? this.smoking,
       alcohol: alcohol ?? this.alcohol,
       drugs: drugs ?? this.drugs,
+      musicLiked: musicLiked ?? this.musicLiked,
+      musicDisliked: musicDisliked ?? this.musicDisliked,
+      matchScore: matchScore ?? this.matchScore,
     );
   }
 

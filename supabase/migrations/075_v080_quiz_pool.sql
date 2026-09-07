@@ -1,0 +1,73 @@
+-- 075_v080_quiz_pool.sql
+--
+-- v0.8.0: Quiz-Fragen-Pool erweitert - 60 echte Fragen (Alltag, Geografie,
+-- Essen & Trinken, Musik, Tiere, Körper, Technik, Sprache, Logik, Sport)
+-- ersetzen die 5 Platzhalter von 034. Idempotent: ein Unique-Index auf dem
+-- Prompt + ON CONFLICT DO NOTHING; die korrekte Antwort rotiert über die
+-- Optionspositionen (nicht immer Index 0).
+
+CREATE UNIQUE INDEX IF NOT EXISTS quiz_questions_prompt_unique
+  ON public.quiz_questions ((lower(prompt)));
+
+INSERT INTO public.quiz_questions (prompt, options, correct_index) VALUES
+  ('Welches Tier ist das größte Landsäugetier der Erde?', '["Afrikanischer Elefant", "Nilpferd", "Nashorn", "Giraffe"]'::jsonb, 0),
+  ('Woraus entsteht Regen?', '["Kondensierender Wasserdampf", "Verdunstetes Meerwasser direkt", "Reif", "Hagelschmelze"]'::jsonb, 0),
+  ('Wie viele Minuten dauert eine halbe Fußball-Erfolgsphase?', '["Die Frage ist falsch gestellt", "45", "30", "60"]'::jsonb, 0),
+  ('Welche Stadt liegt am Rhein?', '["Köln", "Hamburg", "Stuttgart", "Dresden"]'::jsonb, 0),
+  ('Was misst ein Barometer?', '["Luftdruck", "Temperatur", "Luftfeuchtigkeit", "Höhe"]'::jsonb, 0),
+  ('Welches Land hat die meisten Einwohner?', '["Indien", "USA", "Indonesien", "Brasilien"]'::jsonb, 0),
+  ('Was bedeutet „kühl" beim Wetter?', '["Eher kalt, aber nicht frostig", "Eiskalt", "Schwül", "Windstill"]'::jsonb, 0),
+  ('Welcher Kaffee wird mit aufgeschäumter Milch zubereitet?', '["Cappuccino", "Espresso", "Ristretto", "Lungo"]'::jsonb, 0),
+  ('Welches Gewürz gilt als das teuerste der Welt?', '["Safran", "Vanille", "Kardamom", "Zimt"]'::jsonb, 0),
+  ('Aus welchem Land stammt die Pizza?', '["Italien", "Spanien", "Griechenland", "Frankreich"]'::jsonb, 0),
+  ('Was ist ein „Vokal"?', '["Ein Selbstlaut", "Ein Mitlaut", "Ein Satzzeichen", "Ein Reim"]'::jsonb, 0),
+  ('Welcher Planet hat die markanten Ringe?', '["Saturn", "Jupiter", "Neptun", "Mars"]'::jsonb, 0),
+  ('Wie nennt man ein langes, schweres Gewitter mit Schnee?', '["Schneegestöber", "Blizzard", "Föhn", "Nebel"]'::jsonb, 1),
+  ('Welches Instrument hat 88 Tasten?', '["Klavier", "Akkordeon", "Orgel", "Harfe"]'::jsonb, 0),
+  ('Welche Farbe hat ein klassischer Fußball vor dem ersten Anpfiff traditionell überwiegend?', '["Weiß", "Schwarz", "Gelb", "Rot"]'::jsonb, 0),
+  ('Was ist die Hauptstadt von Österreich?', '["Wien", "Graz", "Salzburg", "Linz"]'::jsonb, 0),
+  ('Welches Meer liegt östlich von Spanien?', '["Mittelmeer", "Nordsee", "Ostsee", "Schwarzes Meer"]'::jsonb, 0),
+  ('Wie viele Spieler stehen bei einer Handball-Mannschaft auf dem Feld?', '["7", "6", "11", "5"]'::jsonb, 0),
+  ('Was ist ein „Basso"?', '["Ein tiefer Männergesang", "Ein schnelles Stück", "Ein Instrument", "Ein Takt"]'::jsonb, 0),
+  ('Welches Obst wächst am Baum?', '["Apfel", "Erdbeere", "Himbeere", "Blaubeere"]'::jsonb, 0),
+  ('Was passt zu „Honig"?', '["Biene", "Wespe", "Ameise", "Käfer"]'::jsonb, 0),
+  ('Welches Land ist berühmt für Tulpen?', '["Niederlande", "Belgien", "Dänemark", "Schweiz"]'::jsonb, 0),
+  ('Was bedeutet der Begriff „vegetarisch"?', '["Ohne Fleisch und Fisch", "Nur Fleisch", "Ohne Milchprodukte", "Nur Rohkost"]'::jsonb, 0),
+  ('Welche Einheit misst Energie?', '["Joule", "Watt", "Newton", "Pascal"]'::jsonb, 0),
+  ('Was ist ein „Duo"?', '["Zwei Personen", "Drei Personen", "Ein Soloprojekt", "Ein Chor"]'::jsonb, 0),
+  ('Welches Instrument wird mit einem Bogen gespielt?', '["Violine", "Gitarre", "Trompete", "Flöte"]'::jsonb, 0),
+  ('Was ist die Hauptstadt von Portugal?', '["Lissabon", "Porto", "Madrid", "Faro"]'::jsonb, 0),
+  ('Welches Tier ist ein Reptil?', '["Schildkröte", "Frosch", "Delfin", "Pinguin"]'::jsonb, 0),
+  ('Was ist „Al Dente"?', '["Pasta mit Biss", "Überkochte Pasta", "Eine Soße", "Ein Wein"]'::jsonb, 0),
+  ('Welcher Fluss fließt durch Paris?', '["Seine", "Loire", "Rhône", "Elbe"]'::jsonb, 0),
+  ('Wie viele Tage hat ein Schaltjahr?', '["366", "365", "364", "367"]'::jsonb, 0),
+  ('Was ist ein „Synonym"?', '["Ein Wort gleicher Bedeutung", "Ein Gegenteil", "Ein Reimwort", "Ein Fachbegriff"]'::jsonb, 0),
+  ('Welches Element hat das Kürzel „Fe"?', '["Eisen", "Fluor", "Phosphor", "Francium"]'::jsonb, 0),
+  ('Was macht ein „Taktstock"-Besitzer beruflich meistens?', '["Dirigent", "Trommler", "Gitarrist", "Sänger"]'::jsonb, 0),
+  ('Welches Land hat eine Küste am Pazifik?', '["Chile", "Portugal", "Türkei", "Griechenland"]'::jsonb, 0),
+  ('Was ist ein „Smoothie"?', '["Mixgetränk aus Früchten", "Kaffeespezialität", "Teegetränk", "Sirup"]'::jsonb, 0),
+  ('Welcher Sport nutzt einen „Frame"?', '["Snooker", "Fußball", "Handball", "Tennis"]'::jsonb, 0),
+  ('Was bedeutet „Nocturne" in der Musik?', '["Nachtstück", "Morgenlied", "Tanz", "Marsch"]'::jsonb, 0),
+  ('Welche Frucht ist eine Beere im botanischen Sinn?', '["Banane", "Apfel", "Birne", "Pflaume"]'::jsonb, 0),
+  ('Was ist die Hauptstadt von Dänemark?', '["Kopenhagen", "Aarhus", "Odense", "Oslo"]'::jsonb, 0),
+  ('Welche Form hat ein „Hexagon"?', '["Sechseck", "Fünfeck", "Achteck", "Viereck"]'::jsonb, 0),
+  ('Welches Getränk wird traditionell grün getrunken zum St. Patricks Day?', '["Bier", "Wein", "Sekt", "Kaffee"]'::jsonb, 0),
+  ('Wie nennt man eine Pause im Musikstück?', '["Generalpause", "Interlude", "Refrain", "Strophe"]'::jsonb, 0),
+  ('Wie viele Farben hat der Regenbogen traditionell?', '["7", "5", "6", "8"]'::jsonb, 0),
+  ('Was ist ein „E-Piano"?', '["Elektronisches/electroakustisches Klavier", "Ein Harmonikainstrument", "Ein Effektgerät", "Ein Synthesizer-Turm"]'::jsonb, 0),
+  ('Was passt zu „Gitarre"?', '["Plektrum", "Bogen", "Schlägel", "Mundstück"]'::jsonb, 0),
+  ('Welcher Planet ist der größte in unserem Sonnensystem?', '["Jupiter", "Saturn", "Neptun", "Erde"]'::jsonb, 0),
+  ('Was bedeutet „à la carte"?', '["Aus der Karte frei wählen", "Festes Menü", "Zum Mitnehmen", "Ohne Bestellung"]'::jsonb, 0),
+  ('Welche Stadt hat den „Eiffelturm"?', '["Paris", "Lyon", "Marseille", "Nizza"]'::jsonb, 0),
+  ('Was ist ein „Kompott"?', '["Fruchtgericht", "Suppe", "Brotaufstrich mit Fleisch", "Gewürzmischung"]'::jsonb, 0),
+  ('Welche Sportart nennt man „Königssport"?', '["Schach", "Fußball", "Boxen", "Leichtathletik"]'::jsonb, 0),
+  ('Was ist ein „Riff" in der Musik?', '["Wiederkehrende Melodie-/Akkordfigur", "Ein Solo", "Ein Gesangsteil", "Ein Taktwechsel"]'::jsonb, 0),
+  ('Welche Farbe entsteht aus Rot und Weiß?', '["Rosa", "Orange", "Lila", "Braun"]'::jsonb, 0),
+  ('Was ist „Quinoa"?', '["Pseudo-Getreide", "Ein Käse", "Eine Hülsenfrucht", "Eine Wurzel"]'::jsonb, 0),
+  ('Welches Land ist für Sushi bekannt?', '["Japan", "China", "Korea", "Thailand"]'::jsonb, 0),
+  ('Was bedeutet „authentisch"?', '["Echt", "Selten", "Kopiert", "Modern"]'::jsonb, 0),
+  ('Welches Instrument ist ein Blasinstrument?', '["Klarinette", "Cello", "Schlagzeug", "Laute"]'::jsonb, 0),
+  ('Was ist die Hauptstadt von Norwegen?', '["Oslo", "Bergen", "Stockholm", "Helsinki"]'::jsonb, 0),
+  ('Welcher Wochentag kommt nach Donnerstag?', '["Freitag", "Mittwoch", "Samstag", "Dienstag"]'::jsonb, 0),
+  ('Was ist ein „Cover" in der Musik?', '["Neuinterpretation eines Songs", "Ein Album-Cover", "Ein Textblatt", "Ein Tonträger"]'::jsonb, 0)
+ON CONFLICT (lower(prompt)) DO NOTHING;

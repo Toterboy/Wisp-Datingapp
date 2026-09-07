@@ -78,19 +78,19 @@ class MainNavigation extends ConsumerWidget {
   /// Tab-Wechsel mit Schutz für ungespeicherte Profil-Änderungen
   /// (Nutzerwunsch): Wird "Profil bearbeiten" mit Änderungen verlassen,
   /// fragt die Navigation nach Speichern / Verwerfen / Abbrechen.
+  ///
+  /// Bewusst OHNE Router-URI-Prüfung: Der Dirty-Flag ist genau dann true,
+  /// wenn der Profil-Editor offen ist und ungespeicherte Änderungen hat -
+  /// der Screen setzt ihn beim Verlassen (dispose) zurück. Die frühere
+  /// URI-Ermittlung über den Router-Delegate war fehleranfällig (der
+  /// Kontext der Bottom-Nav sah die Unter-Route je nach Zeitpunkt nicht),
+  /// wodurch die Nachfrage stil blieb.
   Future<void> _goToTab(
     BuildContext context,
     WidgetRef ref,
     int i,
   ) async {
-    // Robust: GoRouterState.of(context).matchedLocation liefert im
-    // Shell-Builder-Kontext nicht immer die Sub-Route ("/profile/edit")
-    // - dadurch blieb der Dirty-Schutz stumm. Die volle URI des
-    // Router-Delegates ist verlässlich.
-    final location =
-        GoRouter.of(context).routerDelegate.currentConfiguration.uri.toString();
-    final dirty =
-        location.startsWith(AppRoutes.profileEdit) && ref.read(profileEditDirtyProvider);
+    final dirty = ref.read(profileEditDirtyProvider);
     if (dirty) {
       final choice = await showDialog<String>(
         context: context,

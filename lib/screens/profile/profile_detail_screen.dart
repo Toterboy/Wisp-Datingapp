@@ -1,4 +1,6 @@
-﻿import 'package:flutter/foundation.dart' show kDebugMode;
+﻿import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,10 +11,13 @@ import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/supabase_database_service.dart';
+import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/widgets/profile_widgets.dart';
+import 'package:wisp/widgets/music_taste_widgets.dart';
 
 /// Versucht, ein Nutzerprofil anhand seiner ID aus den verfügbaren Quellen
 /// aufzulösen (eigenes Profil, Matches). Liefert null, wenn kein Profil in
@@ -108,9 +113,9 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
           ),
           title: const Text('Profil'),
         ),
-        body: const Center(
-          child: Text('Dieses Profil ist derzeit nicht verfügbar.'),
-        ),
+body: Center(
+child: Text(L10n.t(context, 'profile.detail.unavailable')),
+),
       );
     }
 
@@ -118,7 +123,9 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
     final me = ref.watch(profileProvider);
 
     final genderLabel = profile.gender != null && profile.gender!.isNotEmpty
-        ? Gender.fromValue(profile.gender)?.label ?? ''
+        ? (Gender.fromValue(profile.gender) != null
+            ? L10n.t(context, Gender.fromValue(profile.gender)!.labelKey)
+            : '')
         : '';
 
     final isPhotosVisible = AgeSafetyRules.arePhotosVisible(
@@ -156,11 +163,9 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(
-              child: CircleAvatar(
-                radius: 52,
-                child: !isPhotosVisible
-                    ? const Icon(Icons.visibility_off, size: 48)
-                    : const Icon(Icons.person, size: 56),
+              child: _PublicProfileAvatar(
+                profile: profile,
+                isPhotosVisible: isPhotosVisible,
               ),
             ),
             const SizedBox(height: 16),
@@ -223,7 +228,7 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                     color: Mood.fromValue(profile.mood)?.color,
                   ),
                   label: Text(
-                    'Mood: ${Mood.fromValue(profile.mood)?.label ?? profile.mood}',
+                    'Mood: ${Mood.fromValue(profile.mood) != null ? L10n.t(context, Mood.fromValue(profile.mood)!.labelKey) : (profile.mood ?? '')}',
                   ),
                 ),
               ),
@@ -249,11 +254,13 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Über mich',
+                    Text(L10n.t(context, 'profile.detail.aboutMe'),
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text(
-                      profile.bio.isEmpty ? 'Noch keine Bio.' : profile.bio,
+                      profile.bio.isEmpty
+                          ? L10n.t(context, 'profile.detail.noBio')
+                          : profile.bio,
                     ),
                   ],
                 ),
@@ -274,7 +281,7 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Interessen',
+                        Text(L10n.t(context, 'profile.detail.interests'),
                             style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 12),
                         if (common.isNotEmpty) ...[
@@ -284,7 +291,7 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                                   size: 16,
                                   color: Theme.of(context).colorScheme.primary),
                               const SizedBox(width: 6),
-                              Text('Gemeinsam mit dir',
+                              Text(L10n.t(context, 'profile.detail.commonWithYou'),
                                   style: Theme.of(context)
                                       .textTheme
                                       .labelLarge
@@ -301,10 +308,80 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
                         ],
                         if (others.isNotEmpty) ...[
                           if (common.isNotEmpty)
-                            Text('Weitere',
+                            Text(L10n.t(context, 'profile.detail.more'),
                                 style: Theme.of(context).textTheme.labelLarge),
                           const SizedBox(height: 8),
                           InterestChips(interests: others),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+            // Musik-Geschmack (v0.8.0): gemeinsame Genres hervorgehoben.
+            if (profile.musicLiked.isNotEmpty ||
+                profile.musicDisliked.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Builder(builder: (context) {
+                final me = ref.watch(profileProvider);
+                final common =
+                    profile.musicLiked.where(me.musicLiked.contains).toList();
+                final others =
+                    profile.musicLiked.where((g) => !me.musicLiked.contains(g)).toList();
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.music_note,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text(L10n.t(context, 'profile.detail.music'),
+                                style: Theme.of(context).textTheme.titleMedium),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (common.isNotEmpty) ...[
+                          Row(
+                            children: [
+                              Icon(Icons.favorite,
+                                  size: 16,
+                                  color:
+                                      Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 6),
+                              Text(L10n.t(context, 'profile.detail.sameTaste'),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      )),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          MusicTasteView(
+                            liked: common,
+                            commonWith: common,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (others.isNotEmpty) ...[
+                          if (common.isNotEmpty)
+                            Text(L10n.t(context, 'profile.detail.more'),
+                                style: Theme.of(context).textTheme.labelLarge),
+                          const SizedBox(height: 8),
+                          MusicTasteView(liked: others),
+                        ],
+                        if (profile.musicDisliked.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          MusicTasteView(liked: const [], disliked: profile.musicDisliked),
                         ],
                       ],
                     ),
@@ -319,3 +396,57 @@ class _ProfileDetailScreenState extends ConsumerState<ProfileDetailScreen> {
   }
 }
 
+
+
+/// Profilbild des FREMDEN Nutzers (v0.8.1-Fix): Vorher wurde hier nur ein
+/// Person-Platzhalter gezeigt, weil der public_profiles-View die photos-
+/// Spalte nicht enthielt (Migration 077) und der Screen das Bild gar
+/// nicht lud. Jetzt: signierte URL aus photos.first laden und anzeigen.
+/// Respektiert Blind Mode / Foto-Freischaltung (isPhotosVisible).
+class _PublicProfileAvatar extends ConsumerWidget {
+  const _PublicProfileAvatar({
+    required this.profile,
+    required this.isPhotosVisible,
+  });
+
+  final UserProfile profile;
+  final bool isPhotosVisible;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!isPhotosVisible) {
+      return const CircleAvatar(
+        radius: 52,
+        child: Icon(Icons.visibility_off, size: 48),
+      );
+    }
+    final path = profile.photos.isNotEmpty ? profile.photos.first : null;
+    if (path == null) {
+      return const CircleAvatar(
+        radius: 52,
+        child: Icon(Icons.person, size: 56),
+      );
+    }
+    final storage = ref.watch(supabaseStorageServiceProvider);
+    return FutureBuilder<Uint8List?>(
+      future: storage.loadAvatarBytes(path),
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        if (snapshot.connectionState != ConnectionState.done || bytes == null) {
+          return const CircleAvatar(
+            radius: 52,
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        return CircleAvatar(
+          radius: 52,
+          backgroundImage: MemoryImage(bytes),
+        );
+      },
+    );
+  }
+}

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisp/models/match.dart';
 import 'package:wisp/models/message.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/services/chat_service.dart';
+import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/notification_service.dart';
 import 'package:wisp/utils/constants.dart';
 
@@ -12,6 +15,15 @@ class ChatNotifier extends StateNotifier<List<Match>> {
   ChatNotifier(this._chat) : super(_chat.getMatches());
 
   final ChatService _chat;
+
+  /// Opt-in (v0.8.0): verschlüsselter lokaler Chat-Verlauf.
+  /// [limit]: null = kompletter Verlauf, sonst max. N Nachrichten.
+  void setHistoryPersistence(bool enabled, {int? limit}) =>
+      _chat.setHistoryPersistence(enabled, limit: limit);
+
+  /// Lädt den gespeicherten Verlauf eines Matches (Opt-in aktiv).
+  Future<void> hydrateHistory(String matchId) =>
+      _chat.hydrateHistory(matchId);
 
   /// Erzeugt ein Match aus einem gelikten Profil.
   void addMatch(UserProfile partner, {WidgetRef? ref}) {
@@ -38,6 +50,12 @@ class ChatNotifier extends StateNotifier<List<Match>> {
     state = _chat.getMatches();
     return profile;
   }
+
+  /// QR-Kontakte aus dem Speicher (für den Datenexport): enthält die
+  /// ORIGINAL-Match-IDs, damit importierte Verläufe wieder zuordnenbar
+  /// sind.
+  List<Map<String, String>> exportQrContacts() =>
+      _chat.exportQrContacts();
 
   /// Liefert Nachrichten eines Matches.
   List<Message> messagesFor(String matchId) => _chat.getMessages(matchId);
@@ -95,7 +113,7 @@ class ChatNotifier extends StateNotifier<List<Match>> {
   void _notifyMatch(UserProfile partner, WidgetRef ref) {
     ref.read(notificationServiceProvider).showMatchNotification(
       id: partner.id.hashCode,
-      title: 'Neues Match!',
+      title: 'Neuer Funke!',
       body: 'Du und ${partner.name} haben sich gegenseitig geliked 🎉',
       ref: ref,
     );
@@ -104,22 +122,50 @@ class ChatNotifier extends StateNotifier<List<Match>> {
 
 /// Provider für den Chat-Service.
 ///
-/// WICHTIG: Chat-Nachrichten werden BEWUSST NICHT persistiert (keine
-/// Hive-Box). Chats sind Ende-zu-Ende-verschlüsselt und P2P; Inhalte
-/// existieren nur im Speicher und verlassen das Gerät nie – außer über
-/// die explizite Melde-Funktion (letzte 3 Nachrichten an den Support).
+/// WICHTIG: Chat-Nachrichten werden standardmäßig NICHT persistiert
+/// (Chats sind E2E + P2P). Der Nutzer kann im Settings-Screen den
+/// VERSCHLÜSSELTEN lokalen Verlauf aktivieren (Opt-in, SecureHive) -
+/// dann sichert [ChatService] die letzten 200 Nachrichten AES-256
+/// verschlüsselt auf dem Gerät.
 final chatServiceProvider = Provider<ChatService>((ref) {
   return ChatService();
 });
 
-  /// Provider für Matches & Nachrichten.
-  final chatProvider = StateNotifierProvider<ChatNotifier, List<Match>>((ref) {
-    final service = ref.watch(chatServiceProvider);
-    return ChatNotifier(service);
-  });
+/// Provider für Matches & Nachrichten.
+final chatProvider = StateNotifierProvider<ChatNotifier, List<Match>>((ref) {
+  final service = ref.watch(chatServiceProvider);
+  final notifier = ChatNotifier(service);
+  // Opt-in-Einstellung (Geräte-lokal) beim Start anwenden - fail-safe
+  // gekapselt, damit Tests/Container ohne localStorage nicht brechen.
+  unawaited(() async {
+    try {
+      final storage = ref.read(localStorageProvider);
+      final enabled = await storage.getBool('chat_history_local') ?? true;
+      final limitRaw = await storage.getBool('chat_history_all');
+      final limit = (limitRaw ?? true) ? null : 200;
+      service.setHistoryPersistence(enabled, limit: limit);
+    } catch (_) {
+      // Ohne Storage läuft der Chat einfach ohne Verlauf.
+    }
+  }());
+  return notifier;
+});
 
   /// Hilfsprovider, um den Notification-Service in Provider-Buildern
   /// verfügbar zu machen, ohne direkte Singleton-Nutzung.
   final notificationServiceProvider = Provider<NotificationService>((ref) {
     return NotificationService.instance;
   });
+
+/// Ob der verschlüsselte lokale Chat-Verlauf aktiv ist (v0.8.0) - für
+/// den Datenexport: Chats landen nur im Export, wenn der Nutzer den
+/// Verlauf eingeschaltet hat.
+final chatHistoryLocalEnabledProvider = FutureProvider<bool>((ref) async {
+  try {
+    final v = await ref.watch(localStorageProvider).getBool(
+        'chat_history_local');
+    return v ?? false;
+  } catch (_) {
+    return false;
+  }
+});
