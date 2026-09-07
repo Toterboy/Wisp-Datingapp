@@ -37,6 +37,19 @@ jobs:
       - name: Dependencies laden
         run: flutter pub get
 
+      # Der NSFW-Inferenz-Test laedt die native onnxruntime-Bibliothek
+      # (exakt die Version, die das Plugin erwartet). Ohne diesen Schritt
+      # schlaegt der Test auf dem Runner mit "cannot open shared object
+      # file" fehl.
+      - name: onnxruntime native library (fuer NSFW-Inferenz-Test)
+        run: |
+          curl -sSL -o /tmp/ort.tgz \
+            https://github.com/microsoft/onnxruntime/releases/download/v1.15.1/onnxruntime-linux-x64-1.15.1.tgz
+          mkdir -p /tmp/ort
+          tar -xzf /tmp/ort.tgz -C /tmp/ort
+          sudo cp /tmp/ort/onnxruntime-linux-x64-1.15.1/lib/libonnxruntime.so* /usr/local/lib/
+          sudo ldconfig
+
       - name: Analyze (muss fehlerfrei sein)
         run: flutter analyze --fatal-infos
 

@@ -8,6 +8,7 @@ Eine moderne, datenschutzfreundliche Dating-App mit Fokus auf **Persönlichkeit 
 Das Projekt ist vollständig kostenlos nutzbar und soll eine echte Alternative zu Tinder & Co. darstellen. Es befindet sich in aktiver Entwicklung und ist noch nicht vollständig funktional. Beiträge und Feedback sind willkommen:
 [Beitragen](CONTRIBUTING.md) · [Verhaltenskodex](CODE_OF_CONDUCT.md) · [Sicherheitslücken melden](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Entscheidungen (ADR)](docs/adr/) · [Build & F-Droid](docs/BUILD.md) · [Architektur](docs/ARCHITEKTUR.md) · [Datenschutz](docs/DATENSCHUTZ.md) · [Passkey-Server-Setup](docs/PASSKEYS_SERVER_SETUP.md)
 
+
 ## Warum WispDating – und nicht Tinder, Bumble & Co.?
 
 Weil moderne Dating-Apps genau die Probleme haben, die WispDating gezielt
