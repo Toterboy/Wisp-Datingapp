@@ -471,8 +471,8 @@ Future<void> _runAiCheck({
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
             Text(L10n.t(context, 'report.checkingSub')),
           ],
         ),

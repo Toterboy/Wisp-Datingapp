@@ -50,14 +50,13 @@ IMMER an der Server-Verifikation, weil in den „Relying Party Origins" die
 konnte nie matchen, während der native Android-Dialog problemlos lief.
 
 **Lösung (Server, sofort wirksam – kein App-Update nötig):** Dashboard →
-Authentication → Passkeys → „Relying Party Origins" ersetzen durch:
+Authentication → Passkeys → „Relying Party Origins" auf die korrekten
+SHA-256-Werte setzen. Die konkreten Werte stehen in
+`docs/PASSKEYS_SERVER_SETUP.md` (der Release-Key-Hash ist darüber hinaus
+öffentlich via `assetlinks.json`).
 
-```
-https://auth.wispdating.de,android:apk-key-hash:N6pPbMHeuPWVdF6sCs4KGclUcoD8dI8CZr3S7HvpVXI,android:apk-key-hash:WrjQ1eUdTGnHEeMSAqhA6tqoMFqd6yOINSrNwVwwqXk
-```
-
-(1. = Upload-/Release-Key, 2. = Debug-Key; SHA-256, per keytool aus dem
-echten Keystore verifiziert.)
+Hinweis: Der Debug-Key gehört nur in lokale/Entwicklungs-Umgebungen,
+nicht in die Produktions-Origins.
 
 Zusätzlich in Build 8:
 

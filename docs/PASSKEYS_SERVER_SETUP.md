@@ -25,25 +25,29 @@ Wisp beide Keys drin).
 ## Die Origins von WispDating
 
 Berechnet aus dem **tatsächlichen Signatur-Keystore** (`wisp-upload.keystore`,
-SHA-256 via keytool verifiziert) und dem Debug-Keystore:
+SHA-256 via keytool verifiziert):
 
 | Schlüssel | SHA-256 | Origin (exakt so übernehmen) |
 |---|---|---|
 | **Upload-/Release-Key** | `37AA4F…5572` | `android:apk-key-hash:N6pPbMHeuPWVdF6sCs4KGclUcoD8dI8CZr3S7HvpVXI` |
-| **Debug-Key** | `5AB8D0…A979` | `android:apk-key-hash:WrjQ1eUdTGnHEeMSAqhA6tqoMFqd6yOINSrNwVwwqXk` |
 | iOS/Web (Associated Domain) | – | `https://auth.wispdating.de` |
 | Web-App (falls auf Root-Domain) | – | `https://wispdating.de` |
 
+Der **Debug-Key-Hash** wird hier bewusst NICHT veröffentlicht. Er gehört
+ausschließlich in lokale/Entwicklungs-Konfigurationen (bei lokalem
+Testen gegen einen selbst betriebenen Auth-Dienst selbst berechnen,
+Kommando siehe unten) – **nicht** in die Produktions-Origins.
+
 ### ⚠️ Konkreter Fehlerfall (Stand 05.09.2026 behoben)
 
-Im Dashboard standen die **SHA-1**-Fingerprints (nur 20 Byte) der beiden
-Keys – `android:apk-key-hash` verlangt zwingend **SHA-256** (43
+Im Dashboard standen die **SHA-1**-Fingerprints (nur 20 Byte) der Keys –
+`android:apk-key-hash` verlangt zwingend **SHA-256** (43
 Base64URL-Zeichen, 32 Byte). Damit war der Abgleich nie erfolgreich →
 `credential verification failed`. **Richtig (Dashboard-Eintrag komplett
-ersetzen):**
+ersetzen, Produktions-Umfang):**
 
 ```
-https://auth.wispdating.de,android:apk-key-hash:N6pPbMHeuPWVdF6sCs4KGclUcoD8dI8CZr3S7HvpVXI,android:apk-key-hash:WrjQ1eUdTGnHEeMSAqhA6tqoMFqd6yOINSrNwVwwqXk
+https://auth.wispdating.de,android:apk-key-hash:N6pPbMHeuPWVdF6sCs4KGclUcoD8dI8CZr3S7HvpVXI
 ```
 
 **Achtung:** Wer ein APK mit einem NEUEN Keystore signiert (z. B. neuer
@@ -67,9 +71,9 @@ SHA-256-Fingerprints sind NICHT austauschbar.
   `*.p12`/`*.pfx`/`*.pem`/`*.key`) ausgeschlossen und war NIE Teil des
   Repositorys (geprüft via `git ls-files`).
 - Der Debug-Key-Fingerprint ist maschinenspezifisch und nur für lokale
-  `flutter run`-Tests relevant; sein Origin in der Server-Liste kann
-  nach dem lokalen Testen entfernt werden, ohne die Release-App zu
-  beeinträchtigen.
+  `flutter run`-Tests relevant; sein Origin gehört deshalb bewusst NICHT
+  in diese öffentliche Anleitung und sollte nach lokalem Testen aus der
+  Server-Liste entfernt werden, ohne die Release-App zu beeinträchtigen.
 
 Die Fingerprints in `passkey-assets/assetlinks.json` und diesem Dokument
 sind demnach **kein Sicherheitsrisiko** und bleiben absichtlich im Repo.
@@ -83,7 +87,7 @@ WebAuthn/Passkeys zwingend:
 |---|---|
 | `GOTRUE_WEBAUTHN_RP_ID` | `auth.wispdating.de` |
 | `GOTRUE_WEBAUTHN_RP_DISPLAY_NAME` | z. B. `WispDating` |
-| `GOTRUE_WEBAUTHN_RP_ORIGINS` | kommaseparierte Liste – MUSS die `android:apk-key-hash:`-Origins (beide Keys!), `https://auth.wispdating.de` und ggf. `https://wispdating.de` enthalten |
+| `GOTRUE_WEBAUTHN_RP_ORIGINS` | kommaseparierte Liste – MUSS den `android:apk-key-hash:`-Origin des Release-Keys, `https://auth.wispdating.de` und ggf. `https://wispdating.de` enthalten (Debug-Hash nur lokal, nicht in Produktion) |
 
 **Supabase (Hosted):** Dashboard → **Authentication → Sign In / Providers →
 Passkeys (Beta)** → dort **RP ID**, **Display Name** und **Origins** pflegen.

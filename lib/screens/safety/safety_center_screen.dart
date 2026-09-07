@@ -68,69 +68,60 @@ class _SafetyCenterScreenState extends ConsumerState<SafetyCenterScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Text('Sofort Hilfe',
+          Text(L10n.t(context, 'safety.sectionHelp'),
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.phone_in_talk),
-            title: const Text('Hilfetelefon „Gewalt gegen Frauen“'),
-            subtitle: const Text('116 016 · kostenlos, 24/7, anonym'),
+            title: Text(L10n.t(context, 'safety.hotline1')),
+            subtitle: Text(L10n.t(context, 'safety.hotline1Sub')),
             trailing: const Icon(Icons.call),
             onTap: () => _open(context, Uri(scheme: 'tel', path: '116016')),
           ),
           ListTile(
             leading: const Icon(Icons.phone_in_talk),
-            title: const Text('TelefonSeelsorge'),
+            title: Text(L10n.t(context, 'safety.hotline2')),
             subtitle:
-                const Text('0800 111 0 111 · kostenlos, 24/7'),
+                Text(L10n.t(context, 'safety.hotline2Sub')),
             trailing: const Icon(Icons.call),
             onTap: () => _open(context, Uri(scheme: 'tel', path: '08001110111')),
           ),
           ListTile(
             leading: const Icon(Icons.language),
-            title: const Text('klicksafe (Cybermobbing & Beratung)'),
-            subtitle: const Text('klicksafe.de'),
+            title: Text(L10n.t(context, 'safety.hotline3')),
+            subtitle: Text(L10n.t(context, 'safety.hotline3Sub')),
             trailing: const Icon(Icons.open_in_new),
             onTap: () => _open(context, Uri.parse('https://www.klicksafe.de')),
           ),
           ListTile(
             leading: const Icon(Icons.language),
-            title: const Text('Hilfetelefon Stalking (Weisser Ring)'),
-            subtitle: const Text('weisser-ring.de · 116 006'),
+            title: Text(L10n.t(context, 'safety.hotline4')),
+            subtitle: Text(L10n.t(context, 'safety.hotline4Sub')),
             trailing: const Icon(Icons.open_in_new),
             onTap: () =>
                 _open(context, Uri.parse('https://weisser-ring.de')),
           ),
           const Divider(height: 32),
-          Text('Schutz in WispDating',
+          Text(L10n.t(context, 'safety.sectionProtect'),
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           ExpansionTile(
-            leading: Icon(Icons.flag_outlined),
-            title: Text('Jemanden melden'),
+            leading: const Icon(Icons.flag_outlined),
+            title: Text(L10n.t(context, 'safety.reportSomeone')),
             children: [
               Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Text(
-                  'Im Chat über das Flag-Symbol oben rechts oder per langem '
-                  'Drücken auf ein Bild. Deine letzten Nachrichten werden '
-                  'transparent als Kontext übermittelt und vom Support '
-                  'persönlich geprüft.',
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(L10n.t(context, 'safety.reportSomeoneBody')),
               ),
             ],
           ),
-          const ExpansionTile(
-            leading: Icon(Icons.block_outlined),
-            title: Text('Jemanden blockieren'),
+          ExpansionTile(
+            leading: const Icon(Icons.block_outlined),
+            title: Text(L10n.t(context, 'safety.blockSomeone')),
             children: [
               Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Text(
-                  'Chat-Menü (drei Punkte) → Blockieren. Likes und Match '
-                  'werden entfernt; künftige Interaktionen werden serverseitig '
-                  'verhindert. Die Person erfährt nicht davon.',
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(L10n.t(context, 'safety.blockSomeoneBody')),
               ),
             ],
           ),
@@ -139,13 +130,8 @@ class _SafetyCenterScreenState extends ConsumerState<SafetyCenterScreen> {
             title: Text(L10n.t(context, 'safety.protectOwnImages')),
             children: [
               Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Text(
-                  'Bilder eingehender Nachrichten sind standardmäßig '
-                  'verpixelt (Einstellungen → Sicherheit im Chat). Eigene '
-                  'Fotos bleiben bis zum gegenseitigen Quiz-Erfolg '
-                  'grundsätzlich verborgen.',
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(L10n.t(context, 'safety.protectOwnImagesBody')),
               ),
             ],
           ),
@@ -155,25 +141,18 @@ class _SafetyCenterScreenState extends ConsumerState<SafetyCenterScreen> {
           const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.download_outlined),
-            title: const Text('Meine Daten exportieren'),
-            subtitle: const Text('JSON-Export aller gespeicherten Daten'),
+            title: Text(L10n.t(context, 'safety.exportData')),
+            subtitle: Text(L10n.t(context, 'safety.exportDataSub')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.privacy),
           ),
           const Divider(height: 32),
-          Text('Stalking-Leitfaden',
+          Text(L10n.t(context, 'safety.stalkingGuide'),
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          const Text(
-            'Wenn dir jemand online (oder offline) nachstellt:\n'
-            '1. Nicht antworten, Kontakt bewusst abbrechen.\n'
-            '2. Alles dokumentieren: Screenshots mit Datum, Chatverlauf, '
-            'Profilnamen.\n'
-            '3. In-App blockieren und uns über die Melde-Funktion informieren. '
-            'Wir können Accounts dauerhaft sperren.\n'
-            '4. Passwörter ändern und 2FA aktivieren (Einstellungen).\n'
-            '5. Bei Bedrohung oder Angst: Polizei (110) bzw. 116 006 kontaktieren.',
-            style: TextStyle(height: 1.4),
+          Text(
+            L10n.t(context, 'safety.stalkingBody'),
+            style: const TextStyle(height: 1.4),
           ),
           const SizedBox(height: 24),
         ],

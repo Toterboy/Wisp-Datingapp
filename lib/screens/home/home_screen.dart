@@ -167,12 +167,13 @@ Widget _buildMessagesSection(
           ),
           const SizedBox(height: 12),
           if (matchesWithMessages.isEmpty)
-SizedBox(
-width: double.infinity,
-child: _EmptyStateCard(
+            SizedBox(
+              width: double.infinity,
+              child: _EmptyStateCard(
                 icon: Icons.chat_bubble_outline,
-                title: 'Keine neuen Nachrichten',
-                subtitle: 'Wenn du Funken hast, erscheinen hier neue Nachrichten.',
+                title: L10n.t(context, 'home.noMessages'),
+                subtitle:
+                    L10n.t(context, 'home.noMessagesSub'),
               ),
             )
           else

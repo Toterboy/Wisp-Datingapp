@@ -269,6 +269,43 @@ const Map<String, Map<String, String>> _strings = {
     'profile.detail.unavailable': 'Dieses Profil ist derzeit nicht verfügbar.',
     'safety.linkFailed': 'Konnte Link nicht öffnen.',
     'safety.protectOwnImages': 'Eigene Bilder schützen',
+    'safety.protectOwnImagesBody':
+        'Bilder eingehender Nachrichten sind standardmäßig verpixelt '
+        '(Einstellungen - Sicherheit im Chat). Eigene Fotos bleiben bis '
+        'zum gegenseitigen Quiz-Erfolg grundsätzlich verborgen.',
+    'home.noMessages': 'Keine neuen Nachrichten',
+    'home.noMessagesSub': 'Wenn du Funken hast, erscheinen hier neue Nachrichten.',
+    'safety.sectionHelp': 'Sofort Hilfe',
+    'safety.hotline1': 'Hilfetelefon "Gewalt gegen Frauen"',
+    'safety.hotline1Sub': '116 016 - kostenlos, 24/7, anonym',
+    'safety.hotline2': 'TelefonSeelsorge',
+    'safety.hotline2Sub': '0800 111 0 111 - kostenlos, 24/7',
+    'safety.hotline3': 'klicksafe (Cybermobbing & Beratung)',
+    'safety.hotline3Sub': 'klicksafe.de',
+    'safety.hotline4': 'Hilfetelefon Stalking (Weisser Ring)',
+    'safety.hotline4Sub': 'weisser-ring.de - 116 006',
+    'safety.sectionProtect': 'Schutz in WispDating',
+    'safety.reportSomeone': 'Jemanden melden',
+    'safety.reportSomeoneBody':
+        'Im Chat über das Flag-Symbol oben rechts oder per langem Drücken '
+        'auf ein Bild. Deine letzten Nachrichten werden transparent als '
+        'Kontext übermittelt und vom Support persönlich geprüft.',
+    'safety.blockSomeone': 'Jemanden blockieren',
+    'safety.blockSomeoneBody':
+        'Chat-Menü (drei Punkte) - Blockieren. Likes und Funken werden '
+        'entfernt; künftige Interaktionen werden serverseitig verhindert. '
+        'Die Person erfährt nicht davon.',
+    'safety.stalkingGuide': 'Stalking-Leitfaden',
+    'safety.stalkingBody':
+        'Wenn dir jemand online (oder offline) nachstellt: 1. Nicht '
+        'antworten, Kontakt bewusst abbrechen. 2. Alles dokumentieren: '
+        'Screenshots mit Datum, Chatverlauf, Profilnamen. 3. In-App '
+        'blockieren und uns über die Melde-Funktion informieren. Wir '
+        'können Accounts dauerhaft sperren. 4. Passwörter ändern und 2FA '
+        'aktivieren (Einstellungen). 5. Bei Bedrohung oder Angst: Polizei '
+        '(110) bzw. 116 006 kontaktieren.',
+    'safety.exportData': 'Meine Daten exportieren',
+    'safety.exportDataSub': 'JSON-Export aller gespeicherten Daten',
     'spice.answerSent': 'Antwort gesendet. Dein Gegenüber antwortet bald.',
     'spice.answerEdit': 'Antwort ändern',
     'spice.answer': 'Antworten',
@@ -956,6 +993,42 @@ const Map<String, Map<String, String>> _strings = {
     'profile.detail.unavailable': 'This profile is currently unavailable.',
     'safety.linkFailed': 'Could not open link.',
     'safety.protectOwnImages': 'Protect your own images',
+    'safety.protectOwnImagesBody':
+        'Images in incoming messages are blurred by default (settings - '
+        'chat safety). Your own photos remain hidden until mutual quiz '
+        'success.',
+    'home.noMessages': 'No new messages',
+    'home.noMessagesSub': 'New messages appear here once you have sparks.',
+    'safety.sectionHelp': 'Immediate help',
+    'safety.hotline1': 'Help hotline "Violence against women"',
+    'safety.hotline1Sub': '116 016 - free, 24/7, anonymous',
+    'safety.hotline2': 'Telephone counselling',
+    'safety.hotline2Sub': '0800 111 0 111 - free, 24/7',
+    'safety.hotline3': 'klicksafe (cyberbullying & counselling)',
+    'safety.hotline3Sub': 'klicksafe.de',
+    'safety.hotline4': 'Stalking helpline (Weisser Ring)',
+    'safety.hotline4Sub': 'weisser-ring.de - 116 006',
+    'safety.sectionProtect': 'Protection in WispDating',
+    'safety.reportSomeone': 'Report someone',
+    'safety.reportSomeoneBody':
+        'In the chat via the flag icon at the top right, or by long-pressing '
+        'an image. Your last messages are transparently submitted as context '
+        'and personally reviewed by support.',
+    'safety.blockSomeone': 'Block someone',
+    'safety.blockSomeoneBody':
+        'Chat menu (three dots) - Block. Likes and sparks are removed; '
+        'future interactions are prevented server-side. The person is not '
+        'notified.',
+    'safety.stalkingGuide': 'Stalking guide',
+    'safety.stalkingBody':
+        'If someone is stalking you online (or offline): 1. Do not reply, '
+        'deliberately end contact. 2. Document everything: screenshots with '
+        'dates, chat history, profile names. 3. Block in the app and inform '
+        'us via the report function. We can permanently suspend accounts. '
+        '4. Change passwords and enable 2FA (settings). 5. If threatened or '
+        'afraid: contact the police (110) or 116 006.',
+    'safety.exportData': 'Export my data',
+    'safety.exportDataSub': 'JSON export of all stored data',
     'spice.answerSent': 'Answer sent. Your partner will answer soon.',
     'spice.answerEdit': 'Edit answer',
     'spice.answer': 'Answer',
