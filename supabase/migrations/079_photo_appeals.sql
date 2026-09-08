@@ -102,6 +102,7 @@ GRANT SELECT, DELETE ON public.profile_photo_appeals TO authenticated;
 -- ==========================================================================
 -- 3) Storage: Admin darf Einspruchs-Bilder lesen ---------------------------
 -- ==========================================================================
+DROP POLICY IF EXISTS "Admins can read appeal photos" ON storage.objects;
 CREATE POLICY "Admins can read appeal photos"
   ON storage.objects
   FOR SELECT
