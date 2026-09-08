@@ -115,7 +115,10 @@ class ImageSafetyService {
     final session = _session;
     if (session == null) return null;
     try {
-      final tensor = _preprocess(bytes);
+      // FREEZE-FIX (v0.8.1): Decode + Resize eines 2048px-Fotos im
+      // pure-Dart image-Package dauert Sekunden - im Hintergrund-Isolate
+      // statt auf dem UI-Thread.
+      final tensor = await compute(_preprocessSync, bytes);
       final inputName =
           _inputNames.isNotEmpty ? _inputNames.first : 'input';
       final inputOrt = OrtValueTensor.createTensorWithDataList(
@@ -164,8 +167,12 @@ class ImageSafetyService {
   }
 
   /// Dekodiert, resampled und normalisiert die Bildbytes zu einem
-  /// [1, 3, 224, 224]-Float32-Tensor (NCHW, 0..1).
-  Float32List _preprocess(Uint8List bytes) {
+  /// [1, 3, 224, 224]-Float32-Tensor (NCHW, 0..255 - Normalisierung ist
+  /// im Graphen eingebacken).
+  ///
+  /// Läuft im Hintergrund-Isolate (rein, kein Flutter-Bezug) - siehe
+  /// [classifyImage].
+  static Float32List _preprocessSync(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) {
       throw const FormatException('Bild konnte nicht dekodiert werden.');

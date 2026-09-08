@@ -420,7 +420,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       // KEIN automatischer NSFW-Scan beim Senden (Betreiber-Entscheidung):
       // Chat-Bilder bleiben unangetastet E2E. Prüfung ausschließlich
       // melde-basiert (showImageReportDialog -> Edge Function report-image).
-      final bytes = stripImageMetadata(
+      final bytes = await stripImageMetadata(
         Uint8List.fromList(rawBytes),
         jpegQuality: 70,
       );

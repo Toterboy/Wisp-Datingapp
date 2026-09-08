@@ -125,6 +125,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   /// Gerät bei Nichtbestehen nicht).
   Uint8List? _pendingAvatarBytes;
 
+  /// Verzoegerter NSFW-Modell-Warm-up (abbrechbar, siehe initState).
+  Timer? _nsfwWarmupTimer;
+
   // Vorstellung (Find your Match): Zustand wird vom IntroEditor gemeldet.
   String _introTextValue = '';
   String? _introAudioPath;
@@ -206,10 +209,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       });
     }
 
-    // NSFW-Modell VORAB laden (v0.8.1): Die erste Klassifizierung laedt
-    // sonst erst beim Bild-Auswaehlen und dauert mehrere Sekunden - der
-    // Check laeuft dadurch sofort und zuverlaessig.
-    unawaited(ImageSafetyService.instance.ensureSession());
+    // NSFW-Modell VORAB laden (v0.8.1) - aber NACH dem ersten Frame und
+    // mit kleinem, ABBRECHBAREM Delay: OrtSession.fromBuffer parst 12 MB
+    // synchron im UI-Thread und wuerde sonst direkt beim Screen-Oeffnen
+    // janken. Cancel im dispose (sonst haengender Timer in Tests/ANR).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _nsfwWarmupTimer = Timer(const Duration(milliseconds: 600), () {
+        ImageSafetyService.instance.ensureSession();
+      });
+    });
 
     // Initial signed URL für aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
@@ -266,7 +275,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     // sind die Riverpod-Subscriptions dieses Elements noch aktiv und ein
     // Write würde ein markNeedsBuild auf ein bereits defunct Element
     // auslösen. Der Microtask läuft erst NACH abgeschlossenem Unmount.
-    final dirtyController = _dirtyController;
+    _nsfwWarmupTimer?.cancel();
+    _nsfwWarmupTimer = null;
+        final dirtyController = _dirtyController;
     _dirtyController = null;
     if (dirtyController != null) {
       scheduleMicrotask(() {

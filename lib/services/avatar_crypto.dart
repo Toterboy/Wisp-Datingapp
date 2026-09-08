@@ -63,6 +63,14 @@ class AvatarCrypto {
     return gcm.process(cipher);
   }
 
+  /// Isolate-fähige Hülle für [decrypt] (v0.8.1 FREEZE-FIX): AES-GCM in
+  /// pure Dart über 1-2 MB dauert spürbar - Avatar-Entschlüsselung läuft
+  /// deshalb per compute() im Hintergrund-Isolate.
+  static Uint8List decryptArgs((Uint8List, Uint8List, Uint8List) args) {
+    final (cipher, key, iv) = args;
+    return decrypt(cipher, key, iv);
+  }
+
   /// Baut den photos-Eintrag: `path|key|iv`.
   static String encodeRef(String path, String keyB64, String ivB64) =>
       '$path$separator$keyB64$separator$ivB64';

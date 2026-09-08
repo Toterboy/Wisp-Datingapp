@@ -119,9 +119,14 @@ class SupabaseStorageService {
       final path = parsed?.path ?? AvatarCrypto.pathOf(ref);
       final data =
           await _client.storage.from(_bucket).download(path);
+      // FREEZE-FIX (v0.8.1): GCM-Entschlüsselung in pure Dart (1-2 MB)
+      // dauert spürbar - Hintergrund-Isolate statt UI-Thread.
       final result = parsed == null
           ? data // Legacy: Klartext.
-          : AvatarCrypto.decrypt(data, parsed.key, parsed.iv);
+          : await compute(
+              AvatarCrypto.decryptArgs,
+              (data, parsed.key, parsed.iv),
+            );
       _avatarMemoryCache[ref] = result;
       return result;
     } catch (e) {
