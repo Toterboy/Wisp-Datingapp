@@ -321,7 +321,7 @@ BEGIN
     LIMIT 1;
   EXCEPTION WHEN OTHERS THEN
     v_secret := NULL;
-  END IF;
+  END;
   IF v_secret IS NULL OR v_secret = '' THEN
     RAISE WARNING 'notify_soft_ping_trigger: Secret fehlt - kein Push.';
     RETURN NEW;
