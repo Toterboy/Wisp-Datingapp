@@ -187,12 +187,20 @@ GRANT EXECUTE ON FUNCTION public.match_proximity_spark(text[])
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    PERFORM cron.unschedule('cleanup-transit-signals');
+    -- WICHTIG: cron.unschedule wirft einen Fehler, wenn der Jobname
+    -- noch nicht existiert - daher vorher pruefen (Fix: Erstausfuehrung).
+    IF EXISTS (
+      SELECT 1 FROM cron.job WHERE jobname = 'cleanup-transit-signals'
+    ) THEN
+      PERFORM cron.unschedule('cleanup-transit-signals');
+    END IF;
     PERFORM cron.schedule(
       'cleanup-transit-signals',
       '17 4 * * *',
       $cron$ DELETE FROM public.transit_signals WHERE created_at < now() - interval '24 hours'; $cron$
     );
   END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'pg_cron-Cleanup konnte nicht eingerichtet werden (best-effort): %', SQLERRM;
 END;
 $$;
