@@ -28,6 +28,11 @@ Entdecken-Neuaufbau.
   „Menschen kennenlernen" (Find your Match, Dating Hour), „Direkt
   verbinden" (Zufallschat), „Unterwegs" (QR-Code, Transit Spark) – mit
   NEU-Badge; neue Modi rutschen künftig ohne Unübersichtlichkeit ein.
+- **Onboarding als Interview**: Wisp stellt Fragen statt eines Formulars –
+  eine Frage pro Screen in Chat-Optik (Sprechblase mit warmem Ton:
+  „Was macht dich aus?“), dezente Fortschritts-Dots, alles überspringbar.
+  Keine neuen Datenpunkte, kein Belohnungs-Mechanismus – nur Gesprächs-
+  ton statt Formular; komplett zweisprachig.
 
 ## Server & Sicherheit
 

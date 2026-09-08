@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/models/habitude_level.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/providers/settings_provider.dart';
@@ -12,225 +13,18 @@ import 'package:wisp/utils/constants.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
 
-/// Onboarding mit Blind-Mode-Erklärung, Datenschutz-Hinweisen und
-/// ergänzbaren Profilschritten.
+/// Onboarding als INTERVIEW (v0.9.0): Wisp stellt Fragen - eine pro
+/// Screen, in warmem Ton, alles immer überspringbar. KEINE neuen
+/// Datenpunkte und bewusst KEIN Belohnungs-Mechanismus (spielerisch
+/// heißt hier: Gesprächston statt Formular, kein Dopamin-Loop).
 ///
-/// Jeder Profil-Schritt ist überspringbar ("Später ausfüllen"). Am Ende
-/// werden die eingegebenen Daten im Profil/Einstellungen gespeichert.
+/// Die Daten-Logik (Speichern/Server-Sync) ist identisch zur Vorgänger-
+/// version; nur die Präsentation ist das Interview.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
-}
-
-class _InterestsStep extends StatefulWidget {
-  const _InterestsStep({
-    required this.title,
-    required this.onSkip,
-    required this.onContinue,
-    this.onBack,
-    required this.initialInterests,
-    required this.onChanged,
-  });
-
-  final String title;
-  final VoidCallback onSkip;
-  final VoidCallback onContinue;
-  final VoidCallback? onBack;
-  final Set<String> initialInterests;
-  final ValueChanged<Set<String>> onChanged;
-
-  @override
-  State<_InterestsStep> createState() => _InterestsStepState();
-}
-
-class _InterestsStepState extends State<_InterestsStep> {
-  late final Set<String> _interests;
-
-  @override
-  void initState() {
-    super.initState();
-    _interests = Set<String>.from(widget.initialInterests);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            widget.title,
-            style: Theme.of(context).textTheme.headlineSmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: Scrollbar(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: AppConstants.presetInterests
-                          .map(
-                            (i) => FilterChip(
-                              label: Text(i),
-                              selected: _interests.contains(i),
-                              onSelected: (sel) {
-                                setState(() {
-                                  if (sel) {
-                                    _interests.add(i);
-                                  } else {
-                                    _interests.remove(i);
-                                  }
-                                });
-                                widget.onChanged(Set<String>.from(_interests));
-                              },
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: widget.onSkip,
-                      child: const Text('Später ausfüllen'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (widget.onBack != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: widget.onBack,
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Zurück'),
-              ),
-            ),
-          PrimaryButton(label: 'Weiter', onPressed: widget.onContinue),
-        ],
-      ),
-    );
-  }
-}
-
-/// Statische Informationsseite (Blind Mode / Privatsphäre).
-class _Page extends StatelessWidget {
-  const _Page({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 60,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 32),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.headlineSmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            body,
-            style: Theme.of(context).textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Überspringbarer Eingabeschritt im Onboarding.
-class _Step extends StatelessWidget {
-  const _Step({
-    required this.title,
-    required this.child,
-    required this.onSkip,
-    required this.onContinue,
-    this.onBack,
-  });
-
-  final String title;
-  final Widget child;
-  final VoidCallback onSkip;
-  final VoidCallback onContinue;
-  final VoidCallback? onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.headlineSmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: Scrollbar(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    child,
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: onSkip,
-                      child: const Text('Später ausfüllen'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (onBack != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Zurück'),
-              ),
-            ),
-           PrimaryButton(label: 'Weiter', onPressed: onContinue),
-        ],
-      ),
-    );
-  }
 }
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
@@ -242,6 +36,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   HabitudeLevel? _smoking;
   HabitudeLevel? _alcohol;
   HabitudeLevel? _drugs;
+
+  static const int _pageCount = 8;
 
   @override
   void dispose() {
@@ -313,10 +109,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Willkommen'),
+          title: Text(L10n.t(context, 'onboarding.appbarTitle')),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Zurück',
+            tooltip: L10n.t(context, 'common.back'),
             onPressed: () async {
               final router = GoRouter.of(context);
               if (await _onWillPop()) {
@@ -327,62 +123,59 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           actions: [
             TextButton(
               onPressed: _finish,
-              child: const Text('Überspringen'),
+              child: Text(L10n.t(context, 'onboarding.skipAll')),
             ),
           ],
         ),
         body: SafeArea(
           child: Column(
             children: [
+              // Fortschritts-Dots (dezent, kein Belohnungs-Mechanismus).
+              _ProgressDots(controller: _pageController, count: _pageCount),
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
-                  itemCount: 8,
+                  itemCount: _pageCount,
                   itemBuilder: (context, index) {
                     switch (index) {
                       case 0:
-                        return const _Page(
-                          icon: Icons.visibility_off,
-                          title: 'Persönlichkeit vor Aussehen',
-                          body: 'Bei "Persönlichkeit vor Aussehen" siehst du zuerst '
-                              'nur Name, Alter, Bio und Interessen, keine Fotos. '
-                              'So entscheidest du mit dem Kopf, nicht nur mit den '
-                              'Augen.',
+                        return const _InfoPage(
+                          icon: Icons.waving_hand,
+                          titleKey: 'onboarding.hello.title',
+                          bodyKey: 'onboarding.hello.body',
                         );
                       case 1:
-                        return const _Page(
-                          icon: Icons.lock_outline,
-                          title: 'Deine Privatsphäre zählt',
-                          body: 'Du entscheidest, wer dein Profil sehen darf. Deine '
-                              'Fotos bleiben so lange verborgen, bis ihr euch '
-                              'euch gegenseitig ausgewählt habt. Keine unnötigen Berechtigungen.',
+                        return const _InfoPage(
+                          icon: Icons.visibility_off,
+                          titleKey: 'onboarding.blind.title',
+                          bodyKey: 'onboarding.blind.body',
                         );
                       case 2:
-                        return const _Page(
+                        return const _InfoPage(
                           icon: Icons.favorite,
-                          title: 'Echte Verbindungen',
-                          body: 'Erst wenn ihr euch beide liket, werdet ihr '
-                              'auf beiden Seiten Ja gesagt und die Fotos freigeschaltet. Fair '
-                              'und weniger oberflächlich.',
+                          titleKey: 'onboarding.connections.title',
+                          bodyKey: 'onboarding.connections.body',
                         );
                       case 3:
-                        return _Step(
-                          title: 'Erzähl etwas über dich',
+                        return _QuestionStep(
+                          questionKey: 'onboarding.q.bio',
                           onSkip: _next,
                           onContinue: _next,
                           onBack: _prev,
-                          child: TextFormField(
+                          child: TextField(
                             controller: _bioCtrl,
                             maxLines: 4,
                             maxLength: 300,
                             keyboardType: TextInputType.text,
-                            decoration:
-                                const InputDecoration(labelText: 'Bio (Freitext)'),
+                            decoration: InputDecoration(
+                              hintText:
+                                  L10n.t(context, 'onboarding.q.bioHint'),
+                            ),
                           ),
                         );
                       case 4:
                         return _InterestsStep(
-                          title: 'Deine Interessen',
+                          questionKey: 'onboarding.q.interests',
                           onSkip: _next,
                           onContinue: _next,
                           onBack: _prev,
@@ -396,24 +189,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           },
                         );
                       case 5:
-                        return _Step(
-                          title: 'Profilbild',
+                        return _QuestionStep(
+                          questionKey: 'onboarding.q.photo',
                           onSkip: _next,
                           onContinue: _next,
                           onBack: _prev,
                           child: const Center(
                             child: Column(
                               children: [
-                                CircleAvatar(radius: 48, child: Icon(Icons.person, size: 48)),
+                                CircleAvatar(
+                                    radius: 48,
+                                    child:
+                                        Icon(Icons.person, size: 48)),
                                 SizedBox(height: 8),
-                                Text('Du kannst später ein Profilbild hochladen.'),
+                                _PhotoLaterHint(),
                               ],
                             ),
                           ),
                         );
                       case 6:
-                        return _Step(
-                          title: 'Dein Umgang mit ...',
+                        return _QuestionStep(
+                          questionKey: 'onboarding.q.habits',
                           onSkip: _next,
                           onContinue: _next,
                           onBack: _prev,
@@ -421,53 +217,46 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Wie stehst du zu folgenden Dingen? Diese Angaben '
-                                'beeinflussen, wen du bei "Find your Match" siehst. '
-                                'Es werden nur Personen gezeigt, die maximal so '
-                                'viel konsumieren wie du.',
-                                style: Theme.of(context).textTheme.bodyMedium,
+                                L10n.t(context,
+                                    'onboarding.q.habitsHint'),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium,
                               ),
                               const SizedBox(height: 16),
                               HabitudeSelector(
                                 topic: HabitudeTopic.smoking,
                                 value: _smoking,
-                                onChanged: (v) => setState(() => _smoking = v),
+                                onChanged: (v) =>
+                                    setState(() => _smoking = v),
                               ),
                               const SizedBox(height: 16),
                               HabitudeSelector(
                                 topic: HabitudeTopic.alcohol,
                                 value: _alcohol,
-                                onChanged: (v) => setState(() => _alcohol = v),
+                                onChanged: (v) =>
+                                    setState(() => _alcohol = v),
                               ),
                               const SizedBox(height: 16),
                               HabitudeSelector(
                                 topic: HabitudeTopic.drugs,
                                 value: _drugs,
-                                onChanged: (v) => setState(() => _drugs = v),
+                                onChanged: (v) =>
+                                    setState(() => _drugs = v),
                               ),
                             ],
                           ),
                         );
                       case 7:
-                        return const _Page(
+                        return const _InfoPage(
                           icon: Icons.celebration,
-                          title: 'Fertig!',
-                          body: 'Dein Profil ist jetzt eingerichtet. '
-                              'Du kannst alle Angaben später jederzeit in den '
-                              'Einstellungen bearbeiten.',
+                          titleKey: 'onboarding.done.title',
+                          bodyKey: 'onboarding.done.body',
                         );
                       default:
                         return const SizedBox.shrink();
                     }
                   },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: PrimaryButton(
-                  label: 'Los geht\'s',
-                  icon: const Icon(Icons.arrow_forward),
-                  onPressed: _finish,
                 ),
               ),
             ],
@@ -478,3 +267,320 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 }
 
+/// "Später hochladen"-Hinweis (eigenes Widget, damit const-fähig).
+class _PhotoLaterHint extends StatelessWidget {
+  const _PhotoLaterHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(L10n.t(context, 'onboarding.photoLater'));
+  }
+}
+
+/// Fortschritts-Dots: dezent, ohne Belohnungs-Animation.
+class _ProgressDots extends StatelessWidget {
+  const _ProgressDots({required this.controller, required this.count});
+
+  final PageController controller;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final page = controller.hasClients ? (controller.page ?? 0) : 0;
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var i = 0; i < count; i++)
+                Container(
+                  width: i == page.round() ? 20 : 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    color: i == page.round()
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant
+                            .withAlpha(70),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Die Wisp-Interview-Frage: Avatar-Bubble mit warmem Fragetext.
+/// Das optische Kernstück des Interviews (Chat-Optik statt Formular).
+class _InterviewBubble extends StatelessWidget {
+  const _InterviewBubble({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(right: 48),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              child: Text(
+                'W',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                text,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onPrimaryContainer,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// statische Informationsseite (Blind Mode / Privatsphäre) - im Interview-
+/// Ton, als Wisp-Bubble statt_INFO-Karte.
+class _InfoPage extends StatelessWidget {
+  const _InfoPage({
+    required this.icon,
+    required this.titleKey,
+    required this.bodyKey,
+  });
+
+  final IconData icon;
+  final String titleKey;
+  final String bodyKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 54,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Text(
+            L10n.t(context, titleKey),
+            style: Theme.of(context).textTheme.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            L10n.t(context, bodyKey),
+            style: Theme.of(context).textTheme.bodyLarge,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Überspringbarer Interview-Frage-Schritt: Wisp-Bubble + Antwortbereich.
+class _QuestionStep extends StatelessWidget {
+  const _QuestionStep({
+    required this.questionKey,
+    required this.child,
+    required this.onSkip,
+    required this.onContinue,
+    this.onBack,
+  });
+
+  final String questionKey;
+  final Widget child;
+  final VoidCallback onSkip;
+  final VoidCallback onContinue;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          _InterviewBubble(text: L10n.t(context, questionKey)),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Scrollbar(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    child,
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: onSkip,
+                      child: Text(
+                          L10n.t(context, 'onboarding.fillLater')),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (onBack != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back),
+                label: Text(L10n.t(context, 'common.back')),
+              ),
+            ),
+          PrimaryButton(
+              label: L10n.t(context, 'onboarding.next'),
+              onPressed: onContinue),
+        ],
+      ),
+    );
+  }
+}
+
+/// Interessen-Auswahl als Interview-Schritt (gleiche Daten wie zuvor).
+class _InterestsStep extends StatefulWidget {
+  const _InterestsStep({
+    required this.questionKey,
+    required this.onSkip,
+    required this.onContinue,
+    this.onBack,
+    required this.initialInterests,
+    required this.onChanged,
+  });
+
+  final String questionKey;
+  final VoidCallback onSkip;
+  final VoidCallback onContinue;
+  final VoidCallback? onBack;
+  final Set<String> initialInterests;
+  final ValueChanged<Set<String>> onChanged;
+
+  @override
+  State<_InterestsStep> createState() => _InterestsStepState();
+}
+
+class _InterestsStepState extends State<_InterestsStep> {
+  late final Set<String> _interests;
+
+  @override
+  void initState() {
+    super.initState();
+    _interests = Set<String>.from(widget.initialInterests);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          _InterviewBubble(text: L10n.t(context, widget.questionKey)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Scrollbar(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: AppConstants.presetInterests
+                          .map(
+                            (i) => FilterChip(
+                              label: Text(i),
+                              selected: _interests.contains(i),
+                              onSelected: (sel) {
+                                setState(() {
+                                  if (sel) {
+                                    _interests.add(i);
+                                  } else {
+                                    _interests.remove(i);
+                                  }
+                                });
+                                widget.onChanged(Set<String>.from(_interests));
+                              },
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: widget.onSkip,
+                      child: Text(
+                          L10n.t(context, 'onboarding.fillLater')),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (widget.onBack != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: widget.onBack,
+                icon: const Icon(Icons.arrow_back),
+                label: Text(L10n.t(context, 'common.back')),
+              ),
+            ),
+          PrimaryButton(
+              label: L10n.t(context, 'onboarding.next'),
+              onPressed: widget.onContinue),
+        ],
+      ),
+    );
+  }
+}

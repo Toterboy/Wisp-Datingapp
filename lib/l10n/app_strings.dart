@@ -259,6 +259,45 @@ const Map<String, Map<String, String>> _strings = {
     'transit.teenNote':
         'Unter 18? Du siehst ausschließlich altersseitig kompatible '
         'Nutzer - serverseitig erzwungen.',
+    'onboarding.appbarTitle': 'Kurz kennengelernt',
+    'onboarding.skipAll': 'Überspringen',
+    'onboarding.fillLater': 'Später ausfüllen',
+    'onboarding.next': 'Weiter',
+    'onboarding.hello.title': 'Hi, ich bin Wisp!',
+    'onboarding.hello.body':
+        'In den nächsten Minuten richten wir dein Profil zusammen - '
+        'als kurzes Gespräch statt Formular. Alles ist überspringbar, '
+        'nichts ist falsch.',
+    'onboarding.blind.title': 'Persönlichkeit vor Aussehen',
+    'onboarding.blind.body':
+        'Standardmäßig siehst du zuerst nur Name, Alter, Bio und '
+        'Interessen - keine Fotos. So entscheidest du mit dem Kopf, '
+        'nicht nur mit den Augen. Jederzeit abschaltbar.',
+    'onboarding.connections.title': 'Echte Verbindungen',
+    'onboarding.connections.body':
+        'Ein Funke entsteht nur, wenn ihr euch beide wählt. Erst dann '
+        'werden Fotos freigeschaltet und ihr könnt loschatten - fair '
+        'statt oberflächlich.',
+    'onboarding.q.bio':
+        'Was macht dich aus? Erzähl kurz etwas von dir - was du liebst, '
+        'was dich bewegt, was dich lustig findest.',
+    'onboarding.q.bioHint': 'Ein paar ehrliche Sätze reichen völlig …',
+    'onboarding.q.interests':
+        'Womit verbringst du gerne Zeit? Wähle ein paar Interessen - '
+        'daraus entstehen später gemeinsame Themen und Funken.',
+    'onboarding.q.photo':
+        'Magst du ein Profilbild von dir zeigen? Kein Stress - Fotos '
+        'sind bei uns ohnehin erst nach einem Funke sichtbar.',
+    'onboarding.photoLater': 'Du kannst später ein Profilbild hochladen.',
+    'onboarding.q.habits':
+        'Und wie stehst du zu Rauchen, Alkohol und Co.? ',
+    'onboarding.q.habitsHint':
+        'Diese Angaben fließen in dein Matching ein: Du siehst nur '
+        'Personen, die maximal so viel konsumieren wie du.',
+    'onboarding.done.title': 'Geschafft - schön, dass du da bist!',
+    'onboarding.done.body':
+        'Dein Profil steht. Alles kannst du später jederzeit in den '
+        'Einstellungen ändern. Viel Spaß beim Entdecken!',
     'chathist.tileTitle': 'Chat-Verlauf lokal speichern',
     'chathist.mode.off': 'Aus',
     'chathist.mode.cap200': 'An (200 Nachrichten)',
@@ -1076,6 +1115,45 @@ const Map<String, Map<String, String>> _strings = {
     'transit.teenNote':
         'Under 18? You only see age-compatible users - enforced '
         'server-side.',
+    'onboarding.appbarTitle': 'Nice to meet you',
+    'onboarding.skipAll': 'Skip',
+    'onboarding.fillLater': 'Fill in later',
+    'onboarding.next': 'Continue',
+    'onboarding.hello.title': 'Hi, I am Wisp!',
+    'onboarding.hello.body':
+        'Over the next few minutes we will set up your profile - as a '
+        'short conversation instead of a form. Everything is skippable, '
+        'nothing is wrong.',
+    'onboarding.blind.title': 'Personality before looks',
+    'onboarding.blind.body':
+        'By default you will see only name, age, bio and interests '
+        'first - no photos. Decide with your head, not just your eyes. '
+        'Switchable at any time.',
+    'onboarding.connections.title': 'Real connections',
+    'onboarding.connections.body':
+        'A spark is created only if you both choose each other. Photos '
+        'unlock then and you can start chatting - fair instead of '
+        'superficial.',
+    'onboarding.q.bio':
+        'What makes you you? Tell me a little about yourself - what '
+        'you love, what moves you, what you find funny.',
+    'onboarding.q.bioHint': 'A few honest sentences are plenty …',
+    'onboarding.q.interests':
+        'What do you like spending time on? Pick a few interests - '
+        'they will later become shared topics and sparks.',
+    'onboarding.q.photo':
+        'Would you like to show a profile picture? No pressure - '
+        'photos are only visible after a spark anyway.',
+    'onboarding.photoLater': 'You can upload a profile picture later.',
+    'onboarding.q.habits':
+        'And how do you feel about smoking, alcohol and the like? ',
+    'onboarding.q.habitsHint':
+        'These answers feed your matching: you will only see people '
+        'who consume at most as much as you do.',
+    'onboarding.done.title': 'Done - glad you are here!',
+    'onboarding.done.body':
+        'Your profile is set up. You can change everything later in '
+        'the settings. Enjoy discovering!',
     'chathist.tileTitle': 'Save chat history locally',
     'chathist.mode.off': 'Off',
     'chathist.mode.cap200': 'On (200 messages)',
