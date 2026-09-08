@@ -394,14 +394,6 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 
 ## Irgendwann / Idee
 
-- [ ] **Lokale KI als „Ideen-Anstoß" im Chat (KEIN Ghostwriter)**: Die
-      Sanctuary-Engine (0.10.0) könnte Gesprächseinstiege vorschlagen,
-      wenn man nicht weiter weiß – aber bewusst eng begrenzt: ausschließlich
-      auf Basis öffentlicher Profilinfos (Interessen, Musik), NIE aus dem
-      Chatverlauf, nie direkt versendbar ohne eigene Umformulierung,
-      standardmäßig aus. Bekanntes Risiko (Über-Abhängigkeit, Inauthentizität,
-      Asymmetrie zwischen Nutzern) – bewusste Entscheidung nötig, ob das
-      überhaupt zum App-Prinzip „authentische Verbindungen" passt
 - [ ] Admin-Screen-Überarbeitung (internes Werkzeug): Pillen-förmiger
       Tab-Indikator, Kennzahlen-Zeile oben (offene Meldungen, neue Bugs),
       Suche im Sperren-Tab, einheitliche Karten- und Empty-States
