@@ -235,8 +235,19 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 - [ ] **Native Berechtigungen**: Android (`AndroidManifest.xml`) und iOS
       (`Info.plist`) BLE-Konfiguration
 
-### Begleitend in 0.9.0 (UX)
+### Begleitend in 0.9.0 (UX & Server)
 
+- [ ] **public_profiles-View durch SECURITY-DEFINER-Funktion ersetzen**
+      (Option A – löst den wiederkehrenden Advisor-Befund
+      „security_definer_view" auf): RPC `get_public_profile(user_id)` plus
+      Batch-Variante `get_public_profiles(ids)` mit der bisherigen
+      Spalten-Whitelist und dem `age_compatible`-Jugendschutzfilter;
+      Client-Umstellung von `from('public_profiles')` auf die RPCs
+      inkl. Umbau der Likes/Match-Embedded-Joins
+      (`liker:public_profiles!inner(*)` → Batch-Fetch); Parsing der
+      Interessen-/Match-Screens anpassen; die View erst entfernen, wenn
+      ALLE Aufrufer migriert sind; Begründungs-Doku (072, ARCHITEKTUR)
+      aktualisieren. Aufwand ~½–1 Tag, nicht als Pre-Release-Quickfix
 - [ ] **Entdecken-Seite: Modus-Gruppierung** (Vorbereitung auf mehr Modi):
       Die Karten nach Zweck gruppieren statt flacher Liste –
       „Menschen kennenlernen" (Find your Match, Dating Hour),
