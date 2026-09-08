@@ -141,19 +141,22 @@ BEGIN
     RAISE EXCEPTION 'Ungueltiger Pfad';
   END IF;
 
-  SELECT length(COALESCE(bytes, ''::bytea)) INTO v_size
+  -- Existenz + Groesse: storage.objects hat keine bytes-Spalte - die
+  -- Groesse steckt im metadata-JSONB ('size').
+  SELECT COALESCE((metadata ->> 'size')::bigint, 0) INTO v_size
     FROM storage.objects WHERE bucket_id = 'avatars' AND name = p_path;
-  IF v_size IS NULL THEN
+  IF v_size IS NULL OR v_size = 0 THEN
     RAISE EXCEPTION 'Bild nicht gefunden';
   END IF;
   IF v_size > 5242880 THEN
     RAISE EXCEPTION 'Bild zu gross';
   END IF;
 
-  -- Bestehenden aktiven Einspruch ersetzen (alter Dateirest wird vom
-  -- Client ggf. geloescht; hier nur der DB-Eintrag).
+  -- Bestehenden aktiven Einspruch ersetzen (auch approved-unbestaetigt;
+  -- ein neuer Einspruch ersetzt bewusst den alten Stand). Dateireste
+  -- raeumt der Client beim Quittieren auf; hier nur der DB-Eintrag.
   DELETE FROM public.profile_photo_appeals
-   WHERE user_id = v_uid AND status = 'pending';
+   WHERE user_id = v_uid AND status IN ('pending', 'approved');
 
   INSERT INTO public.profile_photo_appeals
     (user_id, storage_path, local_label, local_score, status)
