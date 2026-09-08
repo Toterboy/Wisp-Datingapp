@@ -40,6 +40,15 @@ class TransitEncounterService {
     );
   }
 
+  /// Frische Encounters sortiert (neueste zuerst) - fuer die
+  /// Gruessen-Sektion im Radar (Soft-Ping, v0.9.1).
+  List<TransitEncounter> freshList() {
+    _purgeExpired();
+    final list = _cache.values.toList()
+      ..sort((a, b) => b.seenAt.compareTo(a.seenAt));
+    return list;
+  }
+
   /// Alle frischen Tokens (für den Signal-Versand, max. 100).
   List<String> freshTokens() {
     _purgeExpired();

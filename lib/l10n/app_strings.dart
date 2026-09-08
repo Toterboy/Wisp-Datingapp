@@ -232,6 +232,28 @@ const Map<String, Map<String, String>> _strings = {
     'transit.tag.lanyard': 'Lanyard / Badge',
     'transit.tag.scarf': 'Schal',
     'transit.tag.colorful_top': 'Auffälliges Oberteil',
+    'transit.greetSection': 'Gesehene Geräte in dieser Session',
+    'transit.greet': 'Grüßen',
+    'transit.justNow': 'gerade eben',
+    'transit.minutesAgo': 'vor {count} Min.',
+    'transit.hoursAgo': 'vor {count} Std.',
+    'transit.noEncounters': 'Noch keine Geräte in Reichweite gewesen.',
+    'transit.pingSheetTitle': 'Einen Gruß senden',
+    'transit.pingSheetHint':
+        'Einmal pro Begegnung möglich. Die Person entscheidet still, '
+        'ob sie antwortet - du erfährst nur von einem Ja.',
+    'transit.pingSend': 'Gruß senden',
+    'transit.pingSent': 'Gruß gesendet. 48 Stunden Zeitfenster - mehr '
+        'nicht.',
+    'transit.pingCustomHint': 'Optional: eine kurze eigene Zeile …',
+    'transit.preset.wave': 'Hallo! Ich war gerade eben in deiner Nähe.',
+    'transit.preset.again':
+        'Vielleicht kreuzen sich unsere Wege ja nochmal?',
+    'transit.preset.coffee':
+        'Falls du magst: ein Kaffee in der Nähe?',
+    'transit.inboxTitle': 'Grüße für dich',
+    'transit.ignore': 'Ausblenden',
+    'transit.accept': 'Funke annehmen',
     'transit.stored':
         'Signal gespeichert. Wenn die Person denselben Moment spürt und '
         'ebenfalls funkt, matcht ihr euch.',
@@ -255,7 +277,7 @@ const Map<String, Map<String, String>> _strings = {
     'transit.privacyNote':
         'Tokens sind zufällig, rotieren regelmäßig und verfallen nach '
         '45 Minuten. Gespeichert wird nur, was du aktiv sendest - nichts '
-        'verlässt dein Gerät, solange du nicht selbst funkt.',
+        'verlässt dein Gerät, solange du nicht selbst funkt. Ein Gruß an eine Person braucht deren aktuelles Token - dafür wird bei aktivem Radar dein zufälliges Token (nur dieses) 45 Minuten serverseitig hinterlegt.',
     'transit.teenNote':
         'Unter 18? Du siehst ausschließlich altersseitig kompatible '
         'Nutzer - serverseitig erzwungen.',
@@ -1089,6 +1111,28 @@ const Map<String, Map<String, String>> _strings = {
     'transit.tag.lanyard': 'Lanyard / badge',
     'transit.tag.scarf': 'Scarf',
     'transit.tag.colorful_top': 'Colorful top',
+    'transit.greetSection': 'Devices seen in this session',
+    'transit.greet': 'Greet',
+    'transit.justNow': 'just now',
+    'transit.minutesAgo': '{count} min ago',
+    'transit.hoursAgo': '{count} h ago',
+    'transit.noEncounters': 'No devices in range yet.',
+    'transit.pingSheetTitle': 'Send a greeting',
+    'transit.pingSheetHint':
+        'Possible once per encounter. The person decides quietly '
+        'whether to respond - you will only hear about a yes.',
+    'transit.pingSend': 'Send greeting',
+    'transit.pingSent':
+        'Greeting sent. 48-hour window - that is all.',
+    'transit.pingCustomHint': 'Optional: one short line of your own …',
+    'transit.preset.wave': 'Hi! I was just near you.',
+    'transit.preset.again':
+        'Maybe our paths will cross again?',
+    'transit.preset.coffee':
+        'If you like: a coffee nearby?',
+    'transit.inboxTitle': 'Greetings for you',
+    'transit.ignore': 'Hide',
+    'transit.accept': 'Accept spark',
     'transit.stored':
         'Signal stored. If the other person feels the same moment and '
         'signals too, you will match.',
@@ -1111,7 +1155,10 @@ const Map<String, Map<String, String>> _strings = {
     'transit.privacyNote':
         'Tokens are random, rotate regularly and expire after 45 minutes. '
         'Only what you actively send is stored - nothing leaves your '
-        'device unless you choose to signal.',
+        'device unless you choose to signal. A greeting to a person '
+        'needs their current token - therefore while the radar is '
+        'active your random token (only this one) is stored server-'
+        'side for 45 minutes.',
     'transit.teenNote':
         'Under 18? You only see age-compatible users - enforced '
         'server-side.',

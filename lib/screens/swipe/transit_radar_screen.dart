@@ -9,6 +9,8 @@ import 'package:wisp/models/transit_models.dart';
 import 'package:wisp/providers/transit_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/supabase_database_service.dart';
+import 'package:wisp/services/supabase_service.dart';
 
 /// Transit-Radar (v0.9.0): "Blicke getauscht, sich nicht getraut?"
 /// Aktiviert BLE-Nähe-Erkennung (Vordergrund), zeigt live, wie viele
@@ -308,6 +310,19 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
                   : const Icon(Icons.auto_awesome),
               label: Text(L10n.t(context, 'transit.exchanged')),
             ),
+            if (transit.active) ...[
+              const SizedBox(height: 20),
+              Text(
+                L10n.t(context, 'transit.greetSection'),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              const _EncounterGreetList(),
+            ],
+            const SizedBox(height: 20),
+            const _SoftPingInbox(),
             const SizedBox(height: 24),
             // Erklärung.
             Card(
@@ -438,6 +453,298 @@ class _CountdownTextState extends State<_CountdownText> {
         'time': '$m:${s.toString().padLeft(2, '0')}',
       }),
       style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+}
+
+
+/// Gruessen-Sektion (v0.9.1): Frische Encounters als anonyme Eintraege
+/// ("vor 2 Minuten") - jeder EINMAL per Soft-Ping ansprechbar. Kein
+/// Name, kein Foto: Die Person bleibt anonym, bis sie den Gruß annimmt.
+class _EncounterGreetList extends ConsumerStatefulWidget {
+  const _EncounterGreetList();
+
+  @override
+  ConsumerState<_EncounterGreetList> createState() =>
+      _EncounterGreetListState();
+}
+
+class _EncounterGreetListState extends ConsumerState<_EncounterGreetList> {
+  final Set<String> _pinged = {};
+
+  String _ago(BuildContext context, DateTime seenAt) {
+    final d = DateTime.now().difference(seenAt);
+    if (d.inSeconds < 60) return L10n.t(context, 'transit.justNow');
+    if (d.inMinutes < 60) {
+      return L10n.tf(context, 'transit.minutesAgo',
+          {'count': d.inMinutes.toString()});
+    }
+    return L10n.tf(context, 'transit.hoursAgo',
+        {'count': d.inHours.toString()});
+  }
+
+  Future<void> _greet(TransitEncounter e) async {
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _SoftPingSheet(token: e.token),
+    );
+    if (ok == true && mounted) {
+      setState(() => _pinged.add(e.token));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'transit.pingSent')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final encounters = ref.read(transitProvider.notifier).freshEncounters();
+    if (encounters.isEmpty) {
+      return Text(
+        L10n.t(context, 'transit.noEncounters'),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+      );
+    }
+    return Column(
+      children: [
+        for (final e in encounters.take(10))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            leading: const Icon(Icons.person_outline),
+            title: Text(_ago(context, e.seenAt)),
+            trailing: _pinged.contains(e.token)
+                ? Icon(Icons.check,
+                    color: Theme.of(context).colorScheme.primary)
+                : TextButton(
+                    onPressed: () => _greet(e),
+                    child: Text(L10n.t(context, 'transit.greet')),
+                  ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Soft-Ping-Sheet: vorgefertigte, freundliche Saetze + optionale kurze
+/// eigene Zeile (max. 140 Zeichen, serverseitig gekuerzt/gefiltert).
+class _SoftPingSheet extends ConsumerStatefulWidget {
+  const _SoftPingSheet({required this.token});
+
+  final String token;
+
+  @override
+  ConsumerState<_SoftPingSheet> createState() => _SoftPingSheetState();
+}
+
+class _SoftPingSheetState extends ConsumerState<_SoftPingSheet> {
+  static const _presets = ['wave', 'again', 'coffee'];
+  String? _selected;
+  final _customCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _customCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            L10n.t(context, 'transit.pingSheetTitle'),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            L10n.t(context, 'transit.pingSheetHint'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 16),
+          RadioGroup<String>(
+            groupValue: _selected,
+            onChanged: (v) => setState(() => _selected = v),
+            child: Column(
+              children: [
+                for (final key in _presets)
+                  RadioListTile<String>(
+                    value: key,
+                    title: Text(L10n.t(context, 'transit.preset.$key')),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _customCtrl,
+            maxLength: 140,
+            maxLines: 2,
+            decoration: InputDecoration(
+              hintText: L10n.t(context, 'transit.pingCustomHint'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _selected == null
+                  ? null
+                  : () async {
+                      final ok = await ref
+                          .read(transitProvider.notifier)
+                          .sendSoftPing(
+                            token: widget.token,
+                            messageKey: _selected!,
+                            customLine: _customCtrl.text.trim().isEmpty
+                                ? null
+                                : _customCtrl.text.trim(),
+                          );
+                      if (context.mounted) Navigator.of(context).pop(ok);
+                    },
+              child: Text(L10n.t(context, 'transit.pingSend')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Soft-Ping-Eingang (Empfaenger-Sicht, v0.9.1): Offene Gruesse mit
+/// Annehmen (-> Funke) oder Ausblenden (still, Absender sieht nichts).
+class _SoftPingInbox extends ConsumerStatefulWidget {
+  const _SoftPingInbox();
+
+  @override
+  ConsumerState<_SoftPingInbox> createState() => _SoftPingInboxState();
+}
+
+class _SoftPingInboxState extends ConsumerState<_SoftPingInbox> {
+  List<Map<String, dynamic>>? _pings;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final db = SupabaseDatabaseService(SupabaseService.client);
+      final pings = await db.listMySoftPings();
+      if (mounted) setState(() => _pings = pings);
+    } catch (_) {
+      if (mounted) setState(() => _pings = []);
+    }
+  }
+
+  Future<void> _accept(Map<String, dynamic> ping) async {
+    try {
+      final db = SupabaseDatabaseService(SupabaseService.client);
+      final res = await db.acceptSoftPing(ping['id'] as String);
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      if (res['matched'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L10n.t(context, 'transit.matchTitle')),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) _load();
+    }
+  }
+
+  Future<void> _dismiss(Map<String, dynamic> ping) async {
+    // Still ausblenden: Zeile loeschen (Absender sieht nichts).
+    try {
+      await SupabaseService.client
+          .from('transit_soft_pings')
+          .delete()
+          .eq('id', ping['id'] as String);
+    } catch (_) {}
+    if (mounted) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pings = _pings;
+    if (pings == null || pings.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          L10n.t(context, 'transit.inboxTitle'),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 8),
+        for (final ping in pings)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    L10n.t(context,
+                        'transit.preset.${ping['messageKey'] ?? 'wave'}'),
+                  ),
+                  if ((ping['customLine'] as String?)?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        ping['customLine'] as String,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => _dismiss(ping),
+                        child: Text(L10n.t(context, 'transit.ignore')),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () => _accept(ping),
+                        child: Text(L10n.t(context, 'transit.accept')),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

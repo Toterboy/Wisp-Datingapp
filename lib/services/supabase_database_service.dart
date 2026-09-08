@@ -285,6 +285,45 @@ class SupabaseDatabaseService {
     return Map<String, dynamic>.from(res);
   }
 
+  // =========================================================================
+  // Transit Soft-Ping (v0.9.1, Migration 083)
+  // =========================================================================
+
+  /// Radar aktiv: eigenes Token serverseitig hinterlegen (Heartbeat).
+  Future<void> transitPresenceHeartbeat(String token) async {
+    await _client.rpc('transit_presence_heartbeat', params: {'p_token': token});
+  }
+
+  /// Radar aus: eigenes Token entfernen (Privacy).
+  Future<void> transitPresenceLeave() async {
+    await _client.rpc('transit_presence_leave');
+  }
+
+  /// Soft-Ping senden (1x pro Encounter-Token, 48 h Gueltigkeit).
+  Future<void> sendSoftPing({
+    required String token,
+    required String messageKey,
+    String? customLine,
+  }) async {
+    await _client.rpc('send_soft_ping', params: {
+      'p_token': token,
+      'p_message_key': messageKey,
+      'p_custom_line': customLine,
+    });
+  }
+
+  /// Eigene offene Soft-Pings (Empfaenger-Sicht).
+  Future<List<Map<String, dynamic>>> listMySoftPings() async {
+    final res = await _client.rpc('list_my_soft_pings');
+    return List<Map<String, dynamic>>.from(res as List<dynamic>);
+  }
+
+  /// Soft-Ping annehmen -> Funke ueber Bestandspipeline.
+  Future<Map<String, dynamic>> acceptSoftPing(String id) async {
+    final res = await _client.rpc('accept_soft_ping', params: {'p_id': id});
+    return Map<String, dynamic>.from(res);
+  }
+
   /// Aktualisiert das eigene Profil in der Supabase-Datenbank.
   ///
   /// Robust gegenüber unvollständigen Migrationen (v0.8.1): Liefert

@@ -109,14 +109,36 @@ class TransitNotifier extends StateNotifier<TransitState> {
     final endsAt = DateTime.now().add(kTransitSessionDuration);
     state = state.copyWith(active: true, endsAt: endsAt);
 
+    // Presence-Heartbeat (v0.9.1 Soft-Ping): Das aktuelle Token wird
+    // serverseitig hinterlegt (TTL 45 min, Auto-Purge) - NUR so kann
+    // ein nachtraeglicher Gruß die Person ueberhaupt erreichen. Im
+    // Privacy-Hinweis des Radars transparent genannt.
+    if (SupabaseService.isInitialized) {
+      unawaited(() async {
+        try {
+          await SupabaseDatabaseService(SupabaseService.client)
+              .transitPresenceHeartbeat(token);
+        } catch (e) {
+          debugPrint('[Transit] Presence-Heartbeat fehlgeschlagen: ');
+        }
+      }());
+    }
+
     // Token-Rotation alle 10 Minuten (ephemere Tokens).
     _rotateTimer?.cancel();
     _rotateTimer = Timer.periodic(const Duration(minutes: 10), (_) async {
       if (!state.active) return;
+      final newToken = TransitEncounterService.generateToken();
       await TransitBleService.instance.rotateToken(
-        newToken: TransitEncounterService.generateToken(),
+        newToken: newToken,
         onEncounter: _recordEncounter,
       );
+      if (SupabaseService.isInitialized) {
+        try {
+          await SupabaseDatabaseService(SupabaseService.client)
+              .transitPresenceHeartbeat(newToken);
+        } catch (_) {}
+      }
     });
 
     // Countdown/Ende-Überwachung.
@@ -138,8 +160,42 @@ class TransitNotifier extends StateNotifier<TransitState> {
     _countdownTimer?.cancel();
     _persistTimer?.cancel();
     await TransitBleService.instance.stop();
+    // Presence-Token entfernen (Privacy - Radar aus = nicht mehr
+    // adressierbar).
+    if (SupabaseService.isInitialized) {
+      try {
+        await SupabaseDatabaseService(SupabaseService.client)
+            .transitPresenceLeave();
+      } catch (e) {
+        debugPrint('[Transit] Presence-Leave fehlgeschlagen: ');
+      }
+    }
     await _encounters.clear();
     state = const TransitState();
+  }
+
+  /// Liste der frischen Encounters (Token + Sichtzeit) fuer die
+  /// Gruessen-Sektion im Radar.
+  List<TransitEncounter> freshEncounters() => _encounters.freshList();
+
+  /// Soft-Ping an ein Encounter-Token senden (1x pro Token, 48 h).
+  Future<bool> sendSoftPing({
+    required String token,
+    required String messageKey,
+    String? customLine,
+  }) async {
+    try {
+      if (!SupabaseService.isInitialized) return false;
+      await SupabaseDatabaseService(SupabaseService.client).sendSoftPing(
+        token: token,
+        messageKey: messageKey,
+        customLine: customLine,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[Transit] sendSoftPing fehlgeschlagen: ');
+      return false;
+    }
   }
 
   /// "Blicke getauscht": frische Encounter-Tokens + 1-3 Merkmal-Tags
