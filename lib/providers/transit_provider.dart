@@ -22,7 +22,12 @@ class TransitState {
     this.encounterCount = 0,
     this.busy = false,
     this.lastResult,
+    this.selfTags = const [],
   });
+
+  /// Taegliche Selbst-Angaben (v0.9.0): 1-3 Merkmale zu sich selbst,
+  /// werden mit jedem Signal mitgeschickt - andere finden dich darueber.
+  final List<String> selfTags;
 
   final bool active;
 
@@ -46,6 +51,7 @@ class TransitState {
     bool? busy,
     TransitSparkResult? lastResult,
     bool clearResult = false,
+    List<String>? selfTags,
   }) {
     return TransitState(
       active: active ?? this.active,
@@ -55,6 +61,7 @@ class TransitState {
       busy: busy ?? this.busy,
       lastResult:
           clearResult ? null : (lastResult ?? this.lastResult),
+      selfTags: selfTags ?? this.selfTags,
     );
   }
 }
@@ -93,6 +100,11 @@ class TransitNotifier extends StateNotifier<TransitState> {
   /// Modus setzen (nur bei inaktivem Radar umschaltbar).
   void setMode(TransitMode mode) {
     if (!state.active) state = state.copyWith(mode: mode);
+  }
+
+  /// Taegliche Selbst-Angaben setzen (v0.9.0, beim Radar-Start).
+  void setSelfTags(List<String> tags) {
+    state = state.copyWith(selfTags: tags);
   }
 
   /// Aktiviert das Radar (BLE + Cache). Gibt false zurück, wenn BLE
@@ -153,7 +165,12 @@ class TransitNotifier extends StateNotifier<TransitState> {
     try {
       final tokens = _encounters.freshTokens();
       final res = await SupabaseDatabaseService(SupabaseService.client)
-          .matchProximitySpark(tokens: tokens, tags: tags, mode: state.mode.value);
+          .matchProximitySpark(
+        tokens: tokens,
+        tags: tags,
+        mode: state.mode.value,
+        selfTags: state.selfTags,
+      );
       final result = TransitSparkResult.fromJson(res);
       state = state.copyWith(busy: false, lastResult: result);
       return result;

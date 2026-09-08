@@ -43,33 +43,46 @@ class TransitEncounter {
 /// (Migration 082) - Labels kommen aus dem L10n-Katalog
 /// (`transit.tag.<slug>`).
 class TransitTag {
-  const TransitTag(this.slug, this.icon);
+  const TransitTag(this.slug, this.icon, {this.colorizable = false});
 
   /// Technischer Slug (auch für das Matching, serverseitig whitelisted).
   final String slug;
 
   final IconData icon;
 
+  /// Farbwahl möglich (optional, überspringbar) - Tag wird dann als
+  /// 'slug:color' gesendet.
+  final bool colorizable;
+
   /// L10n-Schlüssel des Labels.
   String get labelKey => 'transit.tag.$slug';
 
+  /// Farbangaben (serverseitig whitelisted, Migration 084).
+  static const List<String> colors = [
+    'black', 'white', 'grey', 'blue', 'green',
+    'red', 'yellow', 'orange', 'pink', 'brown',
+  ];
+
+  static String colorLabelKey(String color) => 'transit.color.$color';
+
   /// Der Catalog (Reihenfolge = Anzeige-Reihenfolge im Bottom Sheet).
   static const List<TransitTag> catalog = [
-    TransitTag('black_hoodie', Icons.checkroom),
-    TransitTag('jacket', Icons.dry_cleaning),
-    TransitTag('cap', Icons.sports_baseball),
+    TransitTag('hoodie', Icons.checkroom, colorizable: true),
+    TransitTag('jacket', Icons.dry_cleaning, colorizable: true),
+    TransitTag('cap', Icons.sports_baseball, colorizable: true),
     TransitTag('glasses', Icons.visibility),
     TransitTag('headphones', Icons.headphones),
     TransitTag('backpack', Icons.backpack),
-    TransitTag('tote_bag', Icons.shopping_bag),
+    TransitTag('tote_bag', Icons.shopping_bag, colorizable: true),
     TransitTag('lanyard', Icons.badge),
-    TransitTag('scarf', Icons.stay_current_landscape),
-    TransitTag('colorful_top', Icons.palette),
+    TransitTag('scarf', Icons.stay_current_landscape, colorizable: true),
+    TransitTag('top', Icons.palette, colorizable: true),
   ];
 
   static TransitTag? bySlug(String slug) {
+    final base = slug.split(':').first;
     for (final t in catalog) {
-      if (t.slug == slug) return t;
+      if (t.slug == base) return t;
     }
     return null;
   }

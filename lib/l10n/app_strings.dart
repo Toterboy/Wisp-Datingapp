@@ -223,7 +223,30 @@ const Map<String, Map<String, String>> _strings = {
         'die Auswahl schärft das Matching.',
     'transit.sheetSend': 'Funken',
     'transit.tag.black_hoodie': 'Schwarzer Hoodie',
-    'transit.tag.jacket': 'Jacke',
+    'transit.tag.hoodie': 'Hoodie',
+    'transit.tag.top': 'Oberteil',
+    'transit.colorOptional': 'Farbe (optional)',
+    'transit.color.black': 'Schwarz',
+    'transit.color.white': 'Weiß',
+    'transit.color.grey': 'Grau',
+    'transit.color.blue': 'Blau',
+    'transit.color.green': 'Grün',
+    'transit.color.red': 'Rot',
+    'transit.color.yellow': 'Gelb',
+    'transit.color.orange': 'Orange',
+    'transit.color.pink': 'Pink',
+    'transit.color.brown': 'Braun',
+    'transit.self.title': 'Wie siehst du gerade aus?',
+    'transit.self.hint':
+        'Wähle 1-3 Merkmale zu dir selbst - nur so können dich andere '
+        'über Transit Spark finden. Jeden Tag neu angeben.',
+    'transit.modeDesc.transit':
+        'Für Begegnungen im Vorbeigehen: normale Reichweite, typisch '
+        'für Zug und Café.',
+    'transit.modeDesc.convention':
+        'Für volle Gebäude und Messen: nur starke Signale direkt neben '
+        'dir zählen (echter Sichtkontakt).',
+        'transit.tag.jacket': 'Jacke',
     'transit.tag.cap': 'Cap',
     'transit.tag.glasses': 'Brille',
     'transit.tag.headphones': 'Kopfhörer',
@@ -1080,6 +1103,29 @@ const Map<String, Map<String, String>> _strings = {
         'sharpens the matching.',
     'transit.sheetSend': 'Spark',
     'transit.tag.black_hoodie': 'Black hoodie',
+    'transit.tag.hoodie': 'Hoodie',
+    'transit.tag.top': 'Top',
+    'transit.colorOptional': 'Color (optional)',
+    'transit.color.black': 'Black',
+    'transit.color.white': 'White',
+    'transit.color.grey': 'Grey',
+    'transit.color.blue': 'Blue',
+    'transit.color.green': 'Green',
+    'transit.color.red': 'Red',
+    'transit.color.yellow': 'Yellow',
+    'transit.color.orange': 'Orange',
+    'transit.color.pink': 'Pink',
+    'transit.color.brown': 'Brown',
+    'transit.self.title': 'How do you look right now?',
+    'transit.self.hint':
+        'Pick 1-3 traits describing yourself - only this way others '
+        'can find you via Transit Spark. Re-enter daily.',
+    'transit.modeDesc.transit':
+        'For passing encounters: normal range, typical for train and '
+        'café.',
+    'transit.modeDesc.convention':
+        'For packed venues and conventions: only strong signals right '
+        'next to you count (real sight contact).',
     'transit.tag.jacket': 'Jacket',
     'transit.tag.cap': 'Cap',
     'transit.tag.glasses': 'Glasses',

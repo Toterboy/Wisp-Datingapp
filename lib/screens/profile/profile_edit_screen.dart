@@ -935,6 +935,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           'music_disliked': _musicDisliked,
           'habits_dealbreaker': _habitsDealbreaker,
           'photos': ref.read(profileProvider).photos,
+          'max_distance_km': ref.read(userPreferencesProvider).maxDistanceKm,
           'city': ?location,
         });
         // Dealbreaker-Schalter in die Settings spiegeln (Restore-Pfad).

@@ -276,11 +276,13 @@ class SupabaseDatabaseService {
     required List<String> tokens,
     required List<String> tags,
     required String mode,
+    List<String> selfTags = const [],
   }) async {
     final res = await _client.rpc('match_proximity_spark', params: {
       'p_tokens': tokens,
       'p_tags': tags,
       'p_mode': mode,
+      'p_self_tags': selfTags,
     });
     return Map<String, dynamic>.from(res);
   }

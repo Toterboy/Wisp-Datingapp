@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -37,7 +38,45 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
       await transit.deactivate();
       return;
     }
-    final ok = await transit.activate();
+
+    // Taegliche Selbst-Angaben (v0.9.0): Pflicht vor dem Start - andere
+    // koennen dich nur darueber finden. Jeden Tag neu angeben.
+    final selfTags = await _showTagPickerSheet(
+      titleKey: 'transit.self.title',
+      hintKey: 'transit.self.hint',
+      requireSelection: true,
+    );
+    if (selfTags == null || !mounted) return;
+    transit.setSelfTags(selfTags);
+
+    var ok = await transit.activate();
+    if (!ok && mounted) {
+      // Bluetooth-Prompt (v0.9.0): direkt aus der App aktivieren.
+      final enable = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.bluetooth_disabled, size: 40),
+          title: Text(L10n.t(ctx, 'transit.btTitle')),
+          content: Text(L10n.t(ctx, 'transit.btBody')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(L10n.t(ctx, 'common.cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(L10n.t(ctx, 'transit.btEnable')),
+            ),
+          ],
+        ),
+      );
+      if (enable == true) {
+        try {
+          await FlutterBluePlus.turnOn();
+        } catch (_) {}
+        ok = await transit.activate();
+      }
+    }
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -48,10 +87,14 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
     }
   }
 
-  /// "Blicke getauscht": Tag-Auswahl (1-3 Merkmale) im Bottom Sheet,
-  /// dann Versand. (v0.9.0: Messe-Modus + Merkmal-Tags)
+  /// "Blicke getauscht": Tag-Auswahl (1-3 Merkmale, Farben optional)
+  /// im Bottom Sheet, dann Versand.
   Future<void> _sendSpark() async {
-    final tags = await _showTagSelectionSheet();
+    final tags = await _showTagPickerSheet(
+      titleKey: 'transit.sheetTitle',
+      hintKey: 'transit.sheetHint',
+      requireSelection: true,
+    );
     if (tags == null || tags.isEmpty || !mounted) return;
 
     final result = await ref.read(transitProvider.notifier).sendSpark(tags);
@@ -98,74 +141,132 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
     }
   }
 
-  /// Tag-Auswahl: 1-3 Merkmale, die an der anderen Person aufgefallen
-  /// sind. Rückgabe: gewählte Slugs oder null (Abbruch).
-  Future<List<String>?> _showTagSelectionSheet() {
+  /// Universeller Tag-Picker (v0.9.0): 1-3 Basis-Merkmale; fuer farbige
+  /// Merkmale folgt OPTIONAL eine Farbwahl (überspringbar, wenn man die
+  /// Farbe vergessen hat). Rueckgabe: Slugs (mit ':farbe' wenn gewaehlt)
+  /// oder null (Abbruch). [requireSelection] = min. 1 Merkmal Pflicht.
+  Future<List<String>?> _showTagPickerSheet({
+    required String titleKey,
+    required String hintKey,
+    required bool requireSelection,
+  }) {
     final selected = <String>{};
+    final colors = <String, String?>{};
     return showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                L10n.t(ctx, 'transit.sheetTitle'),
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                L10n.t(ctx, 'transit.sheetHint'),
-                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+        builder: (ctx, setSheetState) {
+          final pickedTags = TransitTag.catalog
+              .where((t) => selected.contains(t.slug))
+              .toList();
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final tag in TransitTag.catalog)
-                    FilterChip(
-                      avatar: Icon(tag.icon, size: 18),
-                      label: Text(L10n.t(ctx, tag.labelKey)),
-                      selected: selected.contains(tag.slug),
-                      onSelected: (sel) {
-                        setSheetState(() {
-                          if (sel) {
-                            if (selected.length < 3) selected.add(tag.slug);
-                          } else {
-                            selected.remove(tag.slug);
-                          }
-                        });
-                      },
+                  Text(
+                    L10n.t(ctx, titleKey),
+                    style: Theme.of(ctx)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    L10n.t(ctx, hintKey),
+                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                          color:
+                              Theme.of(ctx).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final tag in TransitTag.catalog)
+                        FilterChip(
+                          avatar: Icon(tag.icon, size: 18),
+                          label: Text(L10n.t(ctx, tag.labelKey)),
+                          selected: selected.contains(tag.slug),
+                          onSelected: (sel) {
+                            setSheetState(() {
+                              if (sel) {
+                                if (selected.length < 3) {
+                                  selected.add(tag.slug);
+                                  if (tag.colorizable) {
+                                    colors[tag.slug] = null;
+                                  }
+                                }
+                              } else {
+                                selected.remove(tag.slug);
+                                colors.remove(tag.slug);
+                              }
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                  // Farbschritt: nur fuer gewaehlte farbige Merkmale,
+                  // bewusst OPTIONAL (Farbe vergessen = einfach lassen).
+                  for (final tag in pickedTags)
+                    if (tag.colorizable) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        '${L10n.t(ctx, tag.labelKey)}: '
+                        '${L10n.t(ctx, 'transit.colorOptional')}',
+                        style: Theme.of(ctx).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final color in TransitTag.colors)
+                            ChoiceChip(
+                              label: Text(
+                                  L10n.t(ctx, TransitTag.colorLabelKey(color))),
+                              selected: colors[tag.slug] == color,
+                              onSelected: (sel) {
+                                setSheetState(() {
+                                  colors[tag.slug] = sel ? color : null;
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: (requireSelection && selected.isEmpty)
+                          ? null
+                          : () {
+                              final out = <String>[];
+                              for (final slug in selected) {
+                                final c = colors[slug];
+                                out.add(
+                                    (c != null && c.isNotEmpty) ? '$slug:$c' : slug);
+                              }
+                              Navigator.of(ctx).pop(out);
+                            },
+                      child: Text(L10n.t(ctx, 'transit.sheetSend')),
                     ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: selected.isEmpty
-                      ? null
-                      : () => Navigator.of(ctx).pop(selected.toList()),
-                  icon: const Icon(Icons.auto_awesome),
-                  label: Text(L10n.t(ctx, 'transit.sheetSend')),
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
