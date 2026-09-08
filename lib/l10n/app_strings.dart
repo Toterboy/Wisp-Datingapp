@@ -194,6 +194,50 @@ const Map<String, Map<String, String>> _strings = {
     'dm.datingHour': 'Dating Hour (Event)',
     'dm.datingHourDesc':
         'Samstags 20 bis 21 Uhr: 5-Minuten-Chats mit Entscheidungsphase',
+    'dm.transitSpark': 'Transit Spark',
+    'dm.transitSparkDesc':
+        'Blicke getauscht, sich nicht getraut? Später funken - auch wenn '
+        'ihr längst weitergefahren seid.',
+    'dm.groupMeet': 'Menschen kennenlernen',
+    'dm.groupDirect': 'Direkt verbinden',
+    'dm.groupOnTheGo': 'Unterwegs',
+    'dm.pickHint': 'Wähle einen Modus, um neue Leute zu entdecken:',
+    'common.new': 'NEU',
+    'transit.title': 'Transit Spark',
+    'transit.start': 'Radar aktivieren',
+    'transit.stop': 'Radar stoppen',
+    'transit.active': 'Radar aktiv - du bist sichtbar für Wisp-Geräte in der Nähe.',
+    'transit.inactive': 'Radar aus. Aktiviere es, wenn du unterwegs bist.',
+    'transit.remaining': 'Noch {time} aktiv',
+    'transit.seenCount': '{count} Wisp-Geräte in Reichweite gesehen.',
+    'transit.exchanged': 'Blicke getauscht',
+    'transit.stored':
+        'Signal gespeichert. Wenn die Person denselben Moment spürt und '
+        'ebenfalls funkt, matcht ihr euch.',
+    'transit.matchTitle': 'Funke übergesprungen!',
+    'transit.matchBody':
+        'Die Person hat denselben Moment gespürt. Schaut in eure Funken - '
+        'ihr könnt jetzt chatten.',
+    'transit.later': 'Später',
+    'transit.openSparks': 'Zu den Funken',
+    'transit.startFailed':
+        'Radar konnte nicht gestartet werden. Bluetooth an und Berechtigung '
+        'erteilen.',
+    'transit.sendFailed': 'Signal konnte nicht gesendet werden. Bitte erneut.',
+    'transit.howTitle': 'Wie funktioniert das?',
+    'transit.howBody':
+        'Aktiviere das Radar, wenn du unterwegs bist (Zug, Café, Messe). '
+        'Dein Gerät tauscht mit anderen Wisp-Geräten in nächster Nähe '
+        'anonyme, zufällige Token aus - ohne Namen, ohne Standort, ohne '
+        'Fotos. Tippe später auf "Blicke getauscht": Spürt die andere '
+        'Person denselben Moment und funkt ebenfalls, entsteht ein Funke.',
+    'transit.privacyNote':
+        'Tokens sind zufällig, rotieren regelmäßig und verfallen nach '
+        '45 Minuten. Gespeichert wird nur, was du aktiv sendest - nichts '
+        'verlässt dein Gerät, solange du nicht selbst funkt.',
+    'transit.teenNote':
+        'Unter 18? Du siehst ausschließlich altersseitig kompatible '
+        'Nutzer - serverseitig erzwungen.',
     'chathist.tileTitle': 'Chat-Verlauf lokal speichern',
     'chathist.mode.off': 'Aus',
     'chathist.mode.cap200': 'An (200 Nachrichten)',
@@ -947,6 +991,49 @@ const Map<String, Map<String, String>> _strings = {
     'dm.datingHour': 'Dating Hour (event)',
     'dm.datingHourDesc':
         'Saturdays 8 to 9 pm: 5-minute chats with a decision phase',
+    'dm.transitSpark': 'Transit Spark',
+    'dm.transitSparkDesc':
+        'Exchanged glances but too shy? Spark later - even after you have '
+        'both moved on.',
+    'dm.groupMeet': 'Meet people',
+    'dm.groupDirect': 'Connect directly',
+    'dm.groupOnTheGo': 'On the go',
+    'dm.pickHint': 'Choose a mode to discover new people:',
+    'common.new': 'NEW',
+    'transit.title': 'Transit Spark',
+    'transit.start': 'Activate radar',
+    'transit.stop': 'Stop radar',
+    'transit.active': 'Radar active - visible to nearby Wisp devices.',
+    'transit.inactive': 'Radar off. Activate it when you are on the go.',
+    'transit.remaining': 'Active for another {time}',
+    'transit.seenCount': 'Seen {count} Wisp devices in range.',
+    'transit.exchanged': 'Exchanged glances',
+    'transit.stored':
+        'Signal stored. If the other person feels the same moment and '
+        'signals too, you will match.',
+    'transit.matchTitle': 'Spark jumped over!',
+    'transit.matchBody':
+        'The other person felt the same moment. Check your sparks - you '
+        'can chat now.',
+    'transit.later': 'Later',
+    'transit.openSparks': 'To the sparks',
+    'transit.startFailed':
+        'Radar could not start. Turn on Bluetooth and grant permission.',
+    'transit.sendFailed': 'Signal could not be sent. Please try again.',
+    'transit.howTitle': 'How does it work?',
+    'transit.howBody':
+        'Activate the radar while you are on the go (train, café, '
+        'convention). Your device exchanges anonymous, random tokens with '
+        'other Wisp devices nearby - no names, no location, no photos. '
+        'Later, tap "Exchanged glances": if the other person feels the '
+        'same moment and signals too, a spark is created.',
+    'transit.privacyNote':
+        'Tokens are random, rotate regularly and expire after 45 minutes. '
+        'Only what you actively send is stored - nothing leaves your '
+        'device unless you choose to signal.',
+    'transit.teenNote':
+        'Under 18? You only see age-compatible users - enforced '
+        'server-side.',
     'chathist.tileTitle': 'Save chat history locally',
     'chathist.mode.off': 'Off',
     'chathist.mode.cap200': 'On (200 messages)',

@@ -26,38 +26,36 @@ class SwipeModeSelectionScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Wähle einen Modus, um neue Leute zu entdecken:',
+            L10n.t(context, 'dm.pickHint'),
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
-          // 1. Find your Match (ersetzt den Bild-Swipe)
-          _ModeCard(
-            mode: DiscoveryMode.findMatch,
-            isSelected: false,
-            onTap: () => context.push(AppRoutes.findYourMatch),
+          // v0.9.0: Gruppierung nach Zweck - neue Modi rutschen ohne
+          // Unübersichtlichkeit ein.
+          _ModeGroup(
+            headerKey: 'dm.groupMeet',
+            modes: [
+              (DiscoveryMode.findMatch, () => context.push(AppRoutes.findYourMatch)),
+              (DiscoveryMode.datingHour, () => context.push(AppRoutes.datingHourEvent)),
+            ],
           ),
-          const SizedBox(height: 12),
-          // 2. Zufallschat-Modus
-          _ModeCard(
-            mode: DiscoveryMode.randomChat,
-            isSelected: false, // Kein direkter SwipeMode
-            onTap: () => context.push(AppRoutes.randomChat),
+          const SizedBox(height: 16),
+          _ModeGroup(
+            headerKey: 'dm.groupDirect',
+            modes: [
+              (DiscoveryMode.randomChat, () => context.push(AppRoutes.randomChat)),
+            ],
           ),
-          const SizedBox(height: 12),
-          // 3. QR-Code scannen
-          _ModeCard(
-            mode: DiscoveryMode.qrScan,
-            isSelected: false,
-            onTap: () => context.push(AppRoutes.qrScan),
-          ),
-          const SizedBox(height: 12),
-          // 5. Event-Modus (Dating Hour) - bewusst ganz unten.
-          _ModeCard(
-            mode: DiscoveryMode.datingHour,
-            isSelected: false,
-            onTap: () => context.push(AppRoutes.datingHourEvent),
+          const SizedBox(height: 16),
+          _ModeGroup(
+            headerKey: 'dm.groupOnTheGo',
+            modes: [
+              (DiscoveryMode.qrScan, () => context.push(AppRoutes.qrScan)),
+              (DiscoveryMode.transitSpark,
+                  () => context.push(AppRoutes.transitRadar)),
+            ],
           ),
           const SizedBox(height: 24),
           // Hinweis
@@ -104,20 +102,60 @@ class SwipeModeSelectionScreen extends ConsumerWidget {
 
 }
 
-/// Enum für die Entdeckungs-Modi.
+/// Enum für die Entdeckungs-Modi (v0.9.0: gruppiert nach Zweck).
 enum DiscoveryMode {
   findMatch('Find your Match', 'dm.findMatch', 'dm.findMatchDesc', Icons.headphones),
+  datingHour('Dating Hour (Event)', 'dm.datingHour', 'dm.datingHourDesc', Icons.event),
   randomChat('Zufallschat', 'dm.randomChat', 'dm.randomChatDesc', Icons.chat_bubble),
   qrScan('QR Code scannen', 'dm.qrScan', 'dm.qrScanDesc', Icons.qr_code_scanner),
-  datingHour('Dating Hour (Event)', 'dm.datingHour', 'dm.datingHourDesc', Icons.event);
+  transitSpark('Transit Spark', 'dm.transitSpark', 'dm.transitSparkDesc', Icons.radar);
 
   const DiscoveryMode(this.label, this.labelKey, this.descriptionKey, this.icon);
   final String label;
 
-  /// L10n-Schlüssel (v0.8.1: EN-Übersetzung der Entdecken-Modi).
+  /// L10n-Schlüssel (EN-Übersetzung der Entdecken-Modi).
   final String labelKey;
   final String descriptionKey;
   final IconData icon;
+
+  /// Zeigt den NEU-Badge (frischer Modus in 0.9.0).
+  bool get isNew => this == DiscoveryMode.transitSpark;
+}
+
+/// Gruppenkopf + Karten einer Zweck-Gruppe (v0.9.0).
+class _ModeGroup extends StatelessWidget {
+  const _ModeGroup({
+    required this.headerKey,
+    required this.modes,
+  });
+
+  final String headerKey;
+  final List<(DiscoveryMode, VoidCallback)> modes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          L10n.t(context, headerKey),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+        ),
+        const SizedBox(height: 8),
+        for (final (mode, onTap) in modes) ...[
+          _ModeCard(
+            mode: mode,
+            isSelected: false,
+            onTap: onTap,
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
 }
 
 /// Karte für einen Entdeckungs-Modus.
@@ -135,7 +173,7 @@ class _ModeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.zero,
       elevation: isSelected ? 4 : 1,
       color: isSelected
           ? Theme.of(context).colorScheme.primaryContainer
@@ -178,14 +216,48 @@ class _ModeCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      L10n.t(context, mode.labelKey),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.onPrimaryContainer
-                            : null,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            L10n.t(context, mode.labelKey),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isSelected
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        if (mode.isNew) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              L10n.t(context, 'common.new'),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(

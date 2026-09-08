@@ -76,20 +76,20 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
     super.dispose();
   }
 
-  /// Lädt das Alter des Chat-Partners (public_profiles-View, nur das Alter)
-  /// und zeigt bei >= 10 Jahren Differenz einen Hinweis im Chat an.
+  /// Lädt das Alter des Chat-Partners (RPC get_public_profile, Migration
+  /// 080 - Nachfolger der public_profiles-View; nur das Alter) und zeigt
+  /// bei >= 10 Jahren Differenz einen Hinweis im Chat an.
   Future<void> _loadPartnerAge(DatingHourSession session) async {
     try {
       final myAge = ref.read(profileProvider).age;
       if (myAge == null) return;
       final peerId = session.getPeerId(_currentUserId ?? AppConstants.currentUserId);
-      final rows = await SupabaseService.client
-          .from('public_profiles')
-          .select('age')
-          .eq('user_id', peerId)
-          .limit(1);
-      if (rows.isEmpty) return;
-      final partnerAge = (rows.first['age'] as num?)?.toInt();
+      final row = await SupabaseService.client.rpc(
+        'get_public_profile',
+        params: {'p_user_id': peerId},
+      );
+      if (row == null) return;
+      final partnerAge = ((row as Map)['age'] as num?)?.toInt();
       if (partnerAge == null || !mounted) return;
       setState(() => _partnerAge = partnerAge);
       final diff = (myAge - partnerAge).abs();

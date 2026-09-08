@@ -265,6 +265,20 @@ class SupabaseDatabaseService {
     });
   }
 
+  // =========================================================================
+  // Transit Spark (v0.9.0, Migration 081)
+  // =========================================================================
+
+  /// "Blicke getauscht": frische Encounter-Tokens senden. Match =
+  /// beidseitiges Signal (Bestandspipeline erzeugt den Funke), sonst
+  /// wird das eigene Signal 45 Minuten vorgehalten.
+  Future<Map<String, dynamic>> matchProximitySpark(List<String> tokens) async {
+    final res = await _client.rpc('match_proximity_spark', params: {
+      'p_tokens': tokens,
+    });
+    return Map<String, dynamic>.from(res);
+  }
+
   /// Aktualisiert das eigene Profil in der Supabase-Datenbank.
   ///
   /// Robust gegenüber unvollständigen Migrationen (v0.8.1): Liefert
@@ -581,24 +595,26 @@ class SupabaseDatabaseService {
         .neq('device_id', keepDeviceId);
   }
 
-  /// Holt öffentliche Profile anderer Nutzer (RLS regelt die Sichtbarkeit).
-  Future<List<Map<String, dynamic>>> fetchPublicProfiles({int limit = 20}) async {
-    final response = await _client
-        .from('public_profiles')
-        .select()
-        .limit(limit);
-
-    return List<Map<String, dynamic>>.from(response);
+  /// Holt öffentliche Profile anderer Nutzer (v0.9.0: RPC statt View -
+  /// löst den security_definer_view-Befund auf). Whitelist + Jugendschutz
+  /// serverseitig (Migration 080).
+  Future<List<Map<String, dynamic>>> fetchPublicProfiles({
+    int limit = 20,
+  }) async {
+    // Die RPC-Variante arbeitet auf ID-Listen; ohne Quell-IDs gibt es
+    // hier nichts Sinnvolles - die Methode ist historisch ungenutzt und
+    // liefert bewusst eine leere Liste statt einer DB-Weitabfrage.
+    return [];
   }
 
-  /// Holt ein einzelnes öffentliches Profil via public_profiles-View.
+  /// Holt ein einzelnes öffentliches Profil via RPC (v0.9.0, Migration
+  /// 080 - Nachfolger der public_profiles-View). Null, wenn der Nutzer
+  /// nicht existiert oder altersseitig nicht sichtbar ist.
   Future<Map<String, dynamic>?> fetchPublicProfile(String userId) async {
-    final response = await _client
-        .from('public_profiles')
-        .select()
-        .eq('user_id', userId)
-        .maybeSingle();
-
+    final response = await _client.rpc(
+      'get_public_profile',
+      params: {'p_user_id': userId},
+    );
     if (response == null) return null;
     return Map<String, dynamic>.from(response);
   }
@@ -823,48 +839,94 @@ class SupabaseDatabaseService {
         .toList();
   }
 
-  /// "Meine Likes" — Profile, die ich geliked habe.
+  /// "Meine Likes" — Profile, die ich geliked habe (v0.9.0: zweistufiger
+  /// Fetch statt Embedded-Join auf die View - gleiche Ergebnis-Form:
+  /// flaches Profil + 'liked_at'; Likes ohne sichtbares Profil (z. B.
+  /// altersseitig) fallen weg, wie beim bisherigen INNER-Join).
   Future<List<Map<String, dynamic>>> fetchMyLikes() async {
     final userId = _currentUser?.id;
     if (userId == null) return [];
 
-    final response = await _client
+    final rows = await _client
         .from('likes')
-        .select('liked_user_id, created_at, liked_user:public_profiles!inner(*)')
+        .select('liked_user_id, created_at')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    return (response as List<dynamic>? ?? [])
+    final likeRows = List<Map<String, dynamic>>.from(rows as List<dynamic>);
+    final ids = likeRows
+        .map((r) => r['liked_user_id'] as String?)
+        .whereType<String>()
+        .toList();
+    if (ids.isEmpty) return [];
+
+    final profiles = await _fetchPublicProfilesByIds(ids);
+    final byId = {for (final p in profiles) p['user_id'] as String: p};
+
+    return likeRows
+        .where((r) => byId.containsKey(r['liked_user_id']))
         .map((row) {
-          final liked = row['liked_user'] as Map<String, dynamic>? ?? {};
           return {
-            ...liked,
+            ...byId[row['liked_user_id']] as Map<String, dynamic>,
             'liked_at': row['created_at'],
           };
         })
         .toList();
   }
 
-  /// "Likes für mich" — Profile, die mich geliked haben.
+  /// "Likes für mich" — Profile, die mich geliked haben (v0.9.0: siehe
+  /// [fetchMyLikes] - identisches Antwort-Shape wie der frühere
+  /// Embedded-Join auf die View).
   Future<List<Map<String, dynamic>>> fetchLikesForMe() async {
     final userId = _currentUser?.id;
     if (userId == null) return [];
 
-    final response = await _client
+    final rows = await _client
         .from('likes')
-        .select('user_id, created_at, liker:public_profiles!inner(*)')
+        .select('user_id, created_at')
         .eq('liked_user_id', userId)
         .order('created_at', ascending: false);
 
-    return (response as List<dynamic>? ?? [])
+    final likeRows = List<Map<String, dynamic>>.from(rows as List<dynamic>);
+    final ids = likeRows
+        .map((r) => r['user_id'] as String?)
+        .whereType<String>()
+        .toList();
+    if (ids.isEmpty) return [];
+
+    final profiles = await _fetchPublicProfilesByIds(ids);
+    final byId = {for (final p in profiles) p['user_id'] as String: p};
+
+    return likeRows
+        .where((r) => byId.containsKey(r['user_id']))
         .map((row) {
-          final liker = row['liker'] as Map<String, dynamic>? ?? {};
           return {
-            ...liker,
+            ...byId[row['user_id']] as Map<String, dynamic>,
             'liked_at': row['created_at'],
           };
         })
         .toList();
+  }
+
+  /// Batch-Whitelist-Fetch über den 080er-RPC (max. 200 IDs pro Call,
+  /// bei mehr wird gestaffelt).
+  Future<List<Map<String, dynamic>>> _fetchPublicProfilesByIds(
+    List<String> ids,
+  ) async {
+    final result = <Map<String, dynamic>>[];
+    for (var i = 0; i < ids.length; i += 200) {
+      final chunk = ids.sublist(i, i + 200 > ids.length ? ids.length : i + 200);
+      final res = await _client.rpc(
+        'get_public_profiles',
+        params: {'p_ids': chunk},
+      );
+      if (res is List) {
+        result.addAll(
+          res.map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+      }
+    }
+    return result;
   }
 
   // =========================================================================

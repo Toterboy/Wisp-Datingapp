@@ -46,6 +46,7 @@ import 'package:wisp/screens/safety/safety_center_screen.dart';
 import 'package:wisp/screens/chat/chat_detail_screen.dart';
 import 'package:wisp/screens/profile/profile_detail_screen.dart';
 import 'package:wisp/screens/swipe/random_chat_screen.dart';
+import 'package:wisp/screens/swipe/transit_radar_screen.dart';
 import 'package:wisp/screens/bug_report/bug_report_screen.dart';
 import 'package:wisp/screens/qr/qr_profile_screen.dart';
 import 'package:wisp/screens/qr/qr_scan_screen.dart';
@@ -80,6 +81,8 @@ class AppRoutes {
   static const String settingsPrivacyOnce = '/settings-privacy-once';
   static const String swipeModeSelection = '/swipe-mode-selection';
   static const String randomChat = '/random-chat';
+  // Transit Spark (v0.9.0)
+  static const String transitRadar = '/transit/radar';
   static const String bugReport = '/bug-report';
   // QR-Code (Profil teilen + Scannen)
   static const String qrProfile = '/qr/profile';
@@ -653,6 +656,10 @@ routes: [
           GoRoute(
             path: AppRoutes.randomChat,
             builder: (context, state) => const RandomChatScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.transitRadar,
+            builder: (context, state) => const TransitRadarScreen(),
           ),
           // T: Entdeckungs-Modus-Auswahl MUSS Teil des Bottom-Navigation-Shells
           // sein (nicht eigenständiger Vollbild-Screen), damit die untere
