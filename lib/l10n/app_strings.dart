@@ -211,9 +211,9 @@ const Map<String, Map<String, String>> _strings = {
     'transit.remaining': 'Noch {time} aktiv',
     'transit.seenCount': '{count} Wisp-Geräte in Reichweite gesehen.',
     'transit.exchanged': 'Blicke getauscht',
-    'transit.modeLabel': 'Wo bist du?',
-    'transit.mode.transit': 'Bahn / Café',
-    'transit.mode.convention': 'Messe / Event',
+    'transit.modeLabel': 'Wie weit soll die Erkennung reichen?',
+    'transit.mode.transit': 'Normal',
+    'transit.mode.convention': 'Nur direkt daneben',
     'transit.modeHint':
         'Messe-Modus: nur starke Signale zählen (echter Sichtkontakt in '
         'dichten Umgebungen).',
@@ -222,7 +222,12 @@ const Map<String, Map<String, String>> _strings = {
         'Wähle 1-3 Merkmale, die dir an der Person aufgefallen sind - '
         'die Auswahl schärft das Matching.',
     'transit.sheetSend': 'Funken',
-    'transit.tag.black_hoodie': 'Schwarzer Hoodie',
+    'transit.tag.black_hoodie': 'Hoodie (schwarz)',
+    'transit.tag.tshirt': 'T-Shirt',
+    'transit.tag.sweater': 'Pullover',
+    'transit.tag.shorts': 'Kurze Hose',
+    'transit.tag.pants': 'Lange Hose',
+    'transit.tag.sporty': 'Sportliche Kleidung',
     'transit.tag.hoodie': 'Hoodie',
     'transit.tag.top': 'Oberteil',
     'transit.colorOptional': 'Farbe (optional)',
@@ -241,11 +246,11 @@ const Map<String, Map<String, String>> _strings = {
         'Wähle 1-3 Merkmale zu dir selbst - nur so können dich andere '
         'über Transit Spark finden. Jeden Tag neu angeben.',
     'transit.modeDesc.transit':
-        'Für Begegnungen im Vorbeigehen: normale Reichweite, typisch '
-        'für Zug und Café.',
+        'Übliche Reichweite: Begegnungen im Vorbeigehen, z. B. auf der '
+        'Straße als Fußgänger, im Zug oder im Café.',
     'transit.modeDesc.convention':
-        'Für volle Gebäude und Messen: nur starke Signale direkt neben '
-        'dir zählen (echter Sichtkontakt).',
+        'Eng begrenzt: nur Personen unmittelbar neben dir zählen. Ideal '
+        'für volle Messen, Konzerte und Events.',
         'transit.tag.jacket': 'Jacke',
     'transit.tag.cap': 'Cap',
     'transit.tag.glasses': 'Brille',
@@ -255,6 +260,28 @@ const Map<String, Map<String, String>> _strings = {
     'transit.tag.lanyard': 'Lanyard / Badge',
     'transit.tag.scarf': 'Schal',
     'transit.tag.colorful_top': 'Auffälliges Oberteil',
+    'transit.greetSection': 'Gesehene Geräte in dieser Session',
+    'transit.greet': 'Grüßen',
+    'transit.justNow': 'gerade eben',
+    'transit.minutesAgo': 'vor {count} Min.',
+    'transit.hoursAgo': 'vor {count} Std.',
+    'transit.noEncounters': 'Noch keine Geräte in Reichweite gewesen.',
+    'transit.pingSheetTitle': 'Einen Gruß senden',
+    'transit.pingSheetHint':
+        'Einmal pro Begegnung möglich. Die Person entscheidet still, '
+        'ob sie antwortet - du erfährst nur von einem Ja.',
+    'transit.pingSend': 'Gruß senden',
+    'transit.pingSent': 'Gruß gesendet. 48 Stunden Zeitfenster - mehr '
+        'nicht.',
+    'transit.pingCustomHint': 'Optional: eine kurze eigene Zeile …',
+    'transit.preset.wave': 'Hallo! Ich war gerade eben in deiner Nähe.',
+    'transit.preset.again':
+        'Vielleicht kreuzen sich unsere Wege ja nochmal?',
+    'transit.preset.coffee':
+        'Falls du magst: ein Kaffee in der Nähe?',
+    'transit.inboxTitle': 'Grüße für dich',
+    'transit.ignore': 'Ausblenden',
+    'transit.accept': 'Funke annehmen',
     'transit.stored':
         'Signal gespeichert. Wenn die Person denselben Moment spürt und '
         'ebenfalls funkt, matcht ihr euch.',
@@ -278,7 +305,7 @@ const Map<String, Map<String, String>> _strings = {
     'transit.privacyNote':
         'Tokens sind zufällig, rotieren regelmäßig und verfallen nach '
         '45 Minuten. Gespeichert wird nur, was du aktiv sendest - nichts '
-        'verlässt dein Gerät, solange du nicht selbst funkt.',
+        'verlässt dein Gerät, solange du nicht selbst funkt. Ein Gruß an eine Person braucht deren aktuelles Token - dafür wird bei aktivem Radar dein zufälliges Token (nur dieses) 45 Minuten serverseitig hinterlegt.',
     'transit.teenNote':
         'Unter 18? Du siehst ausschließlich altersseitig kompatible '
         'Nutzer - serverseitig erzwungen.',
@@ -1091,9 +1118,9 @@ const Map<String, Map<String, String>> _strings = {
     'transit.remaining': 'Active for another {time}',
     'transit.seenCount': 'Seen {count} Wisp devices in range.',
     'transit.exchanged': 'Exchanged glances',
-    'transit.modeLabel': 'Where are you?',
-    'transit.mode.transit': 'Train / café',
-    'transit.mode.convention': 'Convention / event',
+    'transit.modeLabel': 'How far should detection reach?',
+    'transit.mode.transit': 'Normal',
+    'transit.mode.convention': 'Only right next to me',
     'transit.modeHint':
         'Convention mode: only strong signals count (real sight contact '
         'in dense environments).',
@@ -1102,7 +1129,12 @@ const Map<String, Map<String, String>> _strings = {
         'Pick 1-3 traits you noticed about the person - your selection '
         'sharpens the matching.',
     'transit.sheetSend': 'Spark',
-    'transit.tag.black_hoodie': 'Black hoodie',
+    'transit.tag.black_hoodie': 'Hoodie (black)',
+    'transit.tag.tshirt': 'T-shirt',
+    'transit.tag.sweater': 'Sweater',
+    'transit.tag.shorts': 'Shorts',
+    'transit.tag.pants': 'Long pants',
+    'transit.tag.sporty': 'Sporty clothes',
     'transit.tag.hoodie': 'Hoodie',
     'transit.tag.top': 'Top',
     'transit.colorOptional': 'Color (optional)',
@@ -1121,11 +1153,11 @@ const Map<String, Map<String, String>> _strings = {
         'Pick 1-3 traits describing yourself - only this way others '
         'can find you via Transit Spark. Re-enter daily.',
     'transit.modeDesc.transit':
-        'For passing encounters: normal range, typical for train and '
-        'café.',
+        'Typical range: passing encounters, e. g. on the street as a '
+        'pedestrian, on the train or in a café.',
     'transit.modeDesc.convention':
-        'For packed venues and conventions: only strong signals right '
-        'next to you count (real sight contact).',
+        'Tightly limited: only people right next to you count. Ideal '
+        'for packed conventions, concerts and events.',
     'transit.tag.jacket': 'Jacket',
     'transit.tag.cap': 'Cap',
     'transit.tag.glasses': 'Glasses',
@@ -1135,6 +1167,28 @@ const Map<String, Map<String, String>> _strings = {
     'transit.tag.lanyard': 'Lanyard / badge',
     'transit.tag.scarf': 'Scarf',
     'transit.tag.colorful_top': 'Colorful top',
+    'transit.greetSection': 'Devices seen in this session',
+    'transit.greet': 'Greet',
+    'transit.justNow': 'just now',
+    'transit.minutesAgo': '{count} min ago',
+    'transit.hoursAgo': '{count} h ago',
+    'transit.noEncounters': 'No devices in range yet.',
+    'transit.pingSheetTitle': 'Send a greeting',
+    'transit.pingSheetHint':
+        'Possible once per encounter. The person decides quietly '
+        'whether to respond - you will only hear about a yes.',
+    'transit.pingSend': 'Send greeting',
+    'transit.pingSent':
+        'Greeting sent. 48-hour window - that is all.',
+    'transit.pingCustomHint': 'Optional: one short line of your own …',
+    'transit.preset.wave': 'Hi! I was just near you.',
+    'transit.preset.again':
+        'Maybe our paths will cross again?',
+    'transit.preset.coffee':
+        'If you like: a coffee nearby?',
+    'transit.inboxTitle': 'Greetings for you',
+    'transit.ignore': 'Hide',
+    'transit.accept': 'Accept spark',
     'transit.stored':
         'Signal stored. If the other person feels the same moment and '
         'signals too, you will match.',
@@ -1157,7 +1211,10 @@ const Map<String, Map<String, String>> _strings = {
     'transit.privacyNote':
         'Tokens are random, rotate regularly and expire after 45 minutes. '
         'Only what you actively send is stored - nothing leaves your '
-        'device unless you choose to signal.',
+        'device unless you choose to signal. A greeting to a person '
+        'needs their current token - therefore while the radar is '
+        'active your random token (only this one) is stored server-'
+        'side for 45 minutes.',
     'transit.teenNote':
         'Under 18? You only see age-compatible users - enforced '
         'server-side.',

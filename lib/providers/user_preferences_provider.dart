@@ -298,7 +298,15 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
       }
     }
     final city = (p['city'] as String? ?? '').trim();
+    var filterMode = state.distanceFilterMode;
+    final fmRaw = p['distance_filter_mode'] as String?;
+    if (fmRaw != null && fmRaw.isNotEmpty) {
+      for (final m in DistanceFilterMode.values) {
+        if (m.name == fmRaw) filterMode = m;
+      }
+    }
     state = state.copyWith(
+      distanceFilterMode: filterMode,
       maxDistanceKm:
           (p['max_distance_km'] as num?)?.toInt() ?? state.maxDistanceKm,
       preferredState: p['preferred_state'] as String? ?? state.preferredState,
@@ -330,6 +338,9 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
     try {
       final body = <String, dynamic>{
         'max_distance_km': state.maxDistanceKm,
+        // Modus mitsenden (Migration 085) - sonst springt er nach
+        // Neuinstallation zurueck (der eigentliche Radius-weg-Bug).
+        'distance_filter_mode': state.distanceFilterMode.name,
         'gender_preferences': state.genderPreferences,
         'relationship_type': state.relationshipType?.value,
         // Bewusst IMMER schreiben (auch null = Filter "Ganz Deutschland"),

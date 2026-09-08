@@ -45,11 +45,13 @@ DECLARE
   v_cutoff timestamptz := now() - interval '45 minutes';
   v_other record;
   v_allowed text[] := ARRAY[
-    'hoodie', 'jacket', 'cap', 'glasses', 'headphones',
-    'backpack', 'tote_bag', 'lanyard', 'scarf', 'top'
+    'tshirt', 'hoodie', 'sweater', 'jacket', 'shorts', 'pants',
+    'sporty', 'cap', 'glasses', 'headphones', 'backpack', 'tote_bag',
+    'lanyard', 'scarf', 'top'
   ];
   v_colorizable text[] := ARRAY[
-    'hoodie', 'jacket', 'cap', 'tote_bag', 'scarf', 'top'
+    'hoodie', 'jacket', 'cap', 'tote_bag', 'scarf', 'top',
+    'tshirt', 'sweater', 'shorts', 'pants'
   ];
   v_colors text[] := ARRAY[
     'black', 'white', 'grey', 'blue', 'green',
@@ -82,8 +84,9 @@ BEGIN
 
   -- Tag-Validator: 'slug' oder 'slug:color', whitelisted.
   FOREACH v_base IN ARRAY ARRAY[
-    'black_hoodie', 'hoodie', 'jacket', 'cap', 'glasses', 'headphones',
-    'backpack', 'tote_bag', 'lanyard', 'scarf', 'top', 'colorful_top'
+    'black_hoodie', 'tshirt', 'hoodie', 'sweater', 'jacket', 'shorts', 'pants',
+    'sporty', 'cap', 'glasses', 'headphones', 'backpack', 'tote_bag',
+    'lanyard', 'scarf', 'top', 'colorful_top', 'black_hoodie'
   ] LOOP
     v_allowed := array_append(v_allowed, v_base);
     IF v_base = ANY (v_colorizable) THEN

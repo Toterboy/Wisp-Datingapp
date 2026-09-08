@@ -237,7 +237,7 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       öffnet den Chat mit situativen Fragen („Bist du noch in der Nähe von
       Halle 7?") + optionaler gegenseitiger Foto-Freischaltung nur für
       diese Session
-- [ ] **Einseitiges Anschreiben („Soft-Ping")** – folgt in 0.9.1: Falls die andere Person
+- [x] **Einseitiges Anschreiben („Soft-Ping")** – umgesetzt in 0.9.1 (Migration 083): Falls die andere Person
       nicht an die App denkt oder sich selbst nicht traut, kann NUR der
       Meldende nach der Begegnung EINMAL eine diskrete Anfrage senden
       (vorgefertigte, freundliche Sätze + optional eine kurze eigene Zeile
