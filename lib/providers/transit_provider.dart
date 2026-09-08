@@ -17,6 +17,7 @@ const Duration kTransitSessionDuration = Duration(minutes: 45);
 class TransitState {
   const TransitState({
     this.active = false,
+    this.mode = TransitMode.transit,
     this.endsAt,
     this.encounterCount = 0,
     this.busy = false,
@@ -24,6 +25,9 @@ class TransitState {
   });
 
   final bool active;
+
+  /// Bahn/Café vs. Messe/Event (steuert die RSSI-Schärfe clientseitig).
+  final TransitMode mode;
 
   /// Wann die Session endet (Auto-Stop + Countdown-Anzeige).
   final DateTime? endsAt;
@@ -36,6 +40,7 @@ class TransitState {
 
   TransitState copyWith({
     bool? active,
+    TransitMode? mode,
     DateTime? endsAt,
     int? encounterCount,
     bool? busy,
@@ -44,6 +49,7 @@ class TransitState {
   }) {
     return TransitState(
       active: active ?? this.active,
+      mode: mode ?? this.mode,
       endsAt: endsAt ?? this.endsAt,
       encounterCount: encounterCount ?? this.encounterCount,
       busy: busy ?? this.busy,
@@ -54,7 +60,8 @@ class TransitState {
 }
 
 /// Provider für Transit Spark: aktiviert BLE (Advertising + Scanning),
-/// rotiert Tokens, hält den Encounter-Cache warm und sendet Signale.
+/// rotiert Tokens, hält den Encounter-Cache warm und sendet Signale
+/// mit 1-3 Merkmal-Tags.
 class TransitNotifier extends StateNotifier<TransitState> {
   TransitNotifier(this._storage) : super(const TransitState()) {
     _encounters.load();
@@ -70,8 +77,22 @@ class TransitNotifier extends StateNotifier<TransitState> {
   Timer? _rotateTimer;
   Timer? _persistTimer;
 
-  void _bumpEncounterCount() {
+  void _recordEncounter(String token, int rssi) {
+    // Messe-Modus (v0.9.0): nur starke Signale = echter Sichtkontakt
+    // (dichte BLE-Umgebungen fluten sonst den Cache).
+    if (state.mode.rssiThreshold > rssi) return;
+    _encounters.recordEncounter(token);
     state = state.copyWith(encounterCount: _encounters.count);
+    // Persist entprellt (nicht bei jedem Treffer schreiben).
+    _persistTimer?.cancel();
+    _persistTimer = Timer(const Duration(seconds: 5), () {
+      _encounters.persist();
+    });
+  }
+
+  /// Modus setzen (nur bei inaktivem Radar umschaltbar).
+  void setMode(TransitMode mode) {
+    if (!state.active) state = state.copyWith(mode: mode);
   }
 
   /// Aktiviert das Radar (BLE + Cache). Gibt false zurück, wenn BLE
@@ -81,15 +102,7 @@ class TransitNotifier extends StateNotifier<TransitState> {
     final token = TransitEncounterService.generateToken();
     final ok = await TransitBleService.instance.start(
       token: token,
-      onEncounter: (t) {
-        _encounters.recordEncounter(t);
-        _bumpEncounterCount();
-        // Persist entprellt (nicht bei jedem Treffer schreiben).
-        _persistTimer?.cancel();
-        _persistTimer = Timer(const Duration(seconds: 5), () {
-          _encounters.persist();
-        });
-      },
+      onEncounter: _recordEncounter,
     );
     if (!ok) return false;
 
@@ -102,10 +115,7 @@ class TransitNotifier extends StateNotifier<TransitState> {
       if (!state.active) return;
       await TransitBleService.instance.rotateToken(
         newToken: TransitEncounterService.generateToken(),
-        onEncounter: (t) {
-          _encounters.recordEncounter(t);
-          _bumpEncounterCount();
-        },
+        onEncounter: _recordEncounter,
       );
     });
 
@@ -132,17 +142,18 @@ class TransitNotifier extends StateNotifier<TransitState> {
     state = const TransitState();
   }
 
-  /// "Blicke getauscht": frische Encounter-Tokens an den Server senden.
-  /// Match = beidseitiges Signal -> Bestandspipeline (Likes -> Match ->
-  /// Push) erzeugt den Funke. Ohne Gegensignal wird das eigene Signal
-  /// 45 Minuten vorgehalten.
-  Future<TransitSparkResult?> sendSpark() async {
+  /// "Blicke getauscht": frische Encounter-Tokens + 1-3 Merkmal-Tags
+  /// an den Server senden. Match = beidseitiges Signal MIT gemeinsamen
+  /// Merkmalen -> Bestandspipeline (Likes -> Match -> Push) erzeugt den
+  /// Funke. Ohne Gegensignal wird das eigene Signal 45 Minuten
+  /// vorgehalten.
+  Future<TransitSparkResult?> sendSpark(List<String> tags) async {
     if (!state.active || state.busy) return null;
     state = state.copyWith(busy: true, clearResult: true);
     try {
       final tokens = _encounters.freshTokens();
       final res = await SupabaseDatabaseService(SupabaseService.client)
-          .matchProximitySpark(tokens);
+          .matchProximitySpark(tokens: tokens, tags: tags, mode: state.mode.value);
       final result = TransitSparkResult.fromJson(res);
       state = state.copyWith(busy: false, lastResult: result);
       return result;

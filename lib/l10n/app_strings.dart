@@ -211,6 +211,27 @@ const Map<String, Map<String, String>> _strings = {
     'transit.remaining': 'Noch {time} aktiv',
     'transit.seenCount': '{count} Wisp-Geräte in Reichweite gesehen.',
     'transit.exchanged': 'Blicke getauscht',
+    'transit.modeLabel': 'Wo bist du?',
+    'transit.mode.transit': 'Bahn / Café',
+    'transit.mode.convention': 'Messe / Event',
+    'transit.modeHint':
+        'Messe-Modus: nur starke Signale zählen (echter Sichtkontakt in '
+        'dichten Umgebungen).',
+    'transit.sheetTitle': 'Wer war das?',
+    'transit.sheetHint':
+        'Wähle 1-3 Merkmale, die dir an der Person aufgefallen sind - '
+        'die Auswahl schärft das Matching.',
+    'transit.sheetSend': 'Funken',
+    'transit.tag.black_hoodie': 'Schwarzer Hoodie',
+    'transit.tag.jacket': 'Jacke',
+    'transit.tag.cap': 'Cap',
+    'transit.tag.glasses': 'Brille',
+    'transit.tag.headphones': 'Kopfhörer',
+    'transit.tag.backpack': 'Rucksack',
+    'transit.tag.tote_bag': 'Tote Bag',
+    'transit.tag.lanyard': 'Lanyard / Badge',
+    'transit.tag.scarf': 'Schal',
+    'transit.tag.colorful_top': 'Auffälliges Oberteil',
     'transit.stored':
         'Signal gespeichert. Wenn die Person denselben Moment spürt und '
         'ebenfalls funkt, matcht ihr euch.',
@@ -1008,6 +1029,27 @@ const Map<String, Map<String, String>> _strings = {
     'transit.remaining': 'Active for another {time}',
     'transit.seenCount': 'Seen {count} Wisp devices in range.',
     'transit.exchanged': 'Exchanged glances',
+    'transit.modeLabel': 'Where are you?',
+    'transit.mode.transit': 'Train / café',
+    'transit.mode.convention': 'Convention / event',
+    'transit.modeHint':
+        'Convention mode: only strong signals count (real sight contact '
+        'in dense environments).',
+    'transit.sheetTitle': 'Who was it?',
+    'transit.sheetHint':
+        'Pick 1-3 traits you noticed about the person - your selection '
+        'sharpens the matching.',
+    'transit.sheetSend': 'Spark',
+    'transit.tag.black_hoodie': 'Black hoodie',
+    'transit.tag.jacket': 'Jacket',
+    'transit.tag.cap': 'Cap',
+    'transit.tag.glasses': 'Glasses',
+    'transit.tag.headphones': 'Headphones',
+    'transit.tag.backpack': 'Backpack',
+    'transit.tag.tote_bag': 'Tote bag',
+    'transit.tag.lanyard': 'Lanyard / badge',
+    'transit.tag.scarf': 'Scarf',
+    'transit.tag.colorful_top': 'Colorful top',
     'transit.stored':
         'Signal stored. If the other person feels the same moment and '
         'signals too, you will match.',

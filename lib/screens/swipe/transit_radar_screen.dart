@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:wisp/l10n/app_strings.dart';
+import 'package:wisp/models/transit_models.dart';
 import 'package:wisp/providers/transit_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
@@ -47,8 +48,13 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
     }
   }
 
+  /// "Blicke getauscht": Tag-Auswahl (1-3 Merkmale) im Bottom Sheet,
+  /// dann Versand. (v0.9.0: Messe-Modus + Merkmal-Tags)
   Future<void> _sendSpark() async {
-    final result = await ref.read(transitProvider.notifier).sendSpark();
+    final tags = await _showTagSelectionSheet();
+    if (tags == null || tags.isEmpty || !mounted) return;
+
+    final result = await ref.read(transitProvider.notifier).sendSpark(tags);
     if (!mounted) return;
     if (result == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,6 +96,78 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
         ),
       );
     }
+  }
+
+  /// Tag-Auswahl: 1-3 Merkmale, die an der anderen Person aufgefallen
+  /// sind. Rückgabe: gewählte Slugs oder null (Abbruch).
+  Future<List<String>?> _showTagSelectionSheet() {
+    final selected = <String>{};
+    return showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                L10n.t(ctx, 'transit.sheetTitle'),
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                L10n.t(ctx, 'transit.sheetHint'),
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final tag in TransitTag.catalog)
+                    FilterChip(
+                      avatar: Icon(tag.icon, size: 18),
+                      label: Text(L10n.t(ctx, tag.labelKey)),
+                      selected: selected.contains(tag.slug),
+                      onSelected: (sel) {
+                        setSheetState(() {
+                          if (sel) {
+                            if (selected.length < 3) selected.add(tag.slug);
+                          } else {
+                            selected.remove(tag.slug);
+                          }
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: selected.isEmpty
+                      ? null
+                      : () => Navigator.of(ctx).pop(selected.toList()),
+                  icon: const Icon(Icons.auto_awesome),
+                  label: Text(L10n.t(ctx, 'transit.sheetSend')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -174,6 +252,38 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
               ),
             ],
             const SizedBox(height: 24),
+            // Modus-Toggle (v0.9.0): Bahn/Café vs. Messe/Event - der
+            // Messe-Modus nimmt nur starke BLE-Signale auf (echter
+            // Sichtkontakt in dichten Umgebungen). Nur inaktiv umschaltbar.
+            if (!transit.active) ...[
+              Text(
+                L10n.t(context, 'transit.modeLabel'),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<TransitMode>(
+                segments: [
+                  for (final mode in TransitMode.values)
+                    ButtonSegment(
+                      value: mode,
+                      icon: Icon(mode.icon),
+                      label: Text(L10n.t(context, mode.labelKey)),
+                    ),
+                ],
+                selected: {transit.mode},
+                onSelectionChanged: (selection) {
+                  ref.read(transitProvider.notifier).setMode(selection.first);
+                },
+              ),
+              const SizedBox(height: 4),
+              Text(
+                L10n.t(context, 'transit.modeHint'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 16),
+            ],
             // Aktivieren/Deaktivieren.
             FilledButton.tonalIcon(
               onPressed: _toggle,

@@ -42,7 +42,7 @@ class TransitBleService {
   /// [onEncounter] feuert pro gesichtetem fremden Token.
   Future<bool> start({
     required String token,
-    required void Function(String token) onEncounter,
+    required void Function(String token, int rssi) onEncounter,
   }) async {
     await stop();
     _currentToken = token;
@@ -59,7 +59,7 @@ class TransitBleService {
         for (final r in results) {
           final token = _extractToken(r);
           if (token != null && token != _currentToken) {
-            onEncounter(token);
+            onEncounter(token, r.rssi);
           }
         }
       });
@@ -75,7 +75,7 @@ class TransitBleService {
   /// Rotiert das Token (beibehaltener Betrieb, z. B. alle 10 Minuten).
   Future<void> rotateToken({
     required String newToken,
-    required void Function(String token) onEncounter,
+    required void Function(String token, int rssi) onEncounter,
   }) async {
     if (!_advertising) return;
     _currentToken = newToken;

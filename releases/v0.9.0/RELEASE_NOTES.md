@@ -14,6 +14,13 @@ Entdecken-Neuaufbau.
   Match-Pipeline: Chat, Quiz, Freischaltung).
   - 45-Minuten-Fenster (asynchron – auch Stunden später funken), Token-
     Rotation alle 10 Minuten, Radar-Stop jederzeit, Daten-Aufräumung
+  - **Modus-Wahl**: „Bahn/Café“ vs. „Messe/Event“ – im Messe-Modus zählen
+    nur starke BLE-Signale (echter Sichtkontakt in dichten Umgebungen)
+  - **Merkmal-Tags**: „Blicke getauscht“ öffnet eine Auswahl (1–3
+    Merkmale, z. B. schwarzer Hoodie, Lanyard) – gematcht wird nur bei
+    Token-Übereinstimmung UND gemeinsamem Merkmal (beide beschreiben
+    dieselbe Begegnung aus zwei Perspektiven); Merkmale sind serverseitig
+    auf einen festen Katalog whitelisted, keine Freitext-Daten
   - Serverseitiger Jugendschutz (Alter) + Blockier-Prüfung vor dem Match
   - Privatsphäre: Tokens sind zufällig/ephemere; nichts verlässt das
     Gerät, solange du nicht selbst funkt
@@ -61,7 +68,8 @@ Entdecken-Neuaufbau.
 
 ## Vor dem Rollout
 
-1. Migrationen **080** (Profil-RPCs) + **081** (Transit Spark) einspielen.
+1. Migrationen **080** (Profil-RPCs), **081** (Transit Spark) und **082**
+   (Merkmal-Tags + Modus) einspielen.
 2. Edge Function `notify-user` unverändert (Push nutzt Bestandspipeline).
 3. Betatest: Transit Spark auf ZWEI Geräten in Nähe testen (beide Radar
    aktiv → ein Signal → Gegensignal → Match + Push).

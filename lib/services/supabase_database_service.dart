@@ -269,12 +269,18 @@ class SupabaseDatabaseService {
   // Transit Spark (v0.9.0, Migration 081)
   // =========================================================================
 
-  /// "Blicke getauscht": frische Encounter-Tokens senden. Match =
-  /// beidseitiges Signal (Bestandspipeline erzeugt den Funke), sonst
-  /// wird das eigene Signal 45 Minuten vorgehalten.
-  Future<Map<String, dynamic>> matchProximitySpark(List<String> tokens) async {
+  /// "Blicke getauscht": frische Encounter-Tokens + 1-3 Merkmal-Tags
+  /// senden. Match = beidseitiges Signal MIT gemeinsamem Merkmal
+  /// (Bestandspipeline erzeugt den Funke), sonst 45 Minuten vorgehalten.
+  Future<Map<String, dynamic>> matchProximitySpark({
+    required List<String> tokens,
+    required List<String> tags,
+    required String mode,
+  }) async {
     final res = await _client.rpc('match_proximity_spark', params: {
       'p_tokens': tokens,
+      'p_tags': tags,
+      'p_mode': mode,
     });
     return Map<String, dynamic>.from(res);
   }
