@@ -89,6 +89,15 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       Geräte" (078), Zweisprachigkeit für Farbschemata/Moods/Entdecken-
       Modi/Sichtbarkeit, „Funke(n)"-Sprache konsequent, Sync-Fehler
       sichtbar (SnackBar + check_columns.sql), abgerundete Klick-Animation
+- [x] **0.9.0-Beta** – Transit Spark (BLE-Nahbereichs-Funke: Encounter-
+      Cache 45 min, Advertising/Scanning, asynchrones Matching per RPC
+      `match_proximity_spark` mit Jugendschutz + Blockier-Prüfung;
+      gegenseitige Likes erzeugen den Funke über die Bestandspipeline),
+      Messe-Modus (RSSI-Schärfe) + Merkmal-Tags (1–3, whitelisted, 082),
+      public_profiles-View → SECURITY-DEFINER-RPCs (080, Option A),
+      Entdecken-Gruppierung („Unterwegs" = QR + Transit Spark), Onboarding
+      als Interview (Wisp-Frage-Bubbles, zweisprachig); Soft-Ping folgt
+      in 0.9.1, Gerätetest ausstehend
 
 ## In Arbeit
 
@@ -170,6 +179,13 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 
 ## Geplant für 0.9.0 – Nahbereichs-Funke („Transit Spark", BLE)
 
+> Status nach dem Bau (v0.9.0-Beta): Kern-Feature + Begleitposten
+> umgesetzt (Migrationen 080-082). ABWEICHUNG: Das Matching läuft als
+> SECURITY-DEFINER-RPC `match_proximity_spark` statt als Edge Function -
+> gleiche Aufgabe, einfachere Wartung/Deployment. Soft-Ping folgt in
+> 0.9.1. Geraetetest auf zwei echten Geraeten steht aus (BLE-Reichweite,
+> Advertise-Abdeckung, Match-Flow).
+
 > Vision: Man lächelt sich im Zug, Café oder auf einer Messe (z. B.
 > Gamescom) an – traut sich aber nicht anzusprechen. Kurz darauf ist die
 > Person 50–500 m entfernt. Wisp macht aus diesem Moment trotzdem einen
@@ -189,29 +205,29 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 > wie überall) und Datensparsamkeit (Auto-Cleanup, keine dauerhaften
 > Verläufe).
 
-- [ ] **Lokaler Encounter-Cache** (`lib/services/encounter_cache_service.dart`):
+- [x] **Lokaler Encounter-Cache** (`lib/services/encounter_cache_service.dart`):
       Erkannte Wisp-BLE-Tokens mit Zeitstempel + stärkstem RSSI cachen,
       45 Minuten Vorhaltezeit, automatisches Aufräumen alter Einträge
-- [ ] **BLE Proximity Service** (`lib/services/transit_ble_service.dart`):
+- [x] **BLE Proximity Service** (`lib/services/transit_ble_service.dart`):
       Advertising rotierender ephemerer Tokens + Tag-Bitmask; Scanning auf
       Wisp-UUID; Messe-Modus mit engerem RSSI-Schwellwert (z. B. > -75 dBm
       = echter Sichtkontakt); Batterieschutz über gepulste Scans und
       einstellbaren Auto-Stop-Timer
-- [ ] **Edge Function `match-proximity-spark`**: Nimmt `cachedEncounterTokens`,
+- [x] **Matching als RPC `match_proximity_spark`** (Abweichung: SECURITY-DEFINER-RPC statt Edge Function - gleiche Aufgabe, kein Extra-Deployment): Nimmt `cachedEncounterTokens`,
       `targetTags`, `timestamp`; prüft, ob in den letzten 30 Minuten eine
       wechselseitige Begegnung zwischen zwei Nutzern mit passendem Alter/
       Geschlecht und übereinstimmenden Tags lag; bei Treffer Realtime-Event
       für beide Clients
-- [ ] **Datenmodelle** (`lib/models/transit_models.dart`): `TransitTag`
+- [x] **Datenmodelle** (`lib/models/transit_models.dart`): `TransitTag`
       (id, label, category: clothing/accessory/activity/event, icon),
       `EncounterRecord` (ephemeralPeerToken, detectedAt, strongestRssi),
       `SparkSignal` (senderSessionToken, recentEncounterTokens, targetTagIds,
       timestamp)
-- [ ] **State Management** (`lib/providers/transit_provider.dart`):
+- [x] **State Management** (`lib/providers/transit_provider.dart`):
       AsyncNotifier mit `isActive`, `remainingDuration`, `myActiveTags`,
       `currentMode` (transit vs. convention), `encounterCache`,
       `sendSpark(targetTags)` + Realtime-Listener für eingehende Funken
-- [ ] **Radar-Screen** (`lib/screens/swipe/transit_radar_screen.dart`):
+- [x] **Radar-Screen + Messe-Modus + Merkmal-Tags** (`lib/screens/swipe/transit_radar_screen.dart`, Migration 082):
       animiertes Radar im Material-3-Style; Mode-Toggle „Bahn/Café" vs.
       „Messe/Gamescom"; Quick-Action „Gerade Blicke getauscht 👁️✨" öffnet
       Bottom Sheet zur Auswahl von 1–3 Merkmalen (z. B. schwarzer Hoodie +
@@ -221,7 +237,7 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       öffnet den Chat mit situativen Fragen („Bist du noch in der Nähe von
       Halle 7?") + optionaler gegenseitiger Foto-Freischaltung nur für
       diese Session
-- [ ] **Einseitiges Anschreiben („Soft-Ping")**: Falls die andere Person
+- [ ] **Einseitiges Anschreiben („Soft-Ping")** – folgt in 0.9.1: Falls die andere Person
       nicht an die App denkt oder sich selbst nicht traut, kann NUR der
       Meldende nach der Begegnung EINMAL eine diskrete Anfrage senden
       (vorgefertigte, freundliche Sätze + optional eine kurze eigene Zeile
@@ -232,12 +248,12 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       eine Ablehnung (kein Lesestatus, kein „Nein" – Schweigen = Ende),
       Blockier-/Melde-Schutz greift wie überall, Jugendschutz-Filter
       serverseitig
-- [ ] **Native Berechtigungen**: Android (`AndroidManifest.xml`) und iOS
+- [x] **Native Berechtigungen**: Android (`AndroidManifest.xml`) und iOS
       (`Info.plist`) BLE-Konfiguration
 
 ### Begleitend in 0.9.0 (UX & Server)
 
-- [ ] **public_profiles-View durch SECURITY-DEFINER-Funktion ersetzen**
+- [x] **public_profiles-View durch SECURITY-DEFINER-Funktion ersetzen**
       (Option A – löst den wiederkehrenden Advisor-Befund
       „security_definer_view" auf): RPC `get_public_profile(user_id)` plus
       Batch-Variante `get_public_profiles(ids)` mit der bisherigen
@@ -248,14 +264,14 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       Interessen-/Match-Screens anpassen; die View erst entfernen, wenn
       ALLE Aufrufer migriert sind; Begründungs-Doku (072, ARCHITEKTUR)
       aktualisieren. Aufwand ~½–1 Tag, nicht als Pre-Release-Quickfix
-- [ ] **Entdecken-Seite: Modus-Gruppierung** (Vorbereitung auf mehr Modi):
+- [x] **Entdecken-Seite: Modus-Gruppierung** (Vorbereitung auf mehr Modi):
       Die Karten nach Zweck gruppieren statt flacher Liste –
       „Menschen kennenlernen" (Find your Match, Dating Hour),
       „Direkt verbinden" (Zufallschat),
       „Unterwegs" (QR-Code teilen/scannen + Transit Spark – beides
       Out-and-About-Szenarien). Neue Modi rutschen damit ohne
       Unübersichtlichkeit ein; NEU-/Experimentell-Badges für frische Modi
-- [ ] **Onboarding als Interview**: Die Einrichtung vom stumpfen
+- [x] **Onboarding als Interview**: Die Einrichtung vom stumpfen
       Daten-Eingeben zu einem spielerischen Frage-für-Frage-Flow
       umgestalten (eine Frage pro Screen, warme Mikrocopy, immer
       überspringbar) – KEINE neuen Datenpunkte, nur die bestehenden in

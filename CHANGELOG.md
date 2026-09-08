@@ -7,6 +7,48 @@ und folgt der [Semantic Versioning Specification (SemVer)](https://semver.org/la
 Solange die Versionsnummer mit `0.` beginnt (Initial Development Phase nach SemVer §4),
 können sich Schnittstellen und Verhalten jederzeit ändern.
 
+## [0.9.0] – Beta – 2026-09-08
+
+Server: Migrationen **080, 081, 082** einspielen (Reihenfolge).
+
+### Neu
+
+- **Transit Spark (Experimentell)** – der Nahbereichs-Funke: „Blicke
+  getauscht, sich nicht getraut?" Zwei-Phasen-Architektur: Geräte in
+  BLE-Nähe (3–10 m) tauschen anonyme, zufällige Encounter-Tokens aus
+  (Phase 1, lokal, 45 Minuten gecacht); tippt später eine Person auf
+  „Blicke getauscht" und die andere ebenfalls, matcht der Server die
+  Tokens (Phase 2, asynchron – auch Stunden später).
+  - Matching per SECURITY-DEFINER-RPC `match_proximity_spark`: Token-
+    Overlap + alterskompatibel + nicht blockiert → gegenseitige Likes
+    erzeugen den Funke über die Bestandspipeline (Match + Push
+    „Neuer Funke" automatisch)
+  - **Merkmal-Tags**: 1–3 Merkmale (z. B. schwarzer Hoodie, Lanyard)
+    schärfen das Matching – serverseitig auf einen festen Katalog
+    whitelisted, keine Freitext-Daten (082)
+  - **Modus-Wahl**: „Bahn/Café" vs. „Messe/Event" – im Messe-Modus
+    zählen nur starke BLE-Signale (echter Sichtkontakt; clientseitig)
+  - Token-Rotation alle 10 Minuten, Rate-Limit (1 Signal / 2 min),
+    Radar-Stop jederzeit, Daten-Cleanup (45 min Fenster / 24 h Cron)
+  - Radar-Screen zweisprachig (DE/EN): Countdown, Encounter-Zähler,
+    Tag-Auswahl, Match-Dialog
+- **Entdecken-Seite neu strukturiert**: Modi nach Zweck gruppiert –
+  „Menschen kennenlernen" (Find your Match, Dating Hour), „Direkt
+  verbinden" (Zufallschat), „Unterwegs" (QR-Code, Transit Spark) –
+  mit NEU-Badge für frische Modi.
+- **Onboarding als Interview**: Wisp stellt Fragen statt eines
+  Formulars – eine Frage pro Screen in Chat-Optik (Sprechblase, warmer
+  Ton), dezente Fortschritts-Dots, alles überspringbar. Keine neuen
+  Datenpunkte, kein Belohnungs-Mechanismus; komplett zweisprachig.
+
+### Geändert
+
+- **public_profiles-View ersetzt (Option A, 080)**: Fremde Profil-
+  Lesezugriffe laufen ausschließlich über die SECURITY-DEFINER-Funktionen
+  `get_public_profile`/`get_public_profiles` – löst den wiederkehrenden
+  Advisor-Befund „security_definer_view". Die View bleibt im Doppel-
+  betrieb für Alt-Clients bestehen (Entfernung in Folgemigration).
+
 ## [0.8.0] – Nachtrag 2 – 2026-09-07
 
 Server: Migrationen **066** (falls fehlend), **074, 075, 076, 077, 078**
