@@ -319,6 +319,27 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 - [ ] **Datenintegrität**: Chatverläufe verbleiben flüchtig im RAM oder
       werden optional rein lokal AES-verschlüsselt in Hive abgelegt
 
+
+### Begleitend in 0.10.0 – Begegnung statt Bildschirm
+
+- [ ] **Sync-Dates** (Distanz-taugliche Mini-Dates im Ideen-Rad): Katalog
+      von gemeinsamen Aktivitäten für denselben Zeitpunkt trotz Distanz –
+      „Spaziergang + Anruf", „Den selben Film schauen", „Koch-Duell",
+      „Sterne gucken und dabei telefonieren". Beim Annehmen: gemeinsamer
+      Timer + Anruf-Button - während des Dates läuft NUR der Anruf, kein
+      Bildschirm. Nutzt bestehendes Ideen-Rad + Audio-Calls.
+- [ ] **Offline-Knopf nach dem echten Treffen**: Nach einem Treffen, das
+      BEIDE Personen bestätigt haben, erscheint der sanfte Vorschlag
+      „Genießt die Zeit - Wisp schweigt bis morgen": Benachrichtigungen
+      stumm für den Abend, ruhiger Bildschirm. Die App feiert Abwesenheit
+      statt Bindung zu erzeugen (konkrete Form der „Digitalen Entgiftung").
+- [ ] **Antizipation statt Streak**: Bei Distanz-Funken den Chat sanft
+      Richtung Anruf/Sprachnachricht nudge („Stimmen verbinden mehr als
+      Texte"); sobald der Meet-Intent terminiert ist, zeigt der
+      Chat-Header die Vorfreude („Treffen am Samstag!") statt
+      Chat-Metriken.
+
+
 ## Geplant für 0.11.0 – Web-Bridge, Transit-Reachability & Zero-Install Gast-Verbindungen
 
 > Vision: Nutzer können Menschen im Alltag und im Nahverkehr (z. B. im
@@ -402,6 +423,17 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       Link-Spam
 - [ ] **Eingehende Gast-Nachrichten** unterliegen denselben
       Sicherheitsregeln (Bild-Blur, Meldung mit manueller Admin-Prüfung)
+
+### 8. Begleitend in 0.11.0 – „Mittendrin": Treffpunkt-Orchestrator
+
+- [ ] **Fairer Treffpunkt für Distanz-Funken**: Aus den gerundeten
+      Standorten beider Personen Städte-Vorschläge als real erreichbare
+      Treffpunkte (beidseitig faire Fahrzeit, Bahn-Anbindung über die
+      Fahrplan-Synchronisation) - direkt im Meet-Intent als
+      „Wo? -> Mittendrin"-Kapitel statt endlosem „wohin denn?"-Chatten.
+      Datenschutz: nur gerundete Koordinaten, Vorschläge auf Stadt-Ebene;
+      beide Standorte werden nie genauer behandelt als die ohnehin
+      bestehende 5-km-Rundung.
 
 ## Irgendwann / Idee
 
