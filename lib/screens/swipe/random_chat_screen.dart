@@ -88,7 +88,8 @@ class _RandomChatScreenState extends ConsumerState<RandomChatScreen> {
       setState(() {
         _state = _RandomChatState.error;
         _errorMessage = 'Zufallschat konnte nicht gestartet werden. '
-            'Bitte versuche es erneut.';
+            'Moegliche Ursache: Gerade sind keine anderen Nutzer online. '
+            'Bitte versuche es später erneut.';
       });
       return;
     }

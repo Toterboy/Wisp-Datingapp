@@ -99,9 +99,28 @@ class _MfaChallengeScreenState extends ConsumerState<MfaChallengeScreen> {
                 textAlign: TextAlign.center,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 onSubmitted: (_) => _verify(),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: '000000',
                   counterText: '',
+                  // Einfuegen-Button (v0.9.0): Code aus der
+                  // Authenticator-App kopiert? Ein Tap fuegt ihn ein -
+                  // kein muhsames Ablesen/Eintippen noetig.
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.content_paste),
+                    tooltip: 'Einfügen',
+                    onPressed: () async {
+                      final data =
+                          await Clipboard.getData('text/plain');
+                      final text =
+                          (data?.text ?? '').replaceAll(RegExp(r'\D'), '');
+                      if (text.isNotEmpty) {
+                        setState(() {
+                          _codeCtrl.text = text.substring(
+                              0, text.length > 6 ? 6 : text.length);
+                        });
+                      }
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
