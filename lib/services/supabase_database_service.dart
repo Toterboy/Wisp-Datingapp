@@ -278,13 +278,47 @@ class SupabaseDatabaseService {
     required String mode,
     List<String> selfTags = const [],
   }) async {
-    final res = await _client.rpc('match_proximity_spark', params: {
-      'p_tokens': tokens,
-      'p_tags': tags,
-      'p_mode': mode,
-      'p_self_tags': selfTags,
-    });
-    return Map<String, dynamic>.from(res);
+    // Fallback-Kette (v0.9.0): Der Server kann je nach Migrationsstand
+    // die 4-Parameter- (084), 3-Parameter- (082) oder 1-Parameter- (081)
+    // Signatur haben. PostgREST matcht nach benannten Argumenten - ein
+    // Aufruf mit zu vielen Parametern scheitert mit PGRST202. Deshalb:
+    // volle Signatur versuchen, bei Nichtfinden absteigen. Die Flags
+    // (Tags/Selbst-Modus) wirken dann erst nach dem jeweiligen Update.
+    final attempts = <Map<String, dynamic>>[
+      {
+        'p_tokens': tokens,
+        'p_tags': tags,
+        'p_mode': mode,
+        'p_self_tags': selfTags,
+      },
+      {
+        'p_tokens': tokens,
+        'p_tags': tags,
+        'p_mode': mode,
+      },
+      {
+        'p_tokens': tokens,
+      },
+    ];
+    Object? lastError;
+    for (final params in attempts) {
+      try {
+        final res = await _client.rpc('match_proximity_spark', params: params);
+        return Map<String, dynamic>.from(res);
+      } catch (e) {
+        lastError = e;
+        // Echte Fachfehler (Rate-Limit, Jugendschutz etc.) nicht
+        // verschlucken: PGRST202 = Funktion nicht gefunden -> naechste
+        // Signatur probieren. Alles andere sofort weiterwerfen.
+        final text = e.toString().toLowerCase();
+        if (!(text.contains('pgrst202') ||
+            text.contains('could not find the function') ||
+            text.contains('function public.match_proximity_spark'))) {
+          rethrow;
+        }
+      }
+    }
+    throw lastError ?? StateError('match_proximity_spark fehlgeschlagen');
   }
 
   // =========================================================================

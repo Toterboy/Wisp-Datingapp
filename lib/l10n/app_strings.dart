@@ -282,9 +282,6 @@ const Map<String, Map<String, String>> _strings = {
     'transit.inboxTitle': 'Grüße für dich',
     'transit.ignore': 'Ausblenden',
     'transit.accept': 'Funke annehmen',
-    'transit.stored':
-        'Signal gespeichert. Wenn die Person denselben Moment spürt und '
-        'ebenfalls funkt, matcht ihr euch.',
     'transit.matchTitle': 'Funke übergesprungen!',
     'transit.matchBody':
         'Die Person hat denselben Moment gespürt. Schaut in eure Funken - '
@@ -294,7 +291,6 @@ const Map<String, Map<String, String>> _strings = {
     'transit.startFailed':
         'Radar konnte nicht gestartet werden. Bluetooth an und Berechtigung '
         'erteilen.',
-    'transit.sendFailed': 'Signal konnte nicht gesendet werden. Bitte erneut.',
     'transit.howTitle': 'Wie funktioniert das?',
     'transit.howBody':
         'Aktiviere das Radar, wenn du unterwegs bist (Zug, Café, Messe). '
@@ -365,6 +361,11 @@ const Map<String, Map<String, String>> _strings = {
         'hindeuten, dass sich jemand in die Verbindung einschleichen '
         'will.\n\nVergleiche die Sicherheitsnummer über einen zweiten '
         'Kanal (z. B. Anruf oder persönlich), bevor du fortfährst.',
+    'transit.btTitle': 'Bluetooth aktivieren',
+    'transit.btBody': 'Für Transit Spark muss Bluetooth eingeschaltet sein. Soll es jetzt aktiviert werden?',
+    'transit.btEnable': 'Jetzt aktivieren',
+    'transit.sendFailed': 'Das Signal konnte gerade nicht gesendet werden. Prüfe deine Verbindung und versuche es gleich noch einmal.',
+    'transit.stored': 'Dein Signal ist gespeichert. Spürt die andere Person denselben Moment und funkt ebenfalls, entsteht euer Funke.',
     'chat.safetyChangedCancel': 'Abbrechen',
     'chat.safetyChangedAccept': 'Nummer geprüft: akzeptieren',
     'chat.reconnectStillFailing': 'Verbindung weiterhin fehlgeschlagen.',
@@ -1189,9 +1190,6 @@ const Map<String, Map<String, String>> _strings = {
     'transit.inboxTitle': 'Greetings for you',
     'transit.ignore': 'Hide',
     'transit.accept': 'Accept spark',
-    'transit.stored':
-        'Signal stored. If the other person feels the same moment and '
-        'signals too, you will match.',
     'transit.matchTitle': 'Spark jumped over!',
     'transit.matchBody':
         'The other person felt the same moment. Check your sparks - you '
@@ -1200,7 +1198,6 @@ const Map<String, Map<String, String>> _strings = {
     'transit.openSparks': 'To the sparks',
     'transit.startFailed':
         'Radar could not start. Turn on Bluetooth and grant permission.',
-    'transit.sendFailed': 'Signal could not be sent. Please try again.',
     'transit.howTitle': 'How does it work?',
     'transit.howBody':
         'Activate the radar while you are on the go (train, café, '
