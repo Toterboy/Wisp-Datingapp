@@ -67,15 +67,22 @@ class TransitTag {
 
   /// Der Catalog (Reihenfolge = Anzeige-Reihenfolge im Bottom Sheet).
   static const List<TransitTag> catalog = [
+    TransitTag('tshirt', Icons.abc, colorizable: true),
     TransitTag('hoodie', Icons.checkroom, colorizable: true),
+    TransitTag('sweater', Icons.dry_cleaning, colorizable: true),
     TransitTag('jacket', Icons.dry_cleaning, colorizable: true),
+    TransitTag('shorts', Icons.airline_seat_legroom_reduced,
+        colorizable: true),
+    TransitTag('pants', Icons.checkroom_outlined, colorizable: true),
+    TransitTag('sporty', Icons.fitness_center),
     TransitTag('cap', Icons.sports_baseball, colorizable: true),
     TransitTag('glasses', Icons.visibility),
     TransitTag('headphones', Icons.headphones),
     TransitTag('backpack', Icons.backpack),
     TransitTag('tote_bag', Icons.shopping_bag, colorizable: true),
     TransitTag('lanyard', Icons.badge),
-    TransitTag('scarf', Icons.stay_current_landscape, colorizable: true),
+    TransitTag('scarf', Icons.stay_current_landscape,
+        colorizable: true),
     TransitTag('top', Icons.palette, colorizable: true),
   ];
 

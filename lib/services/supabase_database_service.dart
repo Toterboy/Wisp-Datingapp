@@ -159,9 +159,9 @@ class SupabaseDatabaseService {
           'gender_preferences, relationship_type, preferred_state, city, '
           'theme_name',
       'max_distance_km, age_range_min, age_range_max, '
-          'gender_preferences, city, theme_name',
+          'gender_preferences, city, distance_filter_mode, theme_name, distance_filter_mode',
       'max_distance_km, age_range_min, age_range_max, '
-          'gender_preferences, city',
+          'gender_preferences, city, distance_filter_mode',
     ]) {
       try {
         return await _fetchOwnPreferencesRaw(columns);

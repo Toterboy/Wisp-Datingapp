@@ -211,9 +211,9 @@ const Map<String, Map<String, String>> _strings = {
     'transit.remaining': 'Noch {time} aktiv',
     'transit.seenCount': '{count} Wisp-Geräte in Reichweite gesehen.',
     'transit.exchanged': 'Blicke getauscht',
-    'transit.modeLabel': 'Wo bist du?',
-    'transit.mode.transit': 'Bahn / Café',
-    'transit.mode.convention': 'Messe / Event',
+    'transit.modeLabel': 'Wie weit soll die Erkennung reichen?',
+    'transit.mode.transit': 'Normal',
+    'transit.mode.convention': 'Nur direkt daneben',
     'transit.modeHint':
         'Messe-Modus: nur starke Signale zählen (echter Sichtkontakt in '
         'dichten Umgebungen).',
@@ -222,7 +222,12 @@ const Map<String, Map<String, String>> _strings = {
         'Wähle 1-3 Merkmale, die dir an der Person aufgefallen sind - '
         'die Auswahl schärft das Matching.',
     'transit.sheetSend': 'Funken',
-    'transit.tag.black_hoodie': 'Schwarzer Hoodie',
+    'transit.tag.black_hoodie': 'Hoodie (schwarz)',
+    'transit.tag.tshirt': 'T-Shirt',
+    'transit.tag.sweater': 'Pullover',
+    'transit.tag.shorts': 'Kurze Hose',
+    'transit.tag.pants': 'Lange Hose',
+    'transit.tag.sporty': 'Sportliche Kleidung',
     'transit.tag.hoodie': 'Hoodie',
     'transit.tag.top': 'Oberteil',
     'transit.colorOptional': 'Farbe (optional)',
@@ -241,11 +246,11 @@ const Map<String, Map<String, String>> _strings = {
         'Wähle 1-3 Merkmale zu dir selbst - nur so können dich andere '
         'über Transit Spark finden. Jeden Tag neu angeben.',
     'transit.modeDesc.transit':
-        'Für Begegnungen im Vorbeigehen: normale Reichweite, typisch '
-        'für Zug und Café.',
+        'Übliche Reichweite: Begegnungen im Vorbeigehen, z. B. auf der '
+        'Straße als Fußgänger, im Zug oder im Café.',
     'transit.modeDesc.convention':
-        'Für volle Gebäude und Messen: nur starke Signale direkt neben '
-        'dir zählen (echter Sichtkontakt).',
+        'Eng begrenzt: nur Personen unmittelbar neben dir zählen. Ideal '
+        'für volle Messen, Konzerte und Events.',
         'transit.tag.jacket': 'Jacke',
     'transit.tag.cap': 'Cap',
     'transit.tag.glasses': 'Brille',
@@ -1113,9 +1118,9 @@ const Map<String, Map<String, String>> _strings = {
     'transit.remaining': 'Active for another {time}',
     'transit.seenCount': 'Seen {count} Wisp devices in range.',
     'transit.exchanged': 'Exchanged glances',
-    'transit.modeLabel': 'Where are you?',
-    'transit.mode.transit': 'Train / café',
-    'transit.mode.convention': 'Convention / event',
+    'transit.modeLabel': 'How far should detection reach?',
+    'transit.mode.transit': 'Normal',
+    'transit.mode.convention': 'Only right next to me',
     'transit.modeHint':
         'Convention mode: only strong signals count (real sight contact '
         'in dense environments).',
@@ -1124,7 +1129,12 @@ const Map<String, Map<String, String>> _strings = {
         'Pick 1-3 traits you noticed about the person - your selection '
         'sharpens the matching.',
     'transit.sheetSend': 'Spark',
-    'transit.tag.black_hoodie': 'Black hoodie',
+    'transit.tag.black_hoodie': 'Hoodie (black)',
+    'transit.tag.tshirt': 'T-shirt',
+    'transit.tag.sweater': 'Sweater',
+    'transit.tag.shorts': 'Shorts',
+    'transit.tag.pants': 'Long pants',
+    'transit.tag.sporty': 'Sporty clothes',
     'transit.tag.hoodie': 'Hoodie',
     'transit.tag.top': 'Top',
     'transit.colorOptional': 'Color (optional)',
@@ -1143,11 +1153,11 @@ const Map<String, Map<String, String>> _strings = {
         'Pick 1-3 traits describing yourself - only this way others '
         'can find you via Transit Spark. Re-enter daily.',
     'transit.modeDesc.transit':
-        'For passing encounters: normal range, typical for train and '
-        'café.',
+        'Typical range: passing encounters, e. g. on the street as a '
+        'pedestrian, on the train or in a café.',
     'transit.modeDesc.convention':
-        'For packed venues and conventions: only strong signals right '
-        'next to you count (real sight contact).',
+        'Tightly limited: only people right next to you count. Ideal '
+        'for packed conventions, concerts and events.',
     'transit.tag.jacket': 'Jacket',
     'transit.tag.cap': 'Cap',
     'transit.tag.glasses': 'Glasses',
