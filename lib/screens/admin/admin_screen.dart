@@ -9,6 +9,7 @@ import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/photo_moderation_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
+import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/utils/constants.dart';
 
 /// Hilfsfunktion: Prueft, ob der aktuell eingeloggte Nutzer der Admin ist.
@@ -108,7 +109,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
     }
 
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin Bereich'),
@@ -121,6 +122,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
               Tab(text: 'Bug Reports', icon: Icon(Icons.bug_report)),
               Tab(text: 'Verifizierung', icon: Icon(Icons.verified)),
               Tab(text: 'Moderation', icon: Icon(Icons.photo_library)),
+              Tab(text: 'Bild-Prüfung', icon: Icon(Icons.image_search)),
               Tab(text: 'Sperren', icon: Icon(Icons.block)),
             ],
           ),
@@ -142,6 +144,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
             _BugReportsTab(),
             _VerificationTab(),
             _PhotoModerationList(),
+            _PhotoAppealsTab(),
             _BansTab(),
           ],
         ),
@@ -941,6 +944,247 @@ class _BansTabState extends ConsumerState<_BansTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+// ===========================================================================
+// Tab 5: Bild-Prüfung (v0.8.1 Einspruchs-Verfahren)
+//
+// Nutzer, deren Profilbild die LOKALE NSFW-Prüfung abgelehnt hat, können
+// Einspruch einlegen. Das Bild liegt dann verschlüsselt-frei (nur
+// Owner + Admin via Storage-Policy) unter {uid}/appeals/ im privaten
+// avatars-Bucket und wird hier zur Entscheidung angezeigt.
+//   - Freigeben: Nutzer erhält Push + kann das Bild in der App als
+//     Profilbild übernehmen (Client verschlüsselt dabei selbst).
+//   - Ablehnen: Nutzer erhält Push; die Appeals-Datei wird vom Client
+//     beim Quittieren gelöscht.
+// ===========================================================================
+class _PhotoAppealsTab extends ConsumerStatefulWidget {
+  const _PhotoAppealsTab();
+
+  @override
+  ConsumerState<_PhotoAppealsTab> createState() => _PhotoAppealsTabState();
+}
+
+class _PhotoAppealsTabState extends ConsumerState<_PhotoAppealsTab> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _appeals = const [];
+  final Set<String> _busy = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final db = SupabaseDatabaseService(SupabaseService.client);
+      final appeals = await db.adminListPhotoAppeals();
+      if (mounted) setState(() => _appeals = appeals);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _decide(Map<String, dynamic> appeal, bool approve) async {
+    final id = appeal['id'] as String? ?? '';
+    if (id.isEmpty || _busy.contains(id)) return;
+    setState(() => _busy.add(id));
+    try {
+      final db = SupabaseDatabaseService(SupabaseService.client);
+      await db.adminDecidePhotoAppeal(id: id, approve: approve);
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Entscheidung fehlgeschlagen: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy.remove(id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Fehler: $_error'),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Erneut versuchen'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_appeals.isEmpty) {
+      return const Center(child: Text('Keine offenen Bild-Einsprüche.'));
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: _appeals.length,
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, i) {
+          final a = _appeals[i];
+          return _AppealCard(
+            appeal: a,
+            busy: _busy.contains(a['id']),
+            onDecide: (approve) => _decide(a, approve),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AppealCard extends ConsumerWidget {
+  const _AppealCard({
+    required this.appeal,
+    required this.busy,
+    required this.onDecide,
+  });
+
+  final Map<String, dynamic> appeal;
+  final bool busy;
+  final void Function(bool approve) onDecide;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final path = appeal['storagePath'] as String? ?? '';
+    final status = appeal['status'] as String? ?? 'pending';
+    final label = appeal['localLabel'] as String? ?? '';
+    final score = (appeal['localScore'] as num?)?.toDouble() ?? 0;
+    final userName = appeal['userName'] as String? ?? 'Unbekannt';
+    final createdAt = DateTime.tryParse(
+            appeal['createdAt'] as String? ?? '') ??
+        DateTime.now();
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 96,
+                    height: 96,
+                    child: FutureBuilder<String?>(
+                      future: ref
+                          .read(supabaseStorageServiceProvider)
+                          .getSignedUrlFor(path),
+                      builder: (context, snap) {
+                        final url = snap.data;
+                        if (url != null) {
+                          return Image.network(url, fit: BoxFit.cover);
+                        }
+                        return const ColoredBox(
+                          color: Color(0x22000000),
+                          child: Icon(Icons.image_not_supported),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(userName,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('Eingereicht: '
+                          '${createdAt.toLocal().toString().substring(0, 16)}'),
+                      Text('Lokaler Befund: '
+                          '${label.isEmpty ? 'n/a' : label} '
+                          '(${(score * 100).toStringAsFixed(0)} %)'),
+                      const SizedBox(height: 4),
+                      _StatusChip(status: status),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (status == 'pending') ...[
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed:
+                        busy ? null : () => onDecide(false),
+                    icon: const Icon(Icons.close),
+                    label: const Text('Ablehnen'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed:
+                        busy ? null : () => onDecide(true),
+                    icon: const Icon(Icons.check),
+                    label: const Text('Freigeben'),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      'pending' => ('Offen', Colors.orange),
+      'approved' => ('Freigegeben', Colors.green),
+      'rejected' => ('Abgelehnt', Colors.red),
+      'notified' => ('Quittiert', Colors.blueGrey),
+      _ => (status, Colors.grey),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(40),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+      ),
     );
   }
 }

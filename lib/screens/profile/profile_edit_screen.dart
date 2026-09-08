@@ -220,6 +220,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       });
     });
 
+    // Einspruchs-Entscheidung abholen (v0.8.1): approved -> Bild aus dem
+    // Pruefungsort uebernehmen (clientseitig verschluesselt hochladen);
+    // rejected -> Aufräumen + Meldung. Danach als 'notified' quittiert.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resolvePendingAppeal();
+    });
+
     // Initial signed URL für aktuelles Profilbild laden.
     if (p.photos.isNotEmpty) {
       _avatarBytesFuture = ref
@@ -314,9 +321,102 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     }
   }
 
-  /// NSFW-Ablehnungs-Dialog (v0.8.0): Der Nutzer kann Einspruch einlegen
-  /// (Bild wird trotzdem hochgeladen und vom Team manuell geprüft) oder
-  /// ein anderes Bild wählen. Rückgabe: 'appeal' | 'other' | null.
+  /// Entscheidungs-Verarbeitung für einen eingereichten Einspruch
+  /// (v0.8.1): approved = Bild aus dem Prüfungsort holen, clientseitig
+  /// verschlüsseln und als Profilbild übernehmen (nach Nutzer-Bestätigung).
+  /// rejected = Meldung + Aufräumen der Appeals-Datei. Danach wird die
+  /// Entscheidung serverseitig als 'notified' quittiert.
+  Future<void> _resolvePendingAppeal() async {
+    try {
+      if (!SupabaseService.isInitialized) return;
+      final db = SupabaseDatabaseService(SupabaseService.client);
+      final appeal = await db.getMyPhotoAppeal();
+      if (appeal == null) return;
+      final id = appeal['id'] as String?;
+      final status = appeal['status'] as String?;
+      final path = appeal['storagePath'] as String?;
+      if (id == null || status == null) return;
+
+      if (status == 'approved') {
+        if (!mounted) return;
+        final use = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: Icon(Icons.check_circle,
+                color: Theme.of(ctx).colorScheme.primary, size: 40),
+            title: Text(L10n.t(ctx, 'profile.appeal.approvedTitle')),
+            content: Text(L10n.t(ctx, 'profile.appeal.approvedBody')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(L10n.t(ctx, 'common.cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(L10n.t(ctx, 'profile.appeal.useBtn')),
+              ),
+            ],
+          ),
+        );
+        await db.acknowledgePhotoAppeal(id);
+        if (use != true || !mounted) return;
+        final storage = ref.read(supabaseStorageServiceProvider);
+        final raw = await storage.downloadAppealImage(path ?? '');
+        if (raw == null || !mounted) return;
+        final encryptedRef = await storage.uploadAvatar(raw);
+        await ref.read(profileProvider.notifier).update(photos: [encryptedRef]);
+        if (SupabaseService.isInitialized) {
+          await SupabaseDatabaseService(SupabaseService.client)
+              .updateSetupFlagsAndVerify({'photos': [encryptedRef]});
+        }
+        if (!mounted) return;
+        setState(() {
+          _pendingAvatarBytes = null;
+          _avatarBytesFuture = storage.loadAvatarBytes(encryptedRef);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(L10n.t(context, 'profile.appeal.applied')),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else if (status == 'rejected') {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: Icon(Icons.cancel,
+                color: Theme.of(ctx).colorScheme.error, size: 40),
+            title: Text(L10n.t(ctx, 'profile.appeal.rejectedTitle')),
+            content: Text(L10n.t(ctx, 'profile.appeal.rejectedBody')),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(L10n.t(ctx, 'profile.appeal.okBtn')),
+              ),
+            ],
+          ),
+        );
+        await db.acknowledgePhotoAppeal(id);
+        // Appeals-Bild aufräumen (Owner-Policy erlaubt Delete).
+        if (path != null && path.isNotEmpty) {
+          await ref
+              .read(supabaseStorageServiceProvider)
+              .deleteOwnObject(path);
+        }
+      }
+    } catch (e) {
+      debugPrint('[ProfileEdit] Appeal-Verarbeitung fehlgeschlagen: ');
+    }
+  }
+
+  /// NSFW-Dialog (v0.8.1-Redesign): Bei Bestehen ein kleines ✓-Popup,
+  /// bei Befund ein ✗ mit dem lokalen Befund und drei Möglichkeiten:
+  /// Einspruch (Bild geht in die Admin-Prüfung, wird NICHT als Avatar
+  /// hochgeladen), Anderes Bild wählen oder Verstanden (verwerfen).
+  /// Rückgabe: 'appeal' | 'other' | null (verworfen).
   Future<String?> _showNsfwAppealDialog(
     BuildContext context,
     ImageSafetyResult verdict,
@@ -325,7 +425,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.block,
+        icon: Icon(Icons.cancel,
             color: Theme.of(ctx).colorScheme.error, size: 40),
         title: Text(L10n.t(ctx, 'profile.edit.photoNsfwTitle')),
         content: Column(
@@ -334,15 +434,22 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             Text(L10n.t(ctx, 'profile.edit.photoNsfwBody')),
             const SizedBox(height: 8),
             Text(
-              'Lokaler Score: ${(verdict.criticalScore * 100).toStringAsFixed(0)} % '
-              '(${verdict.topLabel}).',
+              L10n.tf(ctx, 'profile.edit.photoNsfwVerdict', {
+                'label': verdict.topLabel,
+                'score':
+                    (verdict.criticalScore * 100).toStringAsFixed(0),
+              }),
               style: Theme.of(ctx).textTheme.bodySmall,
             ),
-            const SizedBox(height: 12),
-            Text(L10n.t(ctx, 'profile.edit.photoNsfwChoice')),
+            const SizedBox(height: 8),
+            Text(L10n.t(ctx, 'profile.edit.photoNsfwNotUploaded')),
           ],
         ),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(L10n.t(ctx, 'profile.edit.photoNsfwUnderstood')),
+          ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop('other'),
             child: Text(L10n.t(ctx, 'profile.edit.photoNsfwOther')),
@@ -356,27 +463,98 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
+  /// Kleines ✓-Popup nach bestandener lokaler Prüfung (v0.8.1).
+  Future<void> _showPhotoOkDialog(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.check_circle,
+            color: Theme.of(ctx).colorScheme.primary, size: 40),
+        title: Text(L10n.t(ctx, 'profile.edit.photoOkTitle')),
+        content: Text(L10n.t(ctx, 'profile.edit.photoOkBody')),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(L10n.t(ctx, 'profile.edit.photoOkBtn')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Einspruch einreichen (v0.8.1): Das abgelehnte Bild wird in den
+  /// geschützten Appeals-Ordner hochgeladen (NIEMALS als Avatar
+  /// verwendet) und zur manuellen Admin-Prüfung registriert. Die
+  /// Entscheidung erreicht den Nutzer per Push + In-App-Dialog.
+  Future<void> _submitAppeal({
+    required Uint8List bytes,
+    required ImageSafetyResult verdict,
+  }) async {
+    try {
+      if (!SupabaseService.isInitialized) {
+        throw StateError('kein Server');
+      }
+      final storage = ref.read(supabaseStorageServiceProvider);
+      final path = await storage.uploadAppealImage(bytes);
+      await SupabaseDatabaseService(SupabaseService.client)
+          .submitPhotoAppeal(
+        path: path,
+        label: verdict.topLabel,
+        score: verdict.criticalScore,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text(L10n.t(context, 'profile.edit.appealSubmitted')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'profile.edit.appealFailed')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _pickProfileImage() async {
     try {
       var bytes = await pickAndCropAvatar(context);
       while (bytes != null) {
         // NSFW on-device (v0.8.0, Modell image-safety-classifier-xs):
         // Das Profilbild wird VOR dem Upload rein lokal geprüft - es
-        // verlässt bei Nichtbestehen das Gerät nicht. Der Nutzer kann
-        // Einspruch einlegen (Upload + Team-Review) oder ein anderes
-        // Bild wählen.
+        // verlässt bei Nichtbestehen das Gerät nicht. Bei Befund gibt es
+        // drei Wege (v0.8.1): verwerfen, anderes Bild oder Einspruch in
+        // die Admin-Prüfung (das Bild selbst wird dann NIE als Avatar
+        // hochgeladen).
         final verdict =
             await ImageSafetyService.instance.classifyImage(bytes);
         if (verdict == null) break; // Lokal nicht verfügbar -> normal hochladen.
 
-        if (!verdict.isFlagged) break; // Bestanden -> Upload.
+        if (!verdict.isFlagged) {
+          // Bestanden -> kleines ✓-Popup, dann normal weiter.
+          if (!mounted) return;
+          await _showPhotoOkDialog(context);
+          break;
+        }
 
         if (!mounted) return;
         final action = await _showNsfwAppealDialog(context, verdict);
-        if (action == 'appeal') break; // Upload trotzdem (Team-Review).
         if (!mounted) return;
-        // 'other': erneute Bildauswahl.
-        bytes = await pickAndCropAvatar(context);
+        if (action == 'appeal') {
+          await _submitAppeal(bytes: bytes, verdict: verdict);
+          return; // Bild wird verworfen - kein Avatar-Upload.
+        }
+        if (action == 'other') {
+          bytes = await pickAndCropAvatar(context);
+          continue;
+        }
+        // null = Verstanden: verwerfen.
+        return;
       }
       if (bytes == null) return;
 

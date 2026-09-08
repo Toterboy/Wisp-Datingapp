@@ -660,6 +660,29 @@ const Map<String, Map<String, String>> _strings = {
         'anstößig eingestuft und wird nicht hochgeladen.',
     'profile.edit.photoNsfwChoice': 'Was möchtest du tun?',
     'profile.edit.photoNsfwAppeal': 'Einspruch einlegen',
+    'profile.edit.photoNsfwUnderstood': 'Verstanden',
+    'profile.edit.photoNsfwVerdict': 'Lokaler Befund: {label} ({score} %).',
+    'profile.edit.photoNsfwNotUploaded':
+        'Das Bild wird nicht als Profilbild hochgeladen.',
+    'profile.edit.photoOkTitle': 'Bild geprüft',
+    'profile.edit.photoOkBody':
+        'Dein Bild ist okay und kann verwendet werden.',
+    'profile.edit.photoOkBtn': 'Weiter',
+    'profile.edit.appealSubmitted':
+        'Einspruch eingereicht. Wir benachrichtigen dich über das Ergebnis.',
+    'profile.edit.appealFailed':
+        'Einspruch konnte nicht eingereicht werden. Bitte später erneut.',
+    'profile.appeal.approvedTitle': 'Bild freigegeben',
+    'profile.appeal.approvedBody':
+        'Dein Einspruch wurde geprüft: Das Bild ist freigegeben. Möchtest '
+        'du es jetzt als Profilbild verwenden?',
+    'profile.appeal.useBtn': 'Jetzt verwenden',
+    'profile.appeal.applied': 'Profilbild übernommen.',
+    'profile.appeal.rejectedTitle': 'Bild abgelehnt',
+    'profile.appeal.rejectedBody':
+        'Dein Einspruch wurde geprüft: Das Bild wurde abgelehnt und kann '
+        'nicht verwendet werden. Wähle bitte ein anderes Profilbild.',
+    'profile.appeal.okBtn': 'Verstanden',
     'profile.edit.photoNsfwOther': 'Anderes Bild wählen',
     'profile.edit.locationDetected': 'Standort erkannt und übernommen.',
     'profile.edit.locationFailed':
@@ -1383,6 +1406,29 @@ const Map<String, Map<String, String>> _strings = {
         'inappropriate and will not be uploaded.',
     'profile.edit.photoNsfwChoice': 'What would you like to do?',
     'profile.edit.photoNsfwAppeal': 'Appeal',
+    'profile.edit.photoNsfwUnderstood': 'Understood',
+    'profile.edit.photoNsfwVerdict': 'Local verdict: {label} ({score} %).',
+    'profile.edit.photoNsfwNotUploaded':
+        'This image will not be uploaded as your profile picture.',
+    'profile.edit.photoOkTitle': 'Image checked',
+    'profile.edit.photoOkBody':
+        'Your image is fine and can be used.',
+    'profile.edit.photoOkBtn': 'Continue',
+    'profile.edit.appealSubmitted':
+        'Appeal submitted. We will notify you about the decision.',
+    'profile.edit.appealFailed':
+        'Appeal could not be submitted. Please try again later.',
+    'profile.appeal.approvedTitle': 'Image approved',
+    'profile.appeal.approvedBody':
+        'Your appeal has been reviewed: the image is approved. Would you '
+        'like to use it as your profile picture now?',
+    'profile.appeal.useBtn': 'Use now',
+    'profile.appeal.applied': 'Profile picture updated.',
+    'profile.appeal.rejectedTitle': 'Image rejected',
+    'profile.appeal.rejectedBody':
+        'Your appeal has been reviewed: the image was rejected and cannot '
+        'be used. Please choose a different profile picture.',
+    'profile.appeal.okBtn': 'Understood',
     'profile.edit.photoNsfwOther': 'Choose another image',
     'profile.edit.locationDetected': 'Location detected and applied.',
     'profile.edit.locationFailed':

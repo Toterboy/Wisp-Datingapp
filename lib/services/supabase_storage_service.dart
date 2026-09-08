@@ -68,6 +68,68 @@ class SupabaseStorageService {
   /// Pfad für den aktuellen Nutzer: `{userId}/avatar.jpg`.
   String _avatarPathForUser(String userId) => '$userId/$_fileName';
 
+  /// Pfad für Einspruchs-Bilder: `{userId}/appeals/{timestamp}.jpg`.
+  /// (v0.8.1: abgelehnte Bilder werden NIE als Avatar hochgeladen -
+  /// sie landen ausschließlich im geschützten Prüfungsort, den nur der
+  /// Eigentümer und Admins via Policy lesen können.)
+  Future<String> uploadAppealImage(List<int> data) async {
+    final userId = _currentUser?.id;
+    if (userId == null) {
+      throw AppException('Nicht eingeloggt.');
+    }
+    final path =
+        '$userId/appeals/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    if (kDebugMode) {
+      log('[SupabaseStorageService] Upload appeal image: '
+          'bucket=$_bucket size=${data.length}');
+    }
+    await _client.storage.from(_bucket).uploadBinary(
+          path,
+          Uint8List.fromList(data),
+          fileOptions: const FileOptions(contentType: 'image/jpeg'),
+        );
+    return path;
+  }
+
+  /// Signierte URL für ein Einspruchs-Bild (Admin-Anzeige im
+  /// Moderations-Tab; Zugriff über die 079-Admin-Policy).
+  Future<String?> getSignedUrlFor(String path) async {
+    try {
+      return await _client.storage
+          .from(_bucket)
+          .createSignedUrl(path, _signedUrlExpirySeconds);
+    } catch (e) {
+      if (kDebugMode) {
+        log('[SupabaseStorageService] Signed-URL fehlgeschlagen: $e');
+      }
+      return null;
+    }
+  }
+
+  /// Lädt ein Einspruchs-Bild herunter (Klartext, Owner oder Admin).
+  Future<Uint8List?> downloadAppealImage(String path) async {
+    try {
+      return await _client.storage.from(_bucket).download(path);
+    } catch (e) {
+      if (kDebugMode) {
+        log('[SupabaseStorageService] Appeal-Download fehlgeschlagen: $e');
+      }
+      return null;
+    }
+  }
+
+  /// Löscht eine eigene Datei im avatars-Bucket (z. B. abgelehntes
+  /// Einspruchs-Bild aufräumen). Owner-Policy erlaubt das.
+  Future<void> deleteOwnObject(String path) async {
+    try {
+      await _client.storage.from(_bucket).remove([path]);
+    } catch (e) {
+      if (kDebugMode) {
+        log('[SupabaseStorageService] Delete fehlgeschlagen: $e');
+      }
+    }
+  }
+
   /// Lädt ein Avatar-Bild hoch (v0.8.1: AES-256-GCM-verschlüsselt).
   ///
   /// [data] sind die rohen Bild-Bytes. Sie werden VOR dem Upload

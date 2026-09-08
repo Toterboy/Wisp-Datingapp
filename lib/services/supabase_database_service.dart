@@ -209,6 +209,62 @@ class SupabaseDatabaseService {
     throw lastError ?? StateError('fetchOwnPreferences fehlgeschlagen');
   }
 
+  // =========================================================================
+  // Profilbild-Einspruch (v0.8.1, Migration 079)
+  // =========================================================================
+
+  /// Reicht ein abgelehntes Profilbild zur manuellen Prüfung ein
+  /// (Bild liegt bereits unter {uid}/appeals/ im Storage).
+  Future<void> submitPhotoAppeal({
+    required String path,
+    required String label,
+    required double score,
+  }) async {
+    await _client.rpc('submit_photo_appeal', params: {
+      'p_path': path,
+      'p_label': label,
+      'p_score': score,
+    });
+  }
+
+  /// Eigener Einspruchs-Status (pending/approved/rejected) oder null.
+  Future<Map<String, dynamic>?> getMyPhotoAppeal() async {
+    try {
+      final res = await _client.rpc('get_my_photo_appeal');
+      if (res == null) return null;
+      return Map<String, dynamic>.from(res);
+    } catch (e) {
+      debugPrint('[DB] getMyPhotoAppeal fehlgeschlagen: $e');
+      return null;
+    }
+  }
+
+  /// Entscheidung quittieren (nach Anzeige/Finalisierung).
+  Future<void> acknowledgePhotoAppeal(String id) async {
+    try {
+      await _client.rpc('acknowledge_photo_appeal', params: {'p_id': id});
+    } catch (e) {
+      debugPrint('[DB] acknowledgePhotoAppeal fehlgeschlagen: $e');
+    }
+  }
+
+  /// Admin: alle Einsprüche listen.
+  Future<List<Map<String, dynamic>>> adminListPhotoAppeals() async {
+    final res = await _client.rpc('admin_list_photo_appeals');
+    return List<Map<String, dynamic>>.from(res as List<dynamic>);
+  }
+
+  /// Admin: Einspruch freigeben/ablehnen.
+  Future<void> adminDecidePhotoAppeal({
+    required String id,
+    required bool approve,
+  }) async {
+    await _client.rpc('admin_decide_photo_appeal', params: {
+      'p_id': id,
+      'p_approve': approve,
+    });
+  }
+
   /// Aktualisiert das eigene Profil in der Supabase-Datenbank.
   ///
   /// Robust gegenüber unvollständigen Migrationen (v0.8.1): Liefert
