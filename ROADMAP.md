@@ -96,6 +96,15 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       `wispdating_icon_base.png`; Größen/Masken/Farbwelt-Abstimmung folgen)
 - [ ] F-Droid-Veröffentlichung (Build-Seite fertig: google-freier Flavor,
       UnifiedPush, Fastlane-Metadaten – Einreichung steht noch aus)
+- [ ] **Vorstellungs-Vorlagen (Text + Audio)**: Prompt-Karten (rotierend,
+      z. B. „Erzähl von einem Moment, der dich zuletzt zum Lachen gebracht
+      hat") als opt-in Gerüst für die Text-Vorstellung – ein Tipp fügt
+      einen Einstiegssatz ein, Freitext bleibt erlaubt. Für die Audio-
+      Vorstellung ein 3-Schritte-Leitfaden als Bildschirm-Begleitung beim
+      Aufnehmen (Wer bist du? / Was macht dich aus? / Warum bist du hier?).
+      Ziel: natürliche, persönliche Vorstellungen statt stumpfer Daten-
+      Aufzählung – zahlt direkt auf das Audio-first-Matching von
+      Find your Match ein
 
 ## 0.8.0 – Geschmack & Matching (umgesetzt, inkl. Nachträge 1–2)
 
@@ -225,6 +234,22 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       serverseitig
 - [ ] **Native Berechtigungen**: Android (`AndroidManifest.xml`) und iOS
       (`Info.plist`) BLE-Konfiguration
+
+### Begleitend in 0.9.0 (UX)
+
+- [ ] **Entdecken-Seite: Modus-Gruppierung** (Vorbereitung auf mehr Modi):
+      Die Karten nach Zweck gruppieren statt flacher Liste –
+      „Menschen kennenlernen" (Find your Match, Dating Hour),
+      „Direkt verbinden" (Zufallschat),
+      „Unterwegs" (QR-Code teilen/scannen + Transit Spark – beides
+      Out-and-About-Szenarien). Neue Modi rutschen damit ohne
+      Unübersichtlichkeit ein; NEU-/Experimentell-Badges für frische Modi
+- [ ] **Onboarding als Interview**: Die Einrichtung vom stumpfen
+      Daten-Eingeben zu einem spielerischen Frage-für-Frage-Flow
+      umgestalten (eine Frage pro Screen, warme Mikrocopy, immer
+      überspringbar) – KEINE neuen Datenpunkte, nur die bestehenden in
+      Gesprächsform; bewusst KEIN Belohnungs-Mechanismus (App-Prinzip:
+      spielerisch ≠ Dopamin-Loop)
 
 ## Geplant für 0.10.0 – Emotionaler Rückzugsort (Sanctuary) & Lokaler KI-Reflexions-Chat
 
@@ -369,6 +394,17 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 
 ## Irgendwann / Idee
 
+- [ ] **Lokale KI als „Ideen-Anstoß" im Chat (KEIN Ghostwriter)**: Die
+      Sanctuary-Engine (0.10.0) könnte Gesprächseinstiege vorschlagen,
+      wenn man nicht weiter weiß – aber bewusst eng begrenzt: ausschließlich
+      auf Basis öffentlicher Profilinfos (Interessen, Musik), NIE aus dem
+      Chatverlauf, nie direkt versendbar ohne eigene Umformulierung,
+      standardmäßig aus. Bekanntes Risiko (Über-Abhängigkeit, Inauthentizität,
+      Asymmetrie zwischen Nutzern) – bewusste Entscheidung nötig, ob das
+      überhaupt zum App-Prinzip „authentische Verbindungen" passt
+- [ ] Admin-Screen-Überarbeitung (internes Werkzeug): Pillen-förmiger
+      Tab-Indikator, Kennzahlen-Zeile oben (offene Meldungen, neue Bugs),
+      Suche im Sperren-Tab, einheitliche Karten- und Empty-States
 - [ ] Gruppen-Micro-Events (themenbasierte Treffen mit 2-6 Teilnehmern) –
       von der Diskussion bewusst zurückgestellt, um 1:1 nicht zu verwässern
 - [ ] Gesichtsfeld-Check (Profilbild vs. Verifizierungs-Video) via
