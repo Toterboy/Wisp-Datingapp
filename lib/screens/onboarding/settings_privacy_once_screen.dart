@@ -577,8 +577,8 @@ class _SettingsPrivacyOnceScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Standort erkannt und übernommen (GPS Koordinaten).'),
+          SnackBar(
+            content: Text(L10n.t(context, 'setup.locationDone')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -632,11 +632,11 @@ class _SettingsPrivacyOnceScreenState
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Einstellungen & Privatsphäre'),
+          title: Text(L10n.t(context, 'setup.appbarTitle')),
           leading: _currentPage > 0
               ? IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  tooltip: 'Zurück',
+                  tooltip: L10n.t(context, 'common.back'),
                   onPressed: _prevPage,
                 )
               : null,
@@ -761,8 +761,8 @@ class _SettingsPrivacyOnceScreenState
                     ),
                      // Page 3: Filter & Präferenzen
                      _Page(
-                       title: 'Filter & Präferenzen',
-                       subtitle: 'Wen möchtest du kennenlernen?',
+                       title: L10n.t(context, 'setup.filterTitle'),
+                       subtitle: L10n.t(context, 'setup.filterSub'),
                        child: Column(
                          crossAxisAlignment: CrossAxisAlignment.start,
                          children: [
@@ -788,27 +788,33 @@ class _SettingsPrivacyOnceScreenState
                                 labelText: 'Beziehungsart',
 
                              ),
-                             items: const [
-                               DropdownMenuItem(
-                                 value: RelationshipType.casual,
-                                 child: Text('Lockere Bekanntschaft'),
-                               ),
-                               DropdownMenuItem(
-                                 value: RelationshipType.dating,
-                                 child: Text('Ernsthaftes Dating'),
-                               ),
-                               DropdownMenuItem(
-                                 value: RelationshipType.relationship,
-                                 child: Text('Feste Beziehung'),
-                               ),
-                               DropdownMenuItem(
-                                 value: RelationshipType.friends,
-                                 child: Text('Freundschaft'),
-                               ),
-                               DropdownMenuItem(
-                                 value: RelationshipType.open,
-                                 child: Text('Offen für alles'),
-                               ),
+                              items: [
+                                DropdownMenuItem(
+                                  value: RelationshipType.casual,
+                                  child: Text(L10n.t(
+                                      context, 'profile.edit.rel.casual')),
+                                ),
+                                DropdownMenuItem(
+                                  value: RelationshipType.dating,
+                                  child: Text(L10n.t(
+                                      context, 'profile.edit.rel.dating')),
+                                ),
+                                DropdownMenuItem(
+                                  value: RelationshipType.relationship,
+                                  child: Text(L10n.t(
+                                      context,
+                                      'profile.edit.rel.relationship')),
+                                ),
+                                DropdownMenuItem(
+                                  value: RelationshipType.friends,
+                                  child: Text(L10n.t(
+                                      context, 'profile.edit.rel.friends')),
+                                ),
+                                DropdownMenuItem(
+                                  value: RelationshipType.open,
+                                  child: Text(L10n.t(
+                                      context, 'profile.edit.rel.open')),
+                                ),
                              ],
                              onChanged: (v) {
                                if (v != null) {
@@ -1059,7 +1065,7 @@ class _SettingsPrivacyOnceScreenState
                                                     CircularProgressIndicator(
                                                         strokeWidth: 2))
                                             : const Icon(Icons.add_a_photo),
-                                        tooltip: 'Profilbild wählen',
+                                        tooltip: L10n.t(context, 'setup.photoTooltip'),
                                       ),
                                     ),
                                   ],
@@ -1089,7 +1095,7 @@ class _SettingsPrivacyOnceScreenState
                             decoration: const InputDecoration(
                               labelText: 'Bundesland (optional)',
                             ),
-                            hint: const Text('Bitte wählen'),
+                            hint: Text(L10n.t(context, 'setup.pleasePick')),
                             items: kGermanStates
                                 .map((s) => DropdownMenuItem(
                                       value: s,

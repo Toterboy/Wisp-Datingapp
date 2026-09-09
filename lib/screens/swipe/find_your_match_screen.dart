@@ -8,6 +8,7 @@ import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/widgets/intro_audio_player.dart';
 import 'package:wisp/widgets/intro_editor.dart';
+import 'package:wisp/l10n/app_strings.dart';
 
 /// "Find your Match": Kennenlernen über die Vorstellung (Text oder Audio)
 /// statt über Fotos.
@@ -75,7 +76,7 @@ class _FindYourMatchScreenState extends ConsumerState<FindYourMatchScreen> {
     setState(() => _showIntroSetup = false);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Vorstellung gespeichert. Viel Spaß beim Kennenlernen!'),
+        content: Text(L10n.t(context, 'fym.introSaved')),
         behavior: SnackBarBehavior.floating,
       ),
     );

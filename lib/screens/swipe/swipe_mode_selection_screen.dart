@@ -20,7 +20,7 @@ class SwipeModeSelectionScreen extends ConsumerWidget {
         // Unterscreen - daher bewusst KEINEN Zurück-Pfeil anzeigen. Die
         // untere Navigation bleibt sichtbar (Screen liegt in der ShellRoute).
         automaticallyImplyLeading: false,
-        title: const Text('Entdeckungsmodus wählen'),
+        title: Text(L10n.t(context, 'dm.appbarTitle')),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
