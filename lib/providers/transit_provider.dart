@@ -23,6 +23,7 @@ class TransitState {
     this.busy = false,
     this.lastResult,
     this.selfTags = const [],
+    this.lastError,
   });
 
   /// Taegliche Selbst-Angaben (v0.9.0): 1-3 Merkmale zu sich selbst,
@@ -43,6 +44,9 @@ class TransitState {
   /// Ergebnis des letzten "Blicke getauscht"-Versands.
   final TransitSparkResult? lastResult;
 
+  /// Fehlerursache des letzten Signal-Versands (Snackbar-Diagnose).
+  final String? lastError;
+
   TransitState copyWith({
     bool? active,
     TransitMode? mode,
@@ -52,6 +56,7 @@ class TransitState {
     TransitSparkResult? lastResult,
     bool clearResult = false,
     List<String>? selfTags,
+    String? lastError,
   }) {
     return TransitState(
       active: active ?? this.active,
@@ -62,6 +67,7 @@ class TransitState {
       lastResult:
           clearResult ? null : (lastResult ?? this.lastResult),
       selfTags: selfTags ?? this.selfTags,
+      lastError: lastError,
     );
   }
 }
@@ -228,13 +234,20 @@ class TransitNotifier extends StateNotifier<TransitState> {
         selfTags: state.selfTags,
       );
       final result = TransitSparkResult.fromJson(res);
-      state = state.copyWith(busy: false, lastResult: result);
+      state = state.copyWith(busy: false, lastResult: result, lastError: null);
       return result;
     } catch (e) {
       debugPrint('[Transit] sendSpark fehlgeschlagen: $e');
-      state = state.copyWith(busy: false);
+      state = state.copyWith(busy: false, lastError: _shortError(e));
       return null;
     }
+  }
+
+  String _shortError(Object e) {
+    var t = e.toString();
+    t = t.replaceFirst('AppException: ', '').replaceFirst('Exception: ', '');
+    if (t.length > 160) t = t.substring(0, 160);
+    return t;
   }
 
   @override
