@@ -75,7 +75,7 @@ class _FindYourMatchScreenState extends ConsumerState<FindYourMatchScreen> {
     if (!mounted) return;
     setState(() => _showIntroSetup = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(L10n.t(context, 'fym.introSaved')),
         behavior: SnackBarBehavior.floating,
       ),
