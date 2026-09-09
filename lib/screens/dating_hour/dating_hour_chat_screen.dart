@@ -14,6 +14,7 @@ import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/widgets/funke_overlay.dart';
 import 'package:wisp/services/dating_hour_service.dart';
+import 'package:wisp/services/find_your_match_service.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/p2p_chat_service.dart';
 import 'package:wisp/services/secure_storage.dart';
@@ -273,13 +274,39 @@ class _DatingHourChatScreenState extends ConsumerState<DatingHourChatScreen> {
   Future<void> _createMatchAndNavigate(DatingHourSession session) async {
     final partnerId = session.getPeerId(_currentUserId!);
 
-    // In Produktion sollte hier das echte Profil des Partners geladen werden.
-    final partnerProfile = UserProfile(
+    // v0.9.0-Fix (Gerätetest): Der Funke wurde vorher NUR LOKAL erzeugt
+    // (Platzhalter 'Dein Gegenüber') - der Partner sah ihn nie, das Profil
+    // war unbekannt und der Funke verschwand nach Neuinstallation. Jetzt:
+    // serverseitiger Like -> bestehende Mutual-Like-Pipeline erzeugt das
+    // kanonische Match (fuer BEIDE, samt Push), und das ECHTE Profil
+    // wird geladen.
+    var partnerProfile = UserProfile(
       id: partnerId,
       name: 'Dein Gegenüber',
       bio: '',
       interests: [],
     );
+    if (SupabaseService.isInitialized) {
+      try {
+        final fym = ref.read(findYourMatchServiceProvider);
+        await fym.likeUser(partnerId);
+        final row = await SupabaseDatabaseService(SupabaseService.client)
+            .fetchPublicProfile(partnerId);
+        if (row != null) {
+          partnerProfile = UserProfile.fromJson({
+            'id': row['user_id'],
+            'name': row['name'] ?? 'Dein Gegenüber',
+            'bio': row['bio'] ?? '',
+            'interests': row['interests'] ?? <dynamic>[],
+            'photos': row['photos'],
+            'gender': row['gender'],
+            'birthDate': null,
+          });
+        }
+      } catch (e) {
+        debugPrint('[DH-Chat] Funke-Server-Sync fehlgeschlagen: ');
+      }
+    }
 
     ref.read(chatProvider.notifier).addMatch(partnerProfile, ref: ref);
 
