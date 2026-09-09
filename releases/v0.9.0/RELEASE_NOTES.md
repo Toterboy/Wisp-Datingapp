@@ -34,6 +34,19 @@ Entdecken-Neuaufbau.
   Keine neuen Datenpunkte, kein Belohnungs-Mechanismus – nur Gesprächs-
   ton statt Formular; komplett zweisprachig.
 
+## Neu (ergaenzt, war v0.9.1 geplant)
+
+- **Soft-Ping (einseitiges Anschreiben)**: Nach einer Begegnung im Radar
+  kann die Person EINMAL diskret gegrüßt werden – vorgefertigte,
+  freundliche Sätze plus optional einer kurzen eigenen Zeile (max.
+  140 Zeichen, serverseitig gefiltert). Genau 1 Versuch pro Begegnung,
+  still verfallend nach 48 Stunden; der Absender erfährt NIEMALS eine
+  Ablehnung. Empfangende sehen den Gruß im Radar und können ihn annehmen
+  (= Funke über die Bestandspipeline) oder still ausblenden.
+  Privacy-Hinweis aktualisiert: Bei aktivem Radar wird das eigene
+  zufällige Token (nur dieses) 45 Minuten serverseitig hinterlegt,
+  damit ein Gruß überhaupt zustellbar ist.
+
 ## Server & Sicherheit
 
 - **public_profiles-View ersetzt (Option A)**: Fremde Profil-Lesezugriffe
@@ -73,8 +86,9 @@ Entdecken-Neuaufbau.
 
 ## Vor dem Rollout
 
-1. Migrationen **080** (Profil-RPCs), **081** (Transit Spark) und **082**
-   (Merkmal-Tags + Modus) einspielen.
+1. Migrationen **080** (Profil-RPCs), **081** (Transit Spark), **082**
+   (Merkmal-Tags + Modus), **083** (Soft-Ping) und **084/085**
+   (Tag-Whitelist v2 + Suchradius-Modus) einspielen.
 2. Edge Function `notify-user` unverändert (Push nutzt Bestandspipeline).
 3. Betatest: Transit Spark auf ZWEI Geräten in Nähe testen (beide Radar
    aktiv → ein Signal → Gegensignal → Match + Push).
