@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/providers/auth_provider.dart';
+import 'package:wisp/providers/settings_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
@@ -69,11 +70,16 @@ class _EmailVerificationScreenState
     _capturedEmail = ref.read(pendingVerificationEmailProvider) ??
         SupabaseService.client.auth.currentUser?.email;
     // Sobald die E-Mail bestätigt ist, automatisch zur Hauptapp weiterleiten.
+    // v0.9.0-Fix: Nach FRISCHER Registrierung direkt die Einrichtung
+    // erzwingen (Onboarding-Interview) - vorher kam sie erst beim 2.
+    // Appstart, weil der Server-Flag-Sync ggf. einen veralteten Stand
+    // lieferte.
     _emailConfirmedSub = ref.listenManual<bool?>(
       emailConfirmedProvider,
       (previous, next) {
         if (next == true && previous != true) {
-          context.go(AppRoutes.home);
+          ref.read(settingsProvider.notifier).markOnboardingPending();
+          if (mounted) context.go(AppRoutes.onboarding);
         }
       },
     );

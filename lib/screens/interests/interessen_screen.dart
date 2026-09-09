@@ -141,6 +141,7 @@ class _OwnLikesTabState extends ConsumerState<_OwnLikesTab> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount: _likes.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -273,6 +274,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount: _likes.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),

@@ -213,7 +213,12 @@ class _RandomChatScreenState extends ConsumerState<RandomChatScreen> {
 
   Future<void> _send() async {
     final text = _ctrl.text.trim();
-    if (text.isEmpty || _partnerId == null) return;
+    if (text.isEmpty) return;
+    if (_partnerId == null) {
+      // Allein in der Warteschlange (Test mit nur einem Konto): still
+      // verwerfen statt irrefuehrendem Sende-Fehler.
+      return;
+    }
     _ctrl.clear();
 
     final local = _localMessage(text, senderId: _myUserId!);

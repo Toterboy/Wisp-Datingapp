@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/find_your_match_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/peer_id.dart';
 
@@ -39,7 +40,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
     super.dispose();
   }
 
-  void _onUserFound(String peerId) {
+  void _onUserFound(String peerId) async {
     final myId = ref.read(profileProvider).id;
     if (myId.isEmpty) {
       // Eigenes Profil noch nicht geladen: Supabase-ID verwenden.
@@ -60,6 +61,20 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
 
     final notifier = ref.read(chatProvider.notifier);
     final profile = notifier.findOrCreateMatch(peerId);
+
+    // v0.9.0-Feedback ('gescannt und kein Funke'): Der QR-Kontakt fuehrt
+    // zum Chat, aber es fehlte die Server-Pipeline - jetzt legen wir
+    // zusaetzlich einen Like an, damit die Verbindung im Funken-Feed
+    // sichtbar ist (Blockier-/Jugendschutz greift serverseitig).
+    if (SupabaseService.isInitialized && profile != null) {
+      try {
+        await ref
+            .read(findYourMatchServiceProvider)
+            .likeUser(peerId);
+      } catch (e) {
+        debugPrint('[QR] Like fehlgeschlagen (Chat bleibt aktiv): $e');
+      }
+    }
 
     if (!mounted) return;
 

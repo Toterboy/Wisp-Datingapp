@@ -378,6 +378,16 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _persist();
   }
 
+  /// Nach frischer Registrierung (v0.9.0-Fix): Die Einrichtung MUSS
+  /// sofort kommen - nicht erst beim 2. Appstart, wenn der Server-Flag-
+  /// Sync ggf. einen falschen Stand geliefert hat. Lokal forciert;
+  /// der Server-Sync (syncSetupFlagsFromServer) ueberschreibt true nur
+  /// fuer BESTEHende Konten.
+  Future<void> markOnboardingPending() async {
+    state = state.copyWith(onboardingDone: false, onboardingCompleted: false);
+    await _persist();
+  }
+
   /// Aktiviert oder deaktiviert Benachrichtigungen.
   Future<void> setNotificationsEnabled(bool enabled) async {
     state = state.copyWith(notificationsEnabled: enabled);
