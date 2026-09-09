@@ -102,10 +102,16 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
     final result = await ref.read(transitProvider.notifier).sendSpark(tags);
     if (!mounted) return;
     if (result == null) {
+      final reason = ref.read(transitProvider).lastError;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(L10n.t(context, 'transit.sendFailed')),
+          content: Text(
+            reason == null
+                ? L10n.t(context, 'transit.sendFailed')
+                : '${L10n.t(context, 'transit.sendFailed')} ($reason)',
+          ),
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 8),
         ),
       );
       return;
