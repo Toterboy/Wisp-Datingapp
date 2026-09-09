@@ -162,10 +162,81 @@ void main() {
       addTearDown(container.dispose);
       final notifier = container.read(chatProvider.notifier);
 
-      final profile = notifier.findOrCreateMatch('peer_1');
-      expect(profile, isNotNull);
+      final match = notifier.findOrCreateMatch('peer_1')!;
+      expect(match.isQrContact, isTrue);
+      expect(match.partner.id, 'peer_1');
       expect(container.read(chatProvider).length, 1);
       expect(container.read(chatProvider).first.isQrContact, isTrue);
+
+      // Zweiter Scan derselben Person: WIEDER das gleiche Match
+      // (per Partner-ID gesucht - die Chat-Route braucht die Match-ID,
+      // damit der Detail-Screen das Match findet).
+      final again = notifier.findOrCreateMatch('peer_1')!;
+      expect(again.id, match.id);
+      expect(container.read(chatProvider).length, 1);
+    });
+
+    test('findOrCreateMatch navigierbare Match-ID: Chat-Detail findet Match',
+        () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(chatProvider.notifier);
+
+      final match = notifier.findOrCreateMatch('peer_1')!;
+      // Regression v0.9.0: vor der Fix wurde die PARTNER-ID navigiert
+      // (/chat/<peerId>), der Screen fand das Match anhand seiner
+      // generierten ID nicht -> "Dieser Chat existiert nicht mehr".
+      expect(notifier.getMatchById(match.id), isNotNull);
+      expect(notifier.getMatchById(match.id)!.partner.id, 'peer_1');
+    });
+
+    test('updatePartner ersetzt das Partner-Profil (QR-Server-Fetch)', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(chatProvider.notifier);
+
+      final match = notifier.findOrCreateMatch('peer_1')!;
+      notifier.updatePartner(match.id, _createPartner(id: 'peer_1', name: 'Lia'));
+
+      final updated = notifier.getMatchById(match.id)!;
+      expect(updated.partner.name, 'Lia');
+      expect(updated.isQrContact, isTrue);
+    });
+
+    test('Maximal 5 gespeicherte Profile - 6ter wird abgelehnt', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(chatProvider.notifier);
+
+      for (var i = 1; i <= 5; i++) {
+        expect(notifier.findOrCreateMatch('peer_$i'), isNotNull,
+            reason: 'Kontakt $i muss bis zum Limit anlegbar sein');
+      }
+      // Sechster Kontakt: Maximum erreicht -> null (kein stilles Verdrängen).
+      expect(notifier.findOrCreateMatch('peer_6'), isNull);
+      expect(
+        container.read(chatProvider).where((m) => m.isQrContact).length,
+        5,
+      );
+    });
+
+    test('deleteQrContact gibt wieder einen Slot frei', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(chatProvider.notifier);
+
+      for (var i = 1; i <= 5; i++) {
+        notifier.findOrCreateMatch('peer_$i');
+      }
+      expect(notifier.findOrCreateMatch('peer_6'), isNull);
+
+      final fifth =
+          container.read(chatProvider).where((m) => m.isQrContact).first;
+      notifier.deleteQrContact(fifth.id);
+      expect(container.read(chatProvider).where((m) => m.isQrContact).length, 4);
+
+      // Slot frei -> neuer Kontakt geht wieder.
+      expect(notifier.findOrCreateMatch('peer_6'), isNotNull);
     });
 
     test('addMessage fuegt P2P-Nachricht hinzu ohne Auto-Antwort', () {

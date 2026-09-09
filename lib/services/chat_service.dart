@@ -38,6 +38,99 @@ class ChatService {
   final List<Match> _matches = [];
   final Map<String, List<Message>> _messages = {};
 
+  // ---------------------------------------------------------------------
+  // Persistente QR-Kontakte ("gespeicherte Profile", v0.9.1)
+  // ---------------------------------------------------------------------
+  // Zweck (Nutzerfeedback): Ohne Internet scannen und die Profile LOKAL
+  // behalten, um sie später anzuschreiben. Max. 5, einzeln löschbar,
+  // AES-256-verschlüsselt (SecureHive). Ohne SecureHive (Web/Test) läuft
+  // alles wie bisher rein in-memory (fail-open, wie der Chat-Verlauf).
+  static const String _qrBoxName = 'qr_contacts';
+  static const int maxQrContacts = 5;
+  Box<String>? _qrContactsBox;
+
+  Future<Box<String>?> _qrContactsBoxFuture() async {
+    if (_qrContactsBox != null) return _qrContactsBox;
+    try {
+      _qrContactsBox = await SecureHive.instance.openBox<String>(_qrBoxName);
+      return _qrContactsBox;
+    } catch (e) {
+      debugPrint('[ChatService] QR-Kontakt-Box nicht verfügbar '
+          '(in-memory only): $e');
+      _qrContactsBox = null;
+      return null;
+    }
+  }
+
+  /// Stellt die beim letzten Mal gespeicherten QR-Kontakte wieder her
+  /// (App-Neustart). Duplikate (bereits im Speicher) werden übersprungen.
+  Future<void> restoreQrContacts() async {
+    final box = await _qrContactsBoxFuture();
+    if (box == null) return;
+    try {
+      for (final key in box.keys) {
+        final raw = box.get(key);
+        if (raw == null) continue;
+        final map = jsonDecode(raw) as Map<dynamic, dynamic>;
+        final partner =
+            UserProfile.fromJson(Map<String, dynamic>.from(map));
+        if (getMatchByPartnerId(partner.id) != null) continue;
+        if (getMatchById(key) != null) continue;
+        _matches.add(Match(
+          id: key,
+          partner: partner,
+          matchedAt: DateTime.now(),
+          photosUnlocked: true,
+          isQrContact: true,
+        ));
+        _messages[key] = _messages[key] ?? [];
+      }
+    } catch (e) {
+      debugPrint('[ChatService] QR-Kontakte-Restore fehlgeschlagen: $e');
+    }
+  }
+
+  /// Legt einen PERSISTENTEN QR-Kontakt an ("Profil lokal speichern").
+  ///
+  /// - Existiert bereits ein Kontakt mit dieser Partner-ID: dieser wird
+  ///   zurückgegeben (kein Duplikat, kein Limit-Konsum).
+  /// - Erreicht das Maximum ([maxQrContacts]): `null` - der Aufrufer bietet
+  ///   dann an, erst einen zu löschen (KEIN stiller Verdrängungs-Löschen).
+  Match? createQrContact(UserProfile partner) {
+    final existing = getMatchByPartnerId(partner.id);
+    if (existing != null) return existing;
+    final qrCount = _matches.where((m) => m.isQrContact).length;
+    if (qrCount >= maxQrContacts) return null;
+    final match = createMatch(partner, isQrContact: true);
+    unawaited(_persistQrContact(match));
+    return match;
+  }
+
+  Future<void> _persistQrContact(Match match) async {
+    if (!match.isQrContact) return;
+    final box = await _qrContactsBoxFuture();
+    if (box == null) return;
+    try {
+      await box.put(match.id, jsonEncode(match.partner.toJson()));
+    } catch (e) {
+      debugPrint('[ChatService] QR-Kontakt persistieren fehlgeschlagen: $e');
+    }
+  }
+
+  /// Entfernt einen persistenten QR-Kontakt (Match + Verlauf + Speicher).
+  void deleteQrContact(String matchId) {
+    final match = getMatchById(matchId);
+    if (match == null || !match.isQrContact) return;
+    dissolveMatch(matchId);
+    unawaited(() async {
+      final box = await _qrContactsBoxFuture();
+      if (box == null) return;
+      try {
+        await box.delete(matchId);
+      } catch (_) {}
+    }());
+  }
+
   // v0.8.0: OPTIONALER lokaler Verlauf (Standard AUS, Nutzer-Entscheid).
   // Anders als die entfernte N-8-Persistenz ist diese Variante bewusst
   // OPT-IN und schreibt AES-256-verschlüsselt (SecureHive, Key im
@@ -122,6 +215,28 @@ class ChatService {
       if (m.id == matchId) return m;
     }
     return null;
+  }
+
+  /// Liefert das Match mit dem gegebenen PARTNER (z. B. QR-Scan: die
+  /// Partner-ID ist bekannt, die lokale Match-ID nicht).
+  Match? getMatchByPartnerId(String partnerId) {
+    for (final m in _matches) {
+      if (m.partner.id == partnerId) return m;
+    }
+    return null;
+  }
+
+  /// Ersetzt das Partner-Profil eines Matches (z. B. QR-Kontakt, der
+  /// nachträglich vom Server mit echtem Namen/Vorstellung befüllt wird).
+  /// Bei QR-Kontakten wird der aktualisierte Stand sofort persistiert.
+  void updatePartner(String matchId, UserProfile partner) {
+    final idx = _matches.indexWhere((m) => m.id == matchId);
+    if (idx == -1) return;
+    final updated = _matches[idx].copyWith(partner: partner);
+    _matches[idx] = updated;
+    if (updated.isQrContact) {
+      unawaited(_persistQrContact(updated));
+    }
   }
 
   /// Erzeugt ein neues Match (z. B. nach beidseitigem Like oder via QR-Scan).

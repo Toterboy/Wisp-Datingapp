@@ -2,7 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show FontFeature, ImageFilter;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -16,6 +16,7 @@ import 'package:record/record.dart';
 import 'package:wisp/models/match.dart';
 import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/models/message.dart';
+import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/services/find_your_match_service.dart'
@@ -36,8 +37,8 @@ import 'package:wisp/utils/age_safety_rules.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/utils/exif_stripper.dart';
 import 'package:wisp/widgets/audio_review_sheet.dart';
+import 'package:wisp/widgets/intro_audio_player.dart';
 import 'package:wisp/widgets/meet_intent_card.dart';
-import 'package:wisp/widgets/funke_streak.dart';
 import 'package:wisp/widgets/profile_widgets.dart';
 
 /// 1:1-Chat-Detailansicht mit Nachrichtenverlauf und Eingabefeld.
@@ -95,11 +96,37 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     super.initState();
     _initP2P();
     unawaited(_loadQuizGate());
+    unawaited(_loadPartnerProfileIfNeeded());
     // Opt-in-Verlauf (v0.8.0): gespeicherte Nachrichten laden, sobald der
     // Nutzer den verschlüsselten lokalen Verlauf aktiviert hat.
     unawaited(ref
         .read(chatProvider.notifier)
         .hydrateHistory(widget.matchId));
+  }
+
+  /// QR-Kontakte werden beim Scan mit Platzhaltern ("Unbekannt") angelegt.
+  /// Hier wird das echte Profil (Name, Alter, Interessen, Vorstellung) vom
+  /// Server nachgeladen, damit der Chat den Namen zeigt und die Vorstellung
+  /// anhörbar ist. Fehlschlag ist unkritisch - der Chat funktioniert ohne.
+  Future<void> _loadPartnerProfileIfNeeded() async {
+    final match = ref.read(chatProvider.notifier).getMatchById(widget.matchId);
+    if (match == null) return;
+    if (!SupabaseService.isInitialized) return;
+    if (match.partner.name != 'Unbekannt') return;
+    try {
+      final db = ref.read(supabaseDatabaseServiceProvider);
+      final row = await db.fetchPublicProfile(match.partner.id);
+      if (row == null || !mounted) return;
+      final real = UserProfile.fromPublicView(
+        Map<String, dynamic>.from(row as Map),
+      );
+      ref
+          .read(chatProvider.notifier)
+          .updatePartner(widget.matchId, real);
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('[ChatDetail] Partner-Profil-Refresh fehlgeschlagen: $e');
+    }
   }
 
   /// Prüft serverseitig, ob dieses Match noch quiz-gesperrt ist.
@@ -198,12 +225,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         await _showIdentityChangedDialog(match.partner.id);
         return;
       }
-      if (mounted) {
-        setState(() => _p2pConnected = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('P2P Verbindung fehlgeschlagen: $e')),
-        );
-      }
+      // v0.9.0-Feedback ("es gab einen P2P Fehler"): Wenn die andere Seite
+      // (noch) nicht im Chat ist, scheitert das Signal-Setup - das ist
+      // NORMAL und kein Fehler. Der orange E2E-Badge zeigt den Zustand;
+      // die Verbindung kommt zustande, sobald beide gleichzeitig online
+      // sind. Nur ein ruhiger Hinweis, keine Fehlermeldung.
+      debugPrint('[ChatDetail] P2P-Verbindung noch nicht offen: $e');
+      if (mounted) setState(() => _p2pConnected = false);
     }
 
     // Eingehende Anrufe (invite) abonnieren. Der Anruf-Screen wird nur
@@ -295,15 +323,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Match? _match;
 
   Future<void> _send() async {
-    if (_quizGated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Besteht zuerst das Kennenlern-Quiz.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
     final match = _match;
     if (match == null) return;
     final text = _ctrl.text.trim();
@@ -362,15 +381,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// E: Bild aus Galerie/Kamera auswählen und E2E-verschlüsselt
   /// über den P2P-DataChannel senden.
   Future<void> _pickImage() async {
-    if (_quizGated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Besteht zuerst das Kennenlern-Quiz.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -528,15 +538,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// Mindestlänge: 1 Sekunde (versehentliche Ultra-Kurz-Aufnahmen
   /// werden verworfen).
   Future<void> _toggleRecord() async {
-    if (_quizGated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Besteht zuerst das Kennenlern-Quiz.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
     if (_recording) {
       _recordTimer?.cancel();
 
@@ -587,7 +588,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           path: effectivePath,
           durationSeconds: seconds,
           minimumSeconds: 1,
-          confirmLabel: 'Senden',
+          confirmLabel: L10n.t(context, 'intro.review.send'),
         );
         if (send != true) {
           await file.delete();
@@ -703,15 +704,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// F: Startet einen Audio-Anruf. Öffnet den Anruf-Screen (Signaling + Audio
   /// laufen E2E-verschlüsselt über den bestehenden P2P-DataChannel).
   Future<void> _call() async {
-    if (_quizGated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Besteht zuerst das Kennenlern-Quiz.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
     final match = _match;
     if (match == null) return;
     if (!mounted) return;
@@ -1249,9 +1241,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(partner.name),
-                      const SizedBox(width: 10),
-                      FunkeStreak(compact: true, createdAt: _match!.matchedAt),
+                      Flexible(
+                        child: Text(
+                          partner.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // KEINE Streaks/Flammen-Zählung (v0.9.0-Feedback:
+                      // "Es soll keine Streaks geben") - nur der Name.
                     ]),
                     // Bewusst KEIN Online-Status / „schreibt…“ /
                     // Lesebestätigung - siehe ADR-0007 (Präsenz-frei).
@@ -1399,6 +1396,37 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             matchId: widget.matchId,
             partnerName: partner.name,
           ),
+          // Vorstellung des Partners (Text + Audio): Beide Seiten können
+          // die Vorstellung im Chat anhören (v0.9.0-Feedback - die Person,
+          // die den Funke erhalten hat, hörte sie bisher nur im
+          // "Erhalten"-Tab).
+          if (partner.introText.isNotEmpty || partner.introAudioPath != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.record_voice_over_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          partner.introText.isNotEmpty
+                              ? partner.introText
+                              : L10n.t(context, 'chat.introTitle'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      if (partner.introAudioPath != null)
+                        IntroAudioPlayer(targetUserId: partner.id),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // Ideen-Rad (v0.8.0, Test): wählt aus den bestehenden Date-
           // Kategorien einen Vorschlag, der als Nachricht gesendet wird -
           // beide bestätigen im Chat.
@@ -1467,6 +1495,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     },
                   ),
           ),
+          // Kennenlern-Quiz: schaltet NUR das Foto frei - chatten ist
+          // unabhängig möglich (v0.9.0-Feedback: "Das Quiz soll erst
+          // später kommen").
           if (_quizGated)
             Container(
               width: double.infinity,
@@ -1474,11 +1505,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
-                  const Icon(Icons.lock_outline, size: 18),
+                  const Icon(Icons.photo_outlined, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Chat und Foto werden nach dem Kennenlern-Quiz freigeschaltet.',
+                      L10n.t(context, 'chat.quizBanner'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -1487,7 +1518,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     onPressed: () => context.go(
                       AppRoutes.quizPath(int.parse(widget.matchId)),
                     ),
-                    child: const Text('Zum Quiz'),
+                    child: Text(L10n.t(context, 'chat.quizOpen')),
                   ),
                 ],
               ),
@@ -1501,8 +1532,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     icon: const Icon(Icons.image),
                     tooltip: 'Bild senden',
                     // E: Während eines Uploads deaktivieren.
-                    onPressed:
-                        (_uploadingImage || _quizGated) ? null : _pickImage,
+                    onPressed: _uploadingImage ? null : _pickImage,
                   ),
                   IconButton(
                     icon: Icon(_recording ? Icons.stop : Icons.mic),
@@ -1596,10 +1626,6 @@ class _MessageBubble extends StatefulWidget {
 }
 
 class _MessageBubbleState extends State<_MessageBubble> {
-  AudioPlayer? _player;
-  bool _playing = false;
-  StreamSubscription<PlayerState>? _stateSub;
-
   /// Vom Nutzer nach Warnung freigegebene Bilder (Session-lokal).
   bool _revealed = false;
 
@@ -1611,61 +1637,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
   bool get _isViewOnceViewed =>
       _viewedOnceIds.contains(widget.msg.id) || widget.msg.viewed;
 
-  Future<void> _playVoice(String path) async {
-    try {
-      _player ??= AudioPlayer();
-      final player = _player!;
-
-      if (player.playing) {
-        await player.stop();
-        if (mounted) setState(() => _playing = false);
-        return;
-      }
-
-      await player.setFilePath(path);
-      // Nur EINE Subscription pro Bubble (kein Leak bei Mehrfach-Wiedergabe).
-      await _stateSub?.cancel();
-      _stateSub = player.playerStateStream.listen((state) {
-        if (state.processingState == ProcessingState.completed && mounted) {
-          setState(() => _playing = false);
-          // Audit M-17: Nach der Wiedergabe wird die entschlüsselte Datei
-          // sofort entfernt.
-          unawaited(_deletePlayedFile(path));
-        }
-      });
-      await player.play();
-      if (mounted) setState(() => _playing = true);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Wiedergabe fehlgeschlagen: $e')),
-        );
-      }
-    }
-  }
-
   void _markViewed() {
     _viewedOnceIds.add(widget.msg.id);
     setState(() {});
   }
 
-  /// Audit M-17: Löscht die lokal entschlüsselte Voice-Datei nach der
-  /// Wiedergabe (Bubble-lokal, ohne Zugriff auf den Parent-State).
-  Future<void> _deletePlayedFile(String path) async {
-    try {
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (_) {
-      // Best-effort: der globale Sweep (temp_cleanup) entfernt Reste.
-    }
-  }
-
   @override
   void dispose() {
-    _stateSub?.cancel();
-    _player?.dispose();
     super.dispose();
   }
 
@@ -1804,23 +1782,12 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     ),
                 ],
               ),
-        MessageType.voice => Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(
-                  _playing ? Icons.stop : Icons.play_arrow,
-                  size: 22,
-                ),
-                color: textColor,
-                tooltip: _playing ? 'Stop' : 'Abspielen',
-                onPressed: () => _playVoice(msg.mediaUrl ?? ''),
-              ),
-              Text(
-                'Sprachnachricht · ${msg.durationSeconds}s',
-                style: TextStyle(color: textColor),
-              ),
-            ],
+        MessageType.voice => _VoiceMessage(
+            msgId: msg.id,
+            path: msg.mediaUrl ?? '',
+            durationSeconds: msg.durationSeconds,
+            textColor: textColor,
+            mine: mine,
           ),
         _ => Text(
             msg.text,
@@ -2025,7 +1992,192 @@ class _MessageBubbleState extends State<_MessageBubble> {
 }
 
 
-/// J: Einmalige, zentrierte System-Hinweis-Zeile im Chat-Verlauf
+/// Sprachnachricht im NEUEN Design (v0.9.0): Play/Pause-Knopf,
+/// Wellenform-Visualisierung (deterministische Balken aus der Message-ID)
+/// mit Fortschritt und Dauer. Entschlüsselte Dateien werden nach der
+/// Wiedergabe gelöscht (Audit M-17) - die Nachricht kann daher nur
+/// EINMAL angehört werden; der Wiederholungs-Versuch zeigt einen
+/// verständlichen Hinweis statt eines Roh-Fehlers.
+class _VoiceMessage extends StatefulWidget {
+  const _VoiceMessage({
+    required this.msgId,
+    required this.path,
+    required this.durationSeconds,
+    required this.textColor,
+    required this.mine,
+  });
+
+  final String msgId;
+  final String path;
+  final int durationSeconds;
+  final Color textColor;
+  final bool mine;
+
+  @override
+  State<_VoiceMessage> createState() => _VoiceMessageState();
+}
+
+class _VoiceMessageState extends State<_VoiceMessage> {
+  AudioPlayer? _player;
+  bool _playing = false;
+  Duration _position = Duration.zero;
+  final Duration _length = Duration.zero;
+  bool _consumed = false; // Datei nach Wiedergabe gelöscht (M-17).
+  StreamSubscription<Duration>? _posSub;
+  StreamSubscription<PlayerState>? _stateSub;
+
+  /// Deterministische Balken-Form aus der Message-ID: gleiche Nachricht
+  /// sieht bei beiden Seiten identisch aus, keine zwei gleichen Wellen.
+  List<double> get _bars {
+    final seed = widget.msgId.hashCode;
+    final rand = Random(seed);
+    return List.generate(24, (_) => 0.25 + rand.nextDouble() * 0.75);
+  }
+
+  String _fmt(int seconds) {
+    final m = seconds ~/ 60;
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _stateSub?.cancel();
+    _player?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_consumed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'chat.voiceOnce')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    try {
+      final player = _player ??= AudioPlayer();
+      if (_playing) {
+        await player.stop();
+        if (mounted) {
+          setState(() {
+            _playing = false;
+            _position = Duration.zero;
+          });
+        }
+        return;
+      }
+      await player.setFilePath(widget.path);
+      await _posSub?.cancel();
+      _posSub = player.positionStream.listen((p) {
+        if (mounted) setState(() => _position = p);
+      });
+      await _stateSub?.cancel();
+      _stateSub = player.playerStateStream.listen((state) {
+        if (state.processingState == ProcessingState.completed && mounted) {
+          setState(() {
+            _playing = false;
+            _position = Duration.zero;
+            _consumed = true;
+          });
+          // Audit M-17: Nach der Wiedergabe wird die entschlüsselte Datei
+          // sofort entfernt.
+          unawaited(_deletePlayedFile());
+        }
+      });
+      await player.play();
+      if (mounted) setState(() => _playing = true);
+    } catch (e) {
+      debugPrint('[VoiceMessage] Wiedergabe fehlgeschlagen: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L10n.t(context, 'chat.voiceOnlyOnce')),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Audit M-17: Löscht die lokal entschlüsselte Voice-Datei nach der
+  /// Wiedergabe.
+  Future<void> _deletePlayedFile() async {
+    try {
+      final file = File(widget.path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Best-effort: der globale Sweep (temp_cleanup) entfernt Reste.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bars = _bars;
+    final totalSeconds =
+        _length.inSeconds > 0 ? _length.inSeconds : widget.durationSeconds;
+    final progress = totalSeconds > 0
+        ? _position.inMilliseconds / (totalSeconds * 1000)
+        : 0.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filled(
+          visualDensity: VisualDensity.compact,
+          onPressed: _toggle,
+          icon: Icon(
+            _playing ? Icons.pause : Icons.play_arrow,
+            size: 20,
+            color: widget.mine
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 132,
+          height: 32,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (var i = 0; i < bars.length; i++)
+                Container(
+                  width: 3,
+                  height: 6 + 22 * bars[i],
+                  decoration: BoxDecoration(
+                    color: _consumed
+                        ? widget.textColor.withValues(alpha: 0.25)
+                        : widget.textColor.withValues(
+                            alpha: i / bars.length <= progress ? 1.0 : 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          _consumed
+              ? L10n.t(context, 'chat.voiceListened')
+              : _fmt(totalSeconds),
+          style: TextStyle(
+            color: widget.textColor,
+            fontSize: 12,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Einmalige, zentrierte System-Hinweis-Zeile im Chat-Verlauf
 /// (z. B. "Fotos wurden freigeschaltet").
 class _SystemNotice extends StatelessWidget {
   const _SystemNotice({required this.text});

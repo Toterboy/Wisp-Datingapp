@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:wisp/services/auth_exception.dart';
+
 /// App-Sprache (Deutsch/Englisch). Default: Deutsch. Der Startwert wird
 /// in main() aus SharedPreferences als Override gesetzt; [saveLocale]
 /// aktualisiert State + Persistenz.
@@ -43,6 +45,27 @@ class L10n {
       s = s.replaceAll('{$k}', v);
     });
     return s;
+  }
+
+  /// Zeigt eine Service-Exception zweisprachig an: Services haben keinen
+  /// BuildContext, liefern aber optional einen L10n-Key
+  /// ([AppException.messageKey]) mit {platzhalter}-Params mit.
+  /// Fallback: die deutsche Klartext-Message.
+  static String exc(BuildContext context, Object e) {
+    if (e is AppException) {
+      final key = e.messageKey;
+      if (key != null && key.isNotEmpty) {
+        var s = t(context, key);
+        if (s != key) {
+          e.params.forEach((k, v) {
+            s = s.replaceAll('{$k}', v);
+          });
+          return s;
+        }
+      }
+      return e.message;
+    }
+    return e.toString();
   }
 }
 
@@ -239,6 +262,34 @@ const Map<String, Map<String, String>> _strings = {
     'setup.locationDone': 'Standort erkannt und übernommen (GPS-Koordinaten).',
     'setup.passkeyDone':
         'Passkey eingerichtet. Du kannst dich künftig damit anmelden.',
+    // Erst-Einrichtung als Interview (Wisp-Fragen-Bubbles)
+    'setupq.visibility':
+        'Wie privat magst du bleiben – und wie soll die App aussehen?',
+    'setupq.filter': 'Wonach soll Wisp jemanden für dich suchen?',
+    'setupq.profile':
+        'Was macht dich aus? Ein Bild, ein paar Worte, deine Interessen.',
+    'setupq.intro':
+        'Wie klingst du? Erzähl von dir – als Text und gesprochen.',
+    'setupq.habits': 'Wie stehst du zu Rauchen, Alkohol und Drogen?',
+    'setupq.passkey':
+        'Magst du dein Konto mit einem Passkey absichern? Geht schnell.',
+    'setupq.mfa': 'Magst du zusätzlich einen zweiten Faktor einrichten?',
+    'setupq.guidelines':
+        'Magst du unsere Wertegemeinschaft und ihre Regeln akzeptieren?',
+    // Passkey-Einrichtung in der Erst-Einrichtung
+    'setup.passkeySetupFailed':
+        'Passkey-Setup fehlgeschlagen oder abgebrochen. Du kannst es '
+        'später jederzeit in den Einstellungen nachholen.',
+    // Sicherheitshinweis vor dem Abschluss
+    'setup.nudgeTitle': 'Dringend empfohlen',
+    'setup.nudgeBody':
+        'Sichere dein Konto jetzt mit einem Passkey oder der '
+        'Zwei-Faktor-Authentisierung. Ohne zweiten Faktor kann jeder '
+        'mit deinem Passwort dein Konto übernehmen. Bei einer '
+        'Dating-App besonders heikel.',
+    'setup.nudgeSkip': 'Trotzdem fortfahren',
+    'setup.nudgeMfa': '2FA einrichten',
+    'setup.nudgePasskey': 'Passkey einrichten',
     'transit.tag.hoodie': 'Hoodie',
     'transit.tag.top': 'Oberteil',
     'transit.colorOptional': 'Farbe (optional)',
@@ -417,6 +468,14 @@ const Map<String, Map<String, String>> _strings = {
     'interests.resparkDone': 'Funke mit {name} glüht wieder ✨',
     'interests.matchesSub': 'Bestätigte gegenseitige Likes',
     'qr.openingChat': 'Chat mit {name} wird geöffnet...',
+    // Gespeicherte Profile (lokal, max. 5, zum Nachschreiben)
+    'qr.limitTitle': 'Maximum erreicht',
+    'qr.limitBody':
+        'Es sind bereits 5 Profile lokal gespeichert. Entferne in der Liste '
+        'zuerst eines, dann scanne erneut.',
+    'qr.limitEmpty': 'Keine gespeicherten Profile mehr vorhanden - '
+        'jetzt erneut scannen.',
+    'qr.savedDeleteTooltip': 'Gespeichertes Profil entfernen',
     'qr.enterFullCode': 'Bitte gib den vollständigen 8 stelligen Code ein.',
     'qr.resolveFailed': 'Code konnte nicht aufgelöst werden.',
     'qr.shareSub': 'Damit andere dich finden können',
@@ -520,6 +579,61 @@ const Map<String, Map<String, String>> _strings = {
     'profile.intro.audioLoadError': 'Audio-Vorstellung konnte nicht geladen werden.',
     'profile.intro.stop': 'Stopp',
     'profile.intro.listen': 'Audio-Vorstellung anhören',
+    // Intro-Editor (Audio-Recorder-UX)
+    'intro.title': 'Meine Vorstellung',
+    'intro.hintRequired':
+        'So lernst du andere kennen, bevor ein Foto zu sehen ist. '
+        'Text UND Audio sind Pflicht.',
+    'intro.hintOptional':
+        'So lernst du andere kennen, bevor ein Foto zu sehen ist. Du '
+        'kannst diesen Schritt auch überspringen und alles später '
+        'ergänzen.',
+    'intro.textRequired': 'Vorstellung (Text) *',
+    'intro.text': 'Vorstellung (Text)',
+    'intro.textHint': 'z. B. wer du bist und wonach du suchst',
+    'intro.audioTitleRequired': 'Audio-Vorstellung *',
+    'intro.audioTitle': 'Audio-Vorstellung',
+    'intro.savedState':
+        'Aufgenommen. Du kannst sie neu aufnehmen oder entfernen.',
+    'intro.rangeHint':
+        '{min} bis {max} Sekunden. Du kannst jede Aufnahme vor dem '
+        'Speichern anhören.',
+    'intro.record': 'Aufnehmen',
+    'intro.rerecord': 'Neu aufnehmen',
+    'intro.recordingState': 'Aufnahme läuft …',
+    'intro.pausedState': 'Pausiert',
+    'intro.pause': 'Pause',
+    'intro.resume': 'Weiter',
+    'intro.stopListen': 'Fertig & anhören',
+    'intro.discard': 'Verwerfen',
+    'intro.discardTitle': 'Aufnahme verwerfen?',
+    'intro.discardBody': 'Die laufende Aufnahme wird gelöscht.',
+    'intro.discardKeep': 'Behalten',
+    'intro.delete': 'Entfernen',
+    'intro.deleteTitle': 'Audio-Vorstellung entfernen?',
+    'intro.deleteBody':
+        'Die gespeicherte Aufnahme wird endgültig gelöscht.',
+    'intro.deleteTooltip': 'Audio-Vorstellung entfernen',
+    'intro.micDenied': 'Mikrofon-Zugriff verweigert.',
+    'intro.saved': 'Audio-Vorstellung hochgeladen.',
+    'intro.removed': 'Audio-Vorstellung entfernt.',
+    'intro.recordFailed': 'Aufnahme fehlgeschlagen: {error}',
+    // Audio-Review-Sheet (Anhören vor dem Senden)
+    'intro.review.title': 'Aufnahme prüfen',
+    'intro.review.length': 'Länge: {length}',
+    'intro.review.lengthMin': 'Länge: {length} (mindestens {min} s)',
+    'intro.review.listen': 'Anhören',
+    'intro.review.pause': 'Pause',
+    'intro.review.send': 'Senden',
+    'intro.review.confirm': 'Verwenden & hochladen',
+    'intro.review.discard': 'Verwerfen',
+    'intro.review.rerecord': 'Neu aufnehmen',
+    'intro.review.loadError':
+        'Vorschau nicht abspielbar. Du kannst die Aufnahme trotzdem '
+        'verwenden oder verwerfen.',
+    'intro.review.tooShort':
+        'Die Aufnahme ist zu kurz (mindestens {min} Sekunden). '
+        'Bitte nimm sie neu auf.',
     'mood.noneSelected': 'Kein Mood ausgewählt',
     'mood.today': 'Heute',
     'mood.changeHint': 'Tippe, um deine Stimmung zu ändern.',
@@ -542,6 +656,91 @@ const Map<String, Map<String, String>> _strings = {
         'Biometrischer Login (FaceID/TouchID) ohne Passwort',
     'settings.passkeyCreated': 'Passkey wurde erstellt.',
     'settings.passkeyFailed': 'Passkey-Erstellung fehlgeschlagen.',
+    // Passkey-Bestaetigungs-/Fehlertexte (Services ohne BuildContext)
+    'passkey.err.cancelledRegister': 'Passkey-Einrichtung abgebrochen.',
+    'passkey.err.cancelledLogin': 'Passkey-Anmeldung abgebrochen.',
+    'passkey.err.notAllowedRegister':
+        'Passkey-Einrichtung wurde abgebrochen oder ist abgelaufen. '
+        'Vergewissere dich, dass dein Gerät einen Sperrbildschirm '
+        '(PIN, Muster oder Biometrie) hat, und versuche es erneut.',
+    'passkey.err.notAllowedLogin':
+        'Passkey-Anmeldung wurde abgebrochen oder ist abgelaufen. '
+        'Vergewissere dich, dass dein Gerät einen Sperrbildschirm '
+        '(PIN, Muster oder Biometrie) hat, und versuche es erneut.',
+    'passkey.err.invalidState':
+        'Auf diesem Gerät existiert bereits ein Passkey für dieses Konto.',
+    'passkey.err.securityError':
+        'Die App konnte ihre Domain-Zugehörigkeit nicht nachweisen '
+        '(Passkey-Domain-Verknüpfung). Prüfe, ob die neueste App-Version '
+        'installiert ist, und melde es dem Support, falls es bleibt.',
+    'passkey.err.syncAccount':
+        'Der Passkey konnte nicht verschlüsselt gespeichert werden. '
+        'Stelle sicher, dass du auf dem Gerät mit einem Google-Konto '
+        'angemeldet bist und die Google Play Services aktuell sind.',
+    'passkey.err.timeoutRegister':
+        'Zeitüberschreitung bei der Passkey-Einrichtung. Bitte versuche '
+        'es gleichzeitig am Bildschirm erneut.',
+    'passkey.err.timeoutLogin':
+        'Zeitüberschreitung bei der Passkey-Anmeldung. Bitte versuche es '
+        'gleichzeitig am Bildschirm erneut.',
+    'passkey.err.noCredentialLogin':
+        'Kein Passkey für dieses Konto gefunden. Richte zuerst einen '
+        'unter Einstellungen ein.',
+    'passkey.err.noCredentialRegister':
+        'Kein Passkey-Speicher verfügbar. Prüfe Sperrbildschirm und '
+        'Google Play Services.',
+    'passkey.err.captcha':
+        'Der Sicherheitscheck fehlte oder ist abgelaufen. '
+        'Bitte versuche es erneut.',
+    'passkey.err.verificationFailed':
+        'Der Server konnte den Passkey nicht bestätigen. Wahrscheinlich '
+        'fehlt der Ursprung (apk-key-hash) der installierten App in der '
+        'Passkey-Konfiguration des Servers - siehe '
+        'docs/PASSKEYS_SERVER_SETUP.md. Alternativ: alten Passkey unter '
+        '"Passkeys verwalten" löschen und erneut anlegen.',
+    'passkey.err.serverRejected':
+        'Der Server hat die Passkey-Anfrage abgelehnt. Bitte prüfe in '
+        'den Supabase-Einstellungen, ob "Passkeys" aktiviert ist und die '
+        'RP-ID auf auth.wispdating.de gesetzt ist.{reason}',
+    'passkey.err.unknownRegister':
+        'Passkey-Einrichtung fehlgeschlagen. Bitte versuche es später '
+        'erneut.',
+    'passkey.err.unknownLogin':
+        'Passkey-Anmeldung fehlgeschlagen. Bitte versuche es später '
+        'erneut.',
+    // Passkey-Dialog in den Einstellungen (Server-Bestätigung)
+    'settings.passkeyExistsTitle': 'Passkey existiert bereits',
+    'settings.passkeyExistsBody':
+        'Auf deinem Konto sind bereits {count} Passkey(s) registriert. '
+        'Wenn das Anlegen wieder an der Server-Bestätigung scheitert, '
+        'lösche die alten Einträge unter "Passkeys verwalten" und '
+        'versuche es erneut.\n\nTrotzdem einen weiteren Passkey '
+        'erstellen?',
+    'settings.passkeyExistsAbort': 'Abbrechen',
+    'settings.passkeyExistsContinue': 'Weiter erstellen',
+    'settings.passkeyWaitConfirm': 'Warte auf Bestätigung …',
+    // "Passkeys verwalten"-Karte
+    'passkey.name': 'Passkey',
+    'passkey.stepUpHint': 'Zum Anzeigen der Passkeys ist eine 2FA-Bestätigung nötig.',
+    'passkey.loadError':
+        'Passkeys konnten nicht geladen werden. Bitte später erneut versuchen.',
+    'passkey.renameTitle': 'Passkey umbenennen',
+    'passkey.renameLabel': 'Anzeigename',
+    'passkey.renameHint': 'z. B. Pixel 8',
+    'passkey.renameFailed': 'Umbenennen fehlgeschlagen.',
+    'passkey.deleteBody':
+        '"{name}" wird von deinem Konto entfernt. Die Anmeldung damit '
+        'ist danach nicht mehr möglich. Der Passkey bleibt ggf. auf dem '
+        'Gerät gespeichert.',
+    'passkey.managerSub': 'Registrierte Passkeys auf deinem Konto',
+    'passkey.managerHint':
+        '{count} registriert - tippe zum Umbenennen, Papierkorb zum '
+        'Entfernen',
+    // Passkey-Fallbacks im Login (keine AppException)
+    'auth.passkeyCancelled': 'Passkey-Anmeldung abgebrochen.',
+    'auth.passkeyFailed':
+        'Passkey-Anmeldung fehlgeschlagen. Bitte versuche es mit '
+        'E-Mail und Passwort.',
     'settings.devices': 'Angemeldete Geräte',
     'settings.devicesSub': 'Wo bin ich eingeloggt? Überall abmelden',
     'devices.title': 'Angemeldete Geräte',
@@ -630,6 +829,19 @@ const Map<String, Map<String, String>> _strings = {
         'Keine Nachrichten, Likes oder Funken mehr von dieser Person.',
     'chat.end': 'Funke beenden',
     'chat.call': 'Audio Anruf',
+    // Vorstellung im Chat + Kennenlern-Quiz-Banner (Chat zuerst)
+    'chat.introTitle': 'Vorstellung',
+    'chat.quizBanner':
+        'Das Kennenlern-Quiz schaltet das Profilfoto frei. Chatten ist '
+        'unabhängig möglich.',
+    'chat.quizOpen': 'Zum Quiz',
+    // Sprachnachrichten im Chat (Einmal-Anhören, M-17)
+    'chat.voiceOnce':
+        'Diese Sprachnachricht wurde bereits angehört und entfernt '
+        '(Datenschutz: entschlüsselte Audio-Reste werden gelöscht).',
+    'chat.voiceOnlyOnce': 'Wiedergabe nicht möglich - die Nachricht wurde '
+        'bereits angehört.',
+    'chat.voiceListened': 'angehört',
     'chat.more': 'Weitere Optionen',
     'dh.event.startingSoon': 'Dating Hour startet gleich',
     'dh.event.cancelledToday':
@@ -780,6 +992,26 @@ const Map<String, Map<String, String>> _strings = {
     'dh.event.chatsRunning': 'Chats laufen.',
     'dh.event.waitStart': 'Warte auf den Start.',
     'dh.event.participating': 'Du nimmst teil!',
+    // Dating-Hour-Regeln-Detailzeilen (Event-Screen, Regeln-Karte)
+    'dh.event.rulesTitle': 'Wichtige Regeln',
+    'dh.event.rule.1':
+        'Samstags 20:00 bis 21:00 Uhr (Beitritt bereits vorher möglich).',
+    'dh.event.rule.2':
+        'Direkt in 1:1 Chat verbunden, ohne vorherige Profilansicht.',
+    'dh.event.rule.3':
+        '5 Minuten Chat, dann Entscheidung: "Annehmen" oder "Ablehnen".',
+    'dh.event.rule.4':
+        'Nur bei BEIDSEITIGEM "Annehmen" entsteht ein Funke.',
+    'dh.event.rule.5':
+        'Bei "Ablehnen" (oder Timeout): Automatische neue Zuordnung.',
+    'dh.event.rule.6': 'Während eines Chats: NUR dieser Chat erlaubt.',
+    'dh.event.rule.7':
+        'Um 21:00 Uhr Ende, laufende Chats werden zu Ende geführt.',
+    'dh.event.rule.8':
+        'Erst ab 20 Teilnehmern findet die Dating Hour statt - 20 ist '
+        'das Mindestziel, nach oben gibt es kein Limit.',
+    'dh.event.rule.9':
+        'Die Erstellung von Fake Accounts ist strengstens untersagt.',
 
     'profile.edit.filters': 'Filter & Präferenzen',
     'profile.edit.radiusMode': 'Suchradius definieren über',
@@ -864,6 +1096,12 @@ const Map<String, Map<String, String>> _strings = {
         'möchtest du tun?',
     'profile.edit.unsavedDiscard': 'Verwerfen',
     'profile.detail.aboutMe': 'Über mich',
+    // Gespeicherte Profile (lokal, max. 5)
+    'profile.detail.savedSave': 'Profil lokal speichern (später anschreiben)',
+    'profile.detail.savedRemove': 'Gespeichertes Profil entfernen',
+    'profile.detail.savedDone':
+        '{name} lokal gespeichert. Du kannst {name} später anschreiben.',
+    'profile.detail.savedRemoved': '{name} wurde entfernt.',
     'profile.detail.noBio': 'Noch keine Bio.',
     'profile.detail.interests': 'Interessen',
     'profile.detail.commonWithYou': 'Gemeinsam mit dir',
@@ -1158,6 +1396,34 @@ const Map<String, Map<String, String>> _strings = {
     'setup.locationDone': 'Location detected and applied (GPS coordinates).',
     'setup.passkeyDone':
         'Passkey set up. You can now sign in with it.',
+    // One-time setup as interview (Wisp question bubbles)
+    'setupq.visibility':
+        'How private would you like to stay - and how should the app look?',
+    'setupq.filter': 'What should Wisp search for on your behalf?',
+    'setupq.profile':
+        'What makes you you? A photo, a few words, your interests.',
+    'setupq.intro':
+        'How do you sound? Tell about yourself - in text and voice.',
+    'setupq.habits': 'How do you feel about smoking, alcohol and drugs?',
+    'setupq.passkey':
+        'Would you like to secure your account with a passkey? It is quick.',
+    'setupq.mfa': 'Would you like to add a second factor on top?',
+    'setupq.guidelines':
+        'Would you like to accept our community of values and its rules?',
+    // Passkey setup during one-time setup
+    'setup.passkeySetupFailed':
+        'Passkey setup failed or was cancelled. You can do it later any '
+        'time in the settings.',
+    // Security nudge before finishing
+    'setup.nudgeTitle': 'Strongly recommended',
+    'setup.nudgeBody':
+        'Secure your account now with a passkey or two-factor '
+        'authentication. Without a second factor anyone with your '
+        'password can take over your account - especially risky for a '
+        'dating app.',
+    'setup.nudgeSkip': 'Continue anyway',
+    'setup.nudgeMfa': 'Set up 2FA',
+    'setup.nudgePasskey': 'Set up passkey',
     'transit.tag.hoodie': 'Hoodie',
     'transit.tag.top': 'Top',
     'transit.colorOptional': 'Color (optional)',
@@ -1332,6 +1598,14 @@ const Map<String, Map<String, String>> _strings = {
     'interests.resparkDone': 'Spark with {name} is glowing again ✨',
     'interests.matchesSub': 'Confirmed mutual likes',
     'qr.openingChat': 'Opening chat with {name}...',
+    // Saved profiles (local, max. 5, for writing later)
+    'qr.limitTitle': 'Maximum reached',
+    'qr.limitBody':
+        '5 profiles are already saved locally. Remove one from the list '
+        'first, then scan again.',
+    'qr.limitEmpty':
+        'No saved profiles left - scan again now.',
+    'qr.savedDeleteTooltip': 'Remove saved profile',
     'qr.enterFullCode': 'Please enter the full 8-digit code.',
     'qr.resolveFailed': 'Could not resolve the code.',
     'qr.shareSub': 'So others can find you',
@@ -1434,6 +1708,58 @@ const Map<String, Map<String, String>> _strings = {
     'profile.intro.audioLoadError': 'Audio intro could not be loaded.',
     'profile.intro.stop': 'Stop',
     'profile.intro.listen': 'Listen to audio intro',
+    // Intro editor (audio recorder UX)
+    'intro.title': 'My intro',
+    'intro.hintRequired':
+        'This is how you get to know others before a photo is shown. '
+        'Text AND audio are required.',
+    'intro.hintOptional':
+        'This is how you get to know others before a photo is shown. '
+        'You can skip this step and add everything later.',
+    'intro.textRequired': 'Intro (text) *',
+    'intro.text': 'Intro (text)',
+    'intro.textHint': 'e.g. who you are and what you are looking for',
+    'intro.audioTitleRequired': 'Audio intro *',
+    'intro.audioTitle': 'Audio intro',
+    'intro.savedState': 'Recorded. You can re-record or remove it.',
+    'intro.rangeHint':
+        '{min} to {max} seconds. You can listen to every recording '
+        'before saving.',
+    'intro.record': 'Record',
+    'intro.rerecord': 'Re-record',
+    'intro.recordingState': 'Recording …',
+    'intro.pausedState': 'Paused',
+    'intro.pause': 'Pause',
+    'intro.resume': 'Resume',
+    'intro.stopListen': 'Done & listen',
+    'intro.discard': 'Discard',
+    'intro.discardTitle': 'Discard recording?',
+    'intro.discardBody': 'The current recording will be deleted.',
+    'intro.discardKeep': 'Keep it',
+    'intro.delete': 'Remove',
+    'intro.deleteTitle': 'Remove audio intro?',
+    'intro.deleteBody': 'The saved recording will be permanently deleted.',
+    'intro.deleteTooltip': 'Remove audio intro',
+    'intro.micDenied': 'Microphone access denied.',
+    'intro.saved': 'Audio intro uploaded.',
+    'intro.removed': 'Audio intro removed.',
+    'intro.recordFailed': 'Recording failed: {error}',
+    // Audio review sheet (listen before sending)
+    'intro.review.title': 'Check your recording',
+    'intro.review.length': 'Length: {length}',
+    'intro.review.lengthMin': 'Length: {length} (minimum {min} s)',
+    'intro.review.listen': 'Listen',
+    'intro.review.pause': 'Pause',
+    'intro.review.send': 'Send',
+    'intro.review.confirm': 'Use & upload',
+    'intro.review.discard': 'Discard',
+    'intro.review.rerecord': 'Re-record',
+    'intro.review.loadError':
+        'Preview not playable. You can still use or discard the '
+        'recording.',
+    'intro.review.tooShort':
+        'The recording is too short (minimum {min} seconds). '
+        'Please record it again.',
     'mood.noneSelected': 'No mood selected',
     'mood.today': 'Today',
     'mood.changeHint': 'Tap to change your mood.',
@@ -1456,6 +1782,86 @@ const Map<String, Map<String, String>> _strings = {
         'Biometric login (FaceID/TouchID) without a password',
     'settings.passkeyCreated': 'Passkey created.',
     'settings.passkeyFailed': 'Passkey creation failed.',
+    // Passkey confirmation / error texts (services without BuildContext)
+    'passkey.err.cancelledRegister': 'Passkey setup cancelled.',
+    'passkey.err.cancelledLogin': 'Passkey sign-in cancelled.',
+    'passkey.err.notAllowedRegister':
+        'The passkey setup was cancelled or expired. Make sure your '
+        'device has a screen lock (PIN, pattern or biometrics) and try '
+        'again.',
+    'passkey.err.notAllowedLogin':
+        'The passkey sign-in was cancelled or expired. Make sure your '
+        'device has a screen lock (PIN, pattern or biometrics) and try '
+        'again.',
+    'passkey.err.invalidState':
+        'A passkey for this account already exists on this device.',
+    'passkey.err.securityError':
+        'The app could not prove its domain association '
+        '(passkey domain link). Check whether the latest app version is '
+        'installed, and report it to support if it persists.',
+    'passkey.err.syncAccount':
+        'The passkey could not be stored encrypted. Make sure you are '
+        'signed in with a Google account on the device and that Google '
+        'Play Services are up to date.',
+    'passkey.err.timeoutRegister':
+        'Passkey setup timed out. Please try again while the dialog is '
+        'visible on screen.',
+    'passkey.err.timeoutLogin':
+        'Passkey sign-in timed out. Please try again while the dialog is '
+        'visible on screen.',
+    'passkey.err.noCredentialLogin':
+        'No passkey found for this account. Set one up under Settings '
+        'first.',
+    'passkey.err.noCredentialRegister':
+        'No passkey storage available. Check screen lock and Google Play '
+        'Services.',
+    'passkey.err.captcha':
+        'The security check was missing or expired. Please try again.',
+    'passkey.err.verificationFailed':
+        'The server could not confirm the passkey. Most likely the '
+        'origin (apk-key-hash) of the installed app is missing in the '
+        'server passkey configuration - see '
+        'docs/PASSKEYS_SERVER_SETUP.md. Alternatively delete the old '
+        'passkey under "Manage passkeys" and create it again.',
+    'passkey.err.serverRejected':
+        'The server rejected the passkey request. Please check in the '
+        'Supabase settings whether "Passkeys" is enabled and the RP ID '
+        'is set to auth.wispdating.de.{reason}',
+    'passkey.err.unknownRegister':
+        'Passkey setup failed. Please try again later.',
+    'passkey.err.unknownLogin':
+        'Passkey sign-in failed. Please try again later.',
+    // Passkey dialog in settings (server confirmation)
+    'settings.passkeyExistsTitle': 'Passkey already exists',
+    'settings.passkeyExistsBody':
+        'Your account already has {count} passkey(s) registered. If '
+        'creating another one keeps failing at server confirmation, '
+        'delete the old entries under "Manage passkeys" and try '
+        'again.\n\nCreate another passkey anyway?',
+    'settings.passkeyExistsAbort': 'Cancel',
+    'settings.passkeyExistsContinue': 'Create anyway',
+    'settings.passkeyWaitConfirm': 'Waiting for confirmation …',
+    // "Manage passkeys" card
+    'passkey.name': 'Passkey',
+    'passkey.stepUpHint':
+        'Showing your passkeys requires a 2FA confirmation.',
+    'passkey.loadError':
+        'Passkeys could not be loaded. Please try again later.',
+    'passkey.renameTitle': 'Rename passkey',
+    'passkey.renameLabel': 'Display name',
+    'passkey.renameHint': 'e.g. Pixel 8',
+    'passkey.renameFailed': 'Renaming failed.',
+    'passkey.deleteBody':
+        '"{name}" will be removed from your account. You will no longer '
+        'be able to sign in with it. The passkey may remain stored on '
+        'the device.',
+    'passkey.managerSub': 'Passkeys registered on your account',
+    'passkey.managerHint':
+        '{count} registered - tap to rename, trash icon to remove',
+    // Passkey fallbacks on the login screen (not an AppException)
+    'auth.passkeyCancelled': 'Passkey sign-in cancelled.',
+    'auth.passkeyFailed':
+        'Passkey sign-in failed. Please try with email and password.',
     'settings.devices': 'Signed-in devices',
     'settings.devicesSub': 'Where am I logged in? Sign out everywhere',
     'devices.title': 'Signed-in devices',
@@ -1543,6 +1949,19 @@ const Map<String, Map<String, String>> _strings = {
         'No messages, likes or sparks from this person anymore.',
     'chat.end': 'End spark',
     'chat.call': 'Audio call',
+    // Intro in chat + getting-to-know-you quiz banner (chat first)
+    'chat.introTitle': 'Intro',
+    'chat.quizBanner':
+        'The getting-to-know-you quiz unlocks the profile photo. Chatting '
+        'works independently.',
+    'chat.quizOpen': 'Take quiz',
+    // Voice messages (listen once, M-17)
+    'chat.voiceOnce':
+        'This voice message was already listened to and removed (privacy: '
+        'decrypted audio remains are deleted).',
+    'chat.voiceOnlyOnce': 'Playback not possible - the message was already '
+        'listened to.',
+    'chat.voiceListened': 'listened',
     'chat.more': 'More options',
     'dh.event.startingSoon': 'Dating Hour starts soon',
     'dh.event.cancelledToday':
@@ -1692,6 +2111,26 @@ const Map<String, Map<String, String>> _strings = {
     'dh.event.chatsRunning': 'Chats are running.',
     'dh.event.waitStart': 'Waiting for the start.',
     'dh.event.participating': 'You are in!',
+    // Dating Hour rules detail lines (event screen, rules card)
+    'dh.event.rulesTitle': 'Important rules',
+    'dh.event.rule.1':
+        'Saturdays 20:00 to 21:00 (you can already join beforehand).',
+    'dh.event.rule.2':
+        'Connected directly in a 1:1 chat, without viewing profiles first.',
+    'dh.event.rule.3':
+        '5 minutes of chat, then decide: "Accept" or "Decline".',
+    'dh.event.rule.4':
+        'A spark only forms if BOTH sides "Accept".',
+    'dh.event.rule.5':
+        'On "Decline" (or timeout): automatic new matching.',
+    'dh.event.rule.6': 'During a chat: ONLY this chat is allowed.',
+    'dh.event.rule.7':
+        'End at 21:00; ongoing chats are finished.',
+    'dh.event.rule.8':
+        'The Dating Hour only takes place with at least 20 participants - '
+        '20 is the minimum goal, there is no upper limit.',
+    'dh.event.rule.9':
+        'Creating fake accounts is strictly prohibited.',
 
     'profile.edit.filters': 'Filters & preferences',
     'profile.edit.radiusMode': 'Define search radius by',
@@ -1773,6 +2212,12 @@ const Map<String, Map<String, String>> _strings = {
         'like to do?',
     'profile.edit.unsavedDiscard': 'Discard',
     'profile.detail.aboutMe': 'About me',
+    // Saved profiles (local, max. 5)
+    'profile.detail.savedSave': 'Save profile locally (write later)',
+    'profile.detail.savedRemove': 'Remove saved profile',
+    'profile.detail.savedDone':
+        '{name} saved locally. You can write to {name} later.',
+    'profile.detail.savedRemoved': '{name} was removed.',
     'profile.detail.noBio': 'No bio yet.',
     'profile.detail.interests': 'Interests',
     'profile.detail.commonWithYou': 'Shared with you',

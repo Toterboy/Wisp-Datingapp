@@ -135,6 +135,11 @@ async function isRateLimited(callerId: string): Promise<boolean> {
 /** Serverseitig generierte Texte pro kind (kein client-kontrollierter Text). */
 const clientTextsByKind: Record<string, { title: string; body: string }> = {
   messages: { title: "Wisp", body: "Du hast eine neue Nachricht erhalten." },
+  // v0.9.0-Feedback ("auf dem anderen Gerät passiert gar nichts"): Nach
+  // einem QR-Scan/Like soll die gescannte Person einen Push erhalten.
+  // Der Text ist serverseitig fix (kein Phishing), die E1-Beziehungs-
+  // prüfung unten verlangt einen EIGENEN Like des Aufrufers an das Ziel.
+  likes: { title: "Wisp", body: "Jemand hat deine Vorstellung entdeckt." },
 };
 
 /**

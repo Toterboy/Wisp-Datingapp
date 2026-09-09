@@ -1001,23 +1001,22 @@ class _RulesCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Wichtige Regeln',
+              L10n.t(context, 'dh.event.rulesTitle'),
               style: Theme.of(context)
                   .textTheme
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-    const _RuleItem('1', 'Samstags 20:00 bis 21:00 Uhr (Beitritt bereits vorher möglich).'),
-    const _RuleItem('2', 'Direkt in 1:1 Chat verbunden, ohne vorherige Profilansicht.'),
-    const _RuleItem('3', '5 Minuten Chat, dann Entscheidung: "Annehmen" oder "Ablehnen".'),
-    const _RuleItem('4', 'Nur bei BEIDSEITIGEM "Annehmen" entsteht ein Funke.'),
-    const _RuleItem('5', 'Bei "Ablehnen" (oder Timeout): Automatische neue Zuordnung.'),
-    const _RuleItem('6', 'Während eines Chats: NUR dieser Chat erlaubt.'),
-    const _RuleItem('7', 'Um 21:00 Uhr Ende, laufende Chats werden zu Ende geführt.'),
-    const _RuleItem('8', 'Erst ab 20 Teilnehmern findet die Dating Hour '
-        'statt - 20 ist das Mindestziel, nach oben gibt es kein Limit.'),
-    const _RuleItem('9', 'Die Erstellung von Fake Accounts ist strengstens untersagt.'),
+            _RuleItem('1', L10n.t(context, 'dh.event.rule.1')),
+            _RuleItem('2', L10n.t(context, 'dh.event.rule.2')),
+            _RuleItem('3', L10n.t(context, 'dh.event.rule.3')),
+            _RuleItem('4', L10n.t(context, 'dh.event.rule.4')),
+            _RuleItem('5', L10n.t(context, 'dh.event.rule.5')),
+            _RuleItem('6', L10n.t(context, 'dh.event.rule.6')),
+            _RuleItem('7', L10n.t(context, 'dh.event.rule.7')),
+            _RuleItem('8', L10n.t(context, 'dh.event.rule.8')),
+            _RuleItem('9', L10n.t(context, 'dh.event.rule.9')),
           ],
         ),
       ),

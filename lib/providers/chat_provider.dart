@@ -36,19 +36,53 @@ class ChatNotifier extends StateNotifier<List<Match>> {
 
   /// Findet oder erstellt einen Chat mit einem Nutzer (via QR-Scan).
   ///
-  /// Prüft zuerst, ob bereits ein Match/Chat mit diesem Nutzer existiert.
-  /// Falls nicht, wird ein neuer QR-Kontakt angelegt (kein Like nötig).
-  /// Gibt das UserProfile des Partners zurück für die Navigation.
-  UserProfile? findOrCreateMatch(String peerId) {
-    // Prüfe, ob bereits ein Chat existiert
-    final existing = _chat.getMatchById(peerId);
-    if (existing != null) return existing.partner;
+  /// QR-Kontakte sind PERSISTENT ("gespeicherte Profile", max.
+  /// [ChatService.maxQrContacts]) - sie überleben den App-Neustart, damit
+  /// man offline gescannte Personen später anschreiben kann.
+  ///
+  /// Prüft zuerst, ob bereits ein Match/Chat mit diesem Nutzer existiert
+  /// (per Partner-ID - die Match-ID ist lokal generiert und beim Scan noch
+  /// unbekannt). Gibt das MATCH zurück (nicht das Partner-Profil): Die
+  /// Chat-Route braucht die Match-ID. Vorher wurde die Partner-ID
+  /// navigiert, wodurch der Chat-Detail-Screen "Dieser Chat existiert
+  /// nicht mehr" zeigte.
+  ///
+  /// Liefert `null`, wenn das Maximum erreicht ist - der Aufrufer bietet
+  /// dann an, zuerst einen gespeicherten Kontakt zu löschen.
+  Match? findOrCreateMatch(String peerId) {
+    // Prüfe, ob bereits ein Chat existiert.
+    final existing = _chat.getMatchByPartnerId(peerId);
+    if (existing != null) return existing;
 
-    // Neuen QR-Kontakt anlegen
+    // Neuen QR-Kontakt anlegen (Name/Profil lädt der Screen asynchron
+    // vom Server nach; offline bleibt der Platzhalter "Unbekannt").
     final profile = UserProfile(id: peerId, name: 'Unbekannt', bio: '');
-    _chat.createMatch(profile, isQrContact: true);
+    final match = _chat.createQrContact(profile);
+    if (match != null) {
+      state = _chat.getMatches();
+    }
+    return match;
+  }
+
+  /// Aktualisiert das Partner-Profil eines Matches (z. B. QR-Kontakt, der
+  /// nachträglich vom Server mit echtem Namen/Vorstellung befüllt wird).
+  void updatePartner(String matchId, UserProfile partner) {
+    _chat.updatePartner(matchId, partner);
     state = _chat.getMatches();
-    return profile;
+  }
+
+  /// Entfernt einen persistenten QR-Kontakt ("Gespeichertes Profil
+  /// löschen"): Match, Verlauf und lokale Speicherung.
+  void deleteQrContact(String matchId) {
+    _chat.deleteQrContact(matchId);
+    state = _chat.getMatches();
+  }
+
+  /// Stellt persistierte QR-Kontakte nach dem App-Start wieder her
+  /// ("gespeicherte Profile" überleben den Neustart).
+  Future<void> restorePersistedQrContacts() async {
+    await _chat.restoreQrContacts();
+    state = _chat.getMatches();
   }
 
   /// QR-Kontakte aus dem Speicher (für den Datenexport): enthält die
@@ -146,6 +180,13 @@ final chatProvider = StateNotifierProvider<ChatNotifier, List<Match>>((ref) {
       service.setHistoryPersistence(enabled, limit: limit);
     } catch (_) {
       // Ohne Storage läuft der Chat einfach ohne Verlauf.
+    }
+    // Persistente QR-Kontakte ("gespeicherte Profile") nach dem Start
+    // wiederherstellen - Maximal 5, einzeln löschbar.
+    try {
+      await notifier.restorePersistedQrContacts();
+    } catch (_) {
+      // Best-effort: Ohne Restore funktioniert der Chat trotzdem.
     }
   }());
   return notifier;

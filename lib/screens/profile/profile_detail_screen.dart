@@ -156,6 +156,14 @@ child: Text(L10n.t(context, 'profile.detail.unavailable')),
           },
         ),
         title: Text(profile.name),
+        actions: [
+          // "Profil lokal speichern" (v0.9.1): Fremde Profile (z. B. per
+          // QR gescannt, ohne Internet) lokal behalten, um sie später
+          // anzuschreiben. Max. 5, einzeln löschbar. Für das eigene Profil
+          // ausgeblendet.
+          if (me.id != profile.id)
+            _SavedProfileAction(profile: profile),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -479,6 +487,74 @@ class _PublicProfileAvatarState extends ConsumerState<_PublicProfileAvatar> {
         return const CircleAvatar(
           radius: 52,
           child: Icon(Icons.person, size: 56),
+        );
+      },
+    );
+  }
+}
+
+/// AppBar-Aktion "Profil lokal speichern" (v0.9.1): Erzeugt einen
+/// PERSISTENTEN QR-Kontakt aus dem geladenen Profil (funktioniert auch
+/// ohne Internet, da die Profil-Daten lokal übernommen werden). Max. 5;
+/// bereits gespeicherte Profile lassen sich hier wieder entfernen.
+class _SavedProfileAction extends ConsumerWidget {
+  const _SavedProfileAction({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contacts = ref.watch(chatProvider);
+    final existing = contacts
+        .where((m) => m.isQrContact && m.partner.id == profile.id)
+        .firstOrNull;
+
+    if (existing != null) {
+      return IconButton(
+        icon: const Icon(Icons.bookmark),
+        tooltip: L10n.t(context, 'profile.detail.savedRemove'),
+        onPressed: () {
+          ref.read(chatProvider.notifier).deleteQrContact(existing.id);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  L10n.tf(context, 'profile.detail.savedRemoved',
+                      {'name': profile.name})),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+      );
+    }
+
+    return IconButton(
+      icon: const Icon(Icons.bookmark_border),
+      tooltip: L10n.t(context, 'profile.detail.savedSave'),
+      onPressed: () async {
+        final match = ref
+            .read(chatProvider.notifier)
+            .findOrCreateMatch(profile.id);
+        if (match == null) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(L10n.t(context, 'qr.limitBody')),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+          return;
+        }
+        ref
+            .read(chatProvider.notifier)
+            .updatePartner(match.id, profile);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L10n.tf(
+                context, 'profile.detail.savedDone', {'name': profile.name})),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       },
     );

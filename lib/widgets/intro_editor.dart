@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/services/supabase_storage_service.dart';
 import 'package:wisp/widgets/audio_review_sheet.dart';
 
@@ -14,10 +15,13 @@ import 'package:wisp/widgets/audio_review_sheet.dart';
 /// Meldet jede Änderung über [onChanged] an den Parent, der die Werte
 /// speichert.
 ///
-/// Audio-Flow: Nach dem Stoppen bleibt die Aufnahme lokal erhalten und
-/// wird über ein Review-Sheet erst ANGEHÖRT ([showAudioReviewSheet]) –
-/// erst nach Bestätigung erfolgt der Upload. Mindestlänge 10 Sekunden
-/// ([minAudioSeconds]), Maximum 5 Minuten / 300 Sekunden (Auto-Stopp).
+/// Audio-Flow (Recorder-UX): Während der Aufnahme zeigt die Karte
+/// Dauer + Lautstärke-Visualisierung (Amplituden-Balken) und erlaubt
+/// Pause/Fortsetzen, Verwerfen und Stoppen. Nach dem Stoppen bleibt die
+/// Aufnahme lokal erhalten und wird über ein Review-Sheet erst ANGEHÖRT
+/// ([showAudioReviewSheet]) – erst nach Bestätigung erfolgt der Upload
+/// ("Senden"). Mindestlänge 10 Sekunden ([minAudioSeconds]), Maximum
+/// 5 Minuten / 300 Sekunden (Auto-Stopp).
 ///
 /// Ist [required] false (z. B. in der Erst-Einrichtung), sind Text und
 /// Audio freiwillige Angaben und der Pflicht-Hinweis entfällt.
@@ -47,6 +51,12 @@ class IntroEditor extends ConsumerStatefulWidget {
 
   /// Maximale Länge der Audio-Vorstellung in Sekunden (Auto-Stopp = 5 Min).
   static const int maxAudioSeconds = 300;
+
+  /// Anzahl der Balken der Lautstärke-Visualisierung (Fenster ~3 s).
+  static const int ampBarCount = 28;
+
+  /// Abfrage-Intervall der Amplitude (ms).
+  static const int ampIntervalMs = 100;
 }
 
 class _IntroEditorState extends ConsumerState<IntroEditor> {
@@ -55,8 +65,13 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
 
   String? _audioPath;
   bool _recording = false;
+  bool _paused = false;
   int _recordSeconds = 0;
   Timer? _recordTimer;
+  StreamSubscription<Amplitude>? _ampSub;
+
+  /// Die letzten Amplituden-Level (0..1) für die Balken-Visualisierung.
+  final List<double> _levels = [];
   bool _uploading = false;
 
   @override
@@ -69,87 +84,24 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
   @override
   void dispose() {
     _recordTimer?.cancel();
+    _ampSub?.cancel();
     _textCtrl.dispose();
     _recorder.dispose();
     super.dispose();
   }
 
-  Future<void> _toggleRecording() async {
-    if (_recording) {
-      // WICHTIG: Die Sekunden VOR dem Reset sichern – vorher stand der
-      // Reset vor der Prüfung, sodass JEDE Aufnahme (auch 40 s) als
-      // "unter 1 Sekunde" verworfen wurde.
-      final seconds = _recordSeconds;
-      _recordTimer?.cancel();
-      setState(() {
-        _recording = false;
-        _recordSeconds = 0;
-        _uploading = true;
-      });
-      try {
-        final recordedPath = await _recorder.stop();
-        if (recordedPath == null) {
-          setState(() => _uploading = false);
-          return;
-        }
-        final file = File(recordedPath);
-        if (!mounted) {
-          if (await file.exists()) await file.delete();
-          return;
-        }
+  // ---------------------------------------------------------------------
+  // Aufnahme-Steuerung (Start / Pause-Fortsetzen / Stop / Verwerfen)
+  // ---------------------------------------------------------------------
 
-        // Anhören vor dem Verwenden: Review-Sheet zeigt Player, Länge
-        // und (bei Unterschreitung) die Mindestlänge. Nur bei expliziter
-        // Bestätigung wird hochgeladen.
-        final use = await showAudioReviewSheet(
-          context: context,
-          path: recordedPath,
-          durationSeconds: seconds,
-          minimumSeconds: IntroEditor.minAudioSeconds,
-          confirmLabel: 'Verwenden & hochladen',
-        );
-        if (use != true) {
-          if (await file.exists()) await file.delete();
-          if (mounted) setState(() => _uploading = false);
-          return;
-        }
-
-        final bytes = await file.readAsBytes();
-        await file.delete();
-
-        final storage = ref.read(supabaseStorageServiceProvider);
-        final uploadedPath = await storage.uploadIntroAudio(bytes);
-        if (!mounted) return;
-        setState(() {
-          _audioPath = uploadedPath;
-          _uploading = false;
-        });
-        widget.onChanged(_textCtrl.text, _audioPath);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Audio-Vorstellung hochgeladen.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      } catch (e) {
-        debugPrint('[IntroEditor] Aufnahme fehlgeschlagen: $e');
-        if (mounted) {
-          setState(() => _uploading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Aufnahme fehlgeschlagen: $e')),
-          );
-        }
-      }
-      return;
-    }
-
+  Future<void> _startRecording() async {
     try {
       final hasPermission = await _recorder.hasPermission();
       if (!hasPermission) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Mikrofon Zugriff verweigert.'),
+            SnackBar(
+              content: Text(L10n.t(context, 'intro.micDenied')),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -169,20 +121,205 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
       );
       setState(() {
         _recording = true;
+        _paused = false;
         _recordSeconds = 0;
+        _levels.clear();
       });
-      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() => _recordSeconds++);
-        if (_recordSeconds >= IntroEditor.maxAudioSeconds) {
-          _toggleRecording();
-        }
-      });
+      _ampSub = _recorder
+          .onAmplitudeChanged(
+              const Duration(milliseconds: IntroEditor.ampIntervalMs))
+          .listen(_onAmplitude);
+      _startTimer();
     } catch (e) {
       debugPrint('[IntroEditor] Start fehlgeschlagen: $e');
     }
   }
 
+  /// Lautstärke-Visualisierung: dBFS (-60..0) auf 0..1 normieren.
+  void _onAmplitude(Amplitude amp) {
+    if (!mounted || !_recording || _paused) return;
+    final db = amp.current.clamp(-60.0, 0.0);
+    final level = ((db + 60) / 60).clamp(0.0, 1.0);
+    setState(() {
+      _levels.add(level);
+      while (_levels.length > IntroEditor.ampBarCount) {
+        _levels.removeAt(0);
+      }
+    });
+  }
+
+  void _startTimer() {
+    _recordTimer?.cancel();
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_paused) return; // Pause zählt nicht zur Dauer.
+      setState(() => _recordSeconds++);
+      if (_recordSeconds >= IntroEditor.maxAudioSeconds) {
+        _stopRecording();
+      }
+    });
+  }
+
+  Future<void> _pauseResume() async {
+    if (!_recording) return;
+    try {
+      if (_paused) {
+        await _recorder.resume();
+        if (mounted) setState(() => _paused = false);
+        _startTimer();
+      } else {
+        await _recorder.pause();
+        _recordTimer?.cancel();
+        if (mounted) setState(() => _paused = true);
+      }
+    } catch (e) {
+      debugPrint('[IntroEditor] Pause/Resume fehlgeschlagen: $e');
+    }
+  }
+
+  /// Stoppen -> Review-Sheet (Anhören) -> Senden (Upload).
+  Future<void> _stopRecording() async {
+    if (!_recording) return;
+    // WICHTIG: Die Sekunden VOR dem Reset sichern – vorher stand der
+    // Reset vor der Prüfung, sodass JEDE Aufnahme (auch 40 s) als
+    // "unter 1 Sekunde" verworfen wurde.
+    final seconds = _recordSeconds;
+    _recordTimer?.cancel();
+    _ampSub?.cancel();
+    _ampSub = null;
+    setState(() {
+      _recording = false;
+      _paused = false;
+      _recordSeconds = 0;
+      _uploading = true;
+    });
+    try {
+      final recordedPath = await _recorder.stop();
+      if (recordedPath == null) {
+        setState(() => _uploading = false);
+        return;
+      }
+      final file = File(recordedPath);
+      if (!mounted) {
+        if (await file.exists()) await file.delete();
+        return;
+      }
+
+      // Anhören vor dem Verwenden: Review-Sheet zeigt Player, Länge
+      // und (bei Unterschreitung) die Mindestlänge. Nur bei expliziter
+      // Bestätigung wird hochgeladen.
+      final use = await showAudioReviewSheet(
+        context: context,
+        path: recordedPath,
+        durationSeconds: seconds,
+        minimumSeconds: IntroEditor.minAudioSeconds,
+        confirmLabel: L10n.t(context, 'intro.review.confirm'),
+      );
+      if (use != true) {
+        if (await file.exists()) await file.delete();
+        if (mounted) setState(() => _uploading = false);
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      await file.delete();
+
+      final storage = ref.read(supabaseStorageServiceProvider);
+      final uploadedPath = await storage.uploadIntroAudio(bytes);
+      if (!mounted) return;
+      setState(() {
+        _audioPath = uploadedPath;
+        _uploading = false;
+      });
+      widget.onChanged(_textCtrl.text, _audioPath);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'intro.saved')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      debugPrint('[IntroEditor] Aufnahme fehlgeschlagen: $e');
+      if (mounted) {
+        setState(() => _uploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(L10n.tf(context, 'intro.recordFailed', {'error': '$e'})),
+          ),
+        );
+      }
+    }
+    return;
+  }
+
+  /// Laufende Aufnahme verwerfen (nach Rückfrage).
+  Future<void> _discardRecording() async {
+    final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(L10n.t(ctx, 'intro.discardTitle')),
+            content: Text(L10n.t(ctx, 'intro.discardBody')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(L10n.t(ctx, 'intro.discardKeep')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(L10n.t(ctx, 'intro.discard')),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!discard || !_recording) return;
+    _recordTimer?.cancel();
+    _ampSub?.cancel();
+    _ampSub = null;
+    try {
+      final path = await _recorder.stop();
+      if (path != null) {
+        final f = File(path);
+        if (await f.exists()) await f.delete();
+      }
+    } catch (e) {
+      debugPrint('[IntroEditor] Verwerfen fehlgeschlagen: $e');
+    }
+    if (mounted) {
+      setState(() {
+        _recording = false;
+        _paused = false;
+        _recordSeconds = 0;
+        _levels.clear();
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Gespeicherte Audio-Vorstellung
+  // ---------------------------------------------------------------------
+
   Future<void> _deleteAudio() async {
+    final delete = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(L10n.t(ctx, 'intro.deleteTitle')),
+            content: Text(L10n.t(ctx, 'intro.deleteBody')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(L10n.t(ctx, 'intro.discardKeep')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(L10n.t(ctx, 'intro.delete')),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!delete) return;
     try {
       final storage = ref.read(supabaseStorageServiceProvider);
       await storage.deleteIntroAudio();
@@ -190,8 +327,8 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
       setState(() => _audioPath = null);
       widget.onChanged(_textCtrl.text, null);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Audio-Vorstellung entfernt.'),
+        SnackBar(
+          content: Text(L10n.t(context, 'intro.removed')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -200,23 +337,30 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
     }
   }
 
+  String _fmtSeconds(int s) {
+    final m = s ~/ 60;
+    final sec = (s % 60).toString().padLeft(2, '0');
+    return '$m:$sec';
+  }
+
+  // ---------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Meine Vorstellung',
+          L10n.t(context, 'intro.title'),
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 4),
         Text(
           widget.required
-              ? 'So lernst du andere kennen, bevor ein Foto zu sehen ist. '
-                  'Text UND Audio sind Pflicht.'
-              : 'So lernst du andere kennen, bevor ein Foto zu sehen ist. '
-                  'Du kannst diesen Schritt auch überspringen und alles '
-                  'später ergänzen.',
+              ? L10n.t(context, 'intro.hintRequired')
+              : L10n.t(context, 'intro.hintOptional'),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -232,9 +376,9 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
           scrollPadding: const EdgeInsets.only(bottom: 180),
           decoration: InputDecoration(
             labelText: widget.required
-                ? 'Vorstellung (Text) *'
-                : 'Vorstellung (Text)',
-            hintText: 'z. B. wer du bist und wonach du suchst',
+                ? L10n.t(context, 'intro.textRequired')
+                : L10n.t(context, 'intro.text'),
+            hintText: L10n.t(context, 'intro.textHint'),
           ),
           onChanged: (_) => widget.onChanged(_textCtrl.text, _audioPath),
         ),
@@ -242,73 +386,181 @@ class _IntroEditorState extends ConsumerState<IntroEditor> {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  widget.required ? 'Audio-Vorstellung *' : 'Audio-Vorstellung',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _audioPath != null
-                      ? 'Aufgenommen. Du kannst sie neu aufnehmen oder entfernen.'
-                      : 'Noch keine Audio-Vorstellung hinterlegt.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${IntroEditor.minAudioSeconds} bis '
-                  '${IntroEditor.maxAudioSeconds} '
-                  'Sekunden. Du kannst jede Aufnahme vor dem Speichern anhören.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _uploading ? null : _toggleRecording,
-                        icon: _uploading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2),
-                              )
-                            : Icon(
-                                _recording ? Icons.stop : Icons.mic,
-                                color: _recording ? Colors.red : null,
-                              ),
-                        label: Text(
-                          _recording
-                              ? 'Stopp ($_recordSeconds s)'
-                              : 'Aufnehmen / neu aufnehmen',
-                        ),
-                      ),
-                    ),
-                    if (_audioPath != null) ...[
-                      const SizedBox(width: 12),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            color: Colors.red),
-                        tooltip: 'Audio-Vorstellung entfernen',
-                        onPressed: _uploading ? null : _deleteAudio,
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
+            child: _recording ? _buildRecordingUI() : _buildIdleUI(),
           ),
         ),
       ],
+    );
+  }
+
+  /// UI während der Aufnahme: Live-Dauer, Lautstärke-Balken, Pause/Stop.
+  Widget _buildRecordingUI() {
+    final scheme = Theme.of(context).colorScheme;
+    final liveColor = _paused ? scheme.onSurfaceVariant : scheme.error;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(_paused ? Icons.pause_circle : Icons.radio_button_checked,
+                size: 18, color: _paused ? scheme.onSurfaceVariant : scheme.error),
+            const SizedBox(width: 8),
+            Text(
+              _paused
+                  ? L10n.t(context, 'intro.pausedState')
+                  : L10n.t(context, 'intro.recordingState'),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _paused
+                        ? scheme.onSurfaceVariant
+                        : scheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const Spacer(),
+            Text(
+              _fmtSeconds(_recordSeconds),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Lautstärke-Visualisierung: Balken spiegelbildlich zur Mitte.
+        SizedBox(
+          height: 40,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (var i = 0; i < IntroEditor.ampBarCount; i++)
+                _AmpBar(
+                  level: _levels.length > i
+                      ? _levels[_levels.length - 1 - i]
+                      : 0.0,
+                  color: liveColor,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            IconButton(
+              onPressed: _discardRecording,
+              icon: const Icon(Icons.delete_outline),
+              tooltip: L10n.t(context, 'intro.discard'),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _pauseResume,
+                icon: Icon(_paused ? Icons.play_arrow : Icons.pause),
+                label: Text(_paused
+                    ? L10n.t(context, 'intro.resume')
+                    : L10n.t(context, 'intro.pause')),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _stopRecording,
+                icon: const Icon(Icons.stop),
+                label: Text(L10n.t(context, 'intro.stopListen')),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// UI im Ruhezustand: Aufnehmen / neu aufnehmen + Löschen.
+  Widget _buildIdleUI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          widget.required
+              ? L10n.t(context, 'intro.audioTitleRequired')
+              : L10n.t(context, 'intro.audioTitle'),
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _audioPath != null
+              ? L10n.t(context, 'intro.savedState')
+              : L10n.t(context, 'profile.intro.audioEmpty'),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          L10n.tf(
+            context,
+            'intro.rangeHint',
+            {
+              'min': '${IntroEditor.minAudioSeconds}',
+              'max': '${IntroEditor.maxAudioSeconds}',
+            },
+          ),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _uploading ? null : _startRecording,
+                icon: _uploading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child:
+                            CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.mic),
+                label: Text(
+                  _audioPath != null
+                      ? L10n.t(context, 'intro.rerecord')
+                      : L10n.t(context, 'intro.record'),
+                ),
+              ),
+            ),
+            if (_audioPath != null) ...[
+              const SizedBox(width: 12),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                tooltip: L10n.t(context, 'intro.deleteTooltip'),
+                onPressed: _uploading ? null : _deleteAudio,
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Ein Balken der Lautstärke-Visualisierung (0..1 -> 4..40 px Höhe).
+class _AmpBar extends StatelessWidget {
+  const _AmpBar({required this.level, required this.color});
+
+  final double level;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final h = 4.0 + 36.0 * level.clamp(0.0, 1.0);
+    return Container(
+      width: 3.5,
+      height: h,
+      decoration: BoxDecoration(
+        color: level <= 0.01
+            ? color.withValues(alpha: 0.25)
+            : color.withValues(alpha: 0.35 + 0.65 * level),
+        borderRadius: BorderRadius.circular(2),
+      ),
     );
   }
 }

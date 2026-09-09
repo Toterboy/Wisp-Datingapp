@@ -12,6 +12,7 @@ import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/constants.dart';
 import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
+import 'package:wisp/widgets/interview_bubble.dart';
 
 /// Onboarding als INTERVIEW (v0.9.0): Wisp stellt Fragen - eine pro
 /// Screen, in warmem Ton, alles immer überspringbar. KEINE neuen
@@ -318,66 +319,6 @@ class _ProgressDots extends StatelessWidget {
   }
 }
 
-/// Die Wisp-Interview-Frage: Avatar-Bubble mit warmem Fragetext.
-/// Das optische Kernstück des Interviews (Chat-Optik statt Formular).
-class _InterviewBubble extends StatelessWidget {
-  const _InterviewBubble({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(right: 48),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(4),
-            topRight: Radius.circular(20),
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              child: Text(
-                'W',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                text,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onPrimaryContainer,
-                    ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// statische Informationsseite (Blind Mode / Privatsphäre) - im Interview-
 /// Ton, als Wisp-Bubble statt_INFO-Karte.
 class _InfoPage extends StatelessWidget {
@@ -451,7 +392,7 @@ class _QuestionStep extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          _InterviewBubble(text: L10n.t(context, questionKey)),
+          InterviewBubble(text: L10n.t(context, questionKey)),
           const SizedBox(height: 20),
           Expanded(
             child: Scrollbar(
@@ -526,7 +467,7 @@ class _InterestsStepState extends State<_InterestsStep> {
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          _InterviewBubble(text: L10n.t(context, widget.questionKey)),
+          InterviewBubble(text: L10n.t(context, widget.questionKey)),
           const SizedBox(height: 16),
           Expanded(
             child: Scrollbar(

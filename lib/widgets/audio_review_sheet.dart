@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
+import 'package:wisp/l10n/app_strings.dart';
+
 /// Zeigt eine aufgezeichnete Audio-Datei zum ANHÖREN an, bevor sie
-/// gesendet/verwendet wird.
+/// gesendet/verwendet wird ("Anhören" vor "Senden").
 ///
 /// Liefert `true`, wenn der Nutzer "Senden"/"Verwenden" bestätigt hat,
 /// `false`/`null` bei "Verwerfen" oder Abbruch. Die Datei selbst wird
@@ -13,7 +15,7 @@ Future<bool?> showAudioReviewSheet({
   required String path,
   required int durationSeconds,
   int minimumSeconds = 1,
-  String confirmLabel = 'Senden',
+  String? confirmLabel,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -38,7 +40,7 @@ class _AudioReviewSheet extends StatefulWidget {
   final String path;
   final int durationSeconds;
   final int minimumSeconds;
-  final String confirmLabel;
+  final String? confirmLabel;
 
   @override
   State<_AudioReviewSheet> createState() => _AudioReviewSheetState();
@@ -76,10 +78,9 @@ class _AudioReviewSheetState extends State<_AudioReviewSheet> {
         }
       });
     } catch (e) {
+      debugPrint('[AudioReviewSheet] Vorschau nicht abspielbar: $e');
       if (mounted) {
-        setState(() =>
-            _loadError = 'Vorschau nicht abspielbar ($e). Du kannst die '
-                'Aufnahme trotzdem verwenden oder verwerfen.');
+        setState(() => _loadError = L10n.t(context, 'intro.review.loadError'));
       }
     }
   }
@@ -104,6 +105,16 @@ class _AudioReviewSheetState extends State<_AudioReviewSheet> {
     final progress = total.inMilliseconds > 0
         ? _position.inMilliseconds / total.inMilliseconds
         : 0.0;
+    final scheme = Theme.of(context).colorScheme;
+
+    final lengthText = tooShort
+        ? L10n.tf(context, 'intro.review.lengthMin', {
+            'length': _fmt(Duration(seconds: widget.durationSeconds)),
+            'min': '${widget.minimumSeconds}',
+          })
+        : L10n.tf(context, 'intro.review.length', {
+            'length': _fmt(Duration(seconds: widget.durationSeconds)),
+          });
 
     return SafeArea(
       child: Padding(
@@ -113,18 +124,15 @@ class _AudioReviewSheetState extends State<_AudioReviewSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Aufnahme prüfen',
+              L10n.t(context, 'intro.review.title'),
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
-              'Länge: ${_fmt(Duration(seconds: widget.durationSeconds))}'
-              '${widget.minimumSeconds > 1 ? ' (mindestens ${widget.minimumSeconds} s)' : ''}',
+              lengthText,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: tooShort
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: tooShort ? scheme.error : scheme.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -133,7 +141,7 @@ class _AudioReviewSheetState extends State<_AudioReviewSheet> {
               Text(
                 _loadError!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
+                      color: scheme.error,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -152,7 +160,9 @@ class _AudioReviewSheetState extends State<_AudioReviewSheet> {
                           }
                         },
                   icon: Icon(_playing ? Icons.pause : Icons.play_arrow),
-                  tooltip: _playing ? 'Pause' : 'Anhören',
+                  tooltip: _playing
+                      ? L10n.t(context, 'intro.review.pause')
+                      : L10n.t(context, 'intro.review.listen'),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -175,10 +185,10 @@ class _AudioReviewSheetState extends State<_AudioReviewSheet> {
             const SizedBox(height: 24),
             if (tooShort) ...[
               Text(
-                'Die Aufnahme ist zu kurz (mindestens '
-                '${widget.minimumSeconds} Sekunden). Bitte nimm sie neu auf.',
+                L10n.tf(context, 'intro.review.tooShort',
+                    {'min': '${widget.minimumSeconds}'}),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
+                      color: scheme.error,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -186,19 +196,20 @@ class _AudioReviewSheetState extends State<_AudioReviewSheet> {
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).pop(false),
                 icon: const Icon(Icons.refresh),
-                label: const Text('Neu aufnehmen'),
+                label: Text(L10n.t(context, 'intro.review.rerecord')),
               ),
             ] else ...[
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).pop(true),
                 icon: const Icon(Icons.check),
-                label: Text(widget.confirmLabel),
+                label: Text(widget.confirmLabel ??
+                    L10n.t(context, 'intro.review.send')),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).pop(false),
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Verwerfen'),
+                label: Text(L10n.t(context, 'intro.review.discard')),
               ),
             ],
           ],

@@ -4,13 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisp/models/find_match_models.dart';
+import 'package:wisp/models/match.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/find_your_match_service.dart';
-import 'package:wisp/utils/formatters.dart';
 import 'package:wisp/widgets/funke_overlay.dart';
-import 'package:wisp/widgets/funke_streak.dart';
 import 'package:wisp/widgets/intro_audio_player.dart';
 import 'package:wisp/widgets/states.dart';
 import 'package:wisp/l10n/app_strings.dart';
@@ -239,7 +238,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
           content: Text(
             accept
                 ? 'Ein Funke mit ${like.profile.name} ist entstanden! '
-                    'Das Kennenlern-Quiz wartet auf euch.'
+                    'Ihr könnt direkt chatten.'
                 : 'Like von ${like.profile.name} abgelehnt.',
           ),
           behavior: SnackBarBehavior.floating,
@@ -455,6 +454,48 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
     }
   }
 
+  /// Gespeichertes Profil (persistenter QR-Kontakt) entfernen - mit
+  /// Bestätigung, da der zugehörige Chat/Verlauf mit verloren geht.
+  Future<void> _deleteSavedProfile(
+    BuildContext context,
+    WidgetRef ref,
+    Match contact,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Gespeichertes Profil entfernen?'),
+        content: Text(
+          '${contact.partner.name} wird lokal gelöscht. Der zugehörige '
+          'Chat-Verlauf geht damit verloren.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Behalten'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Entfernen'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !ref.context.mounted) return;
+    ref.read(chatProvider.notifier).deleteQrContact(contact.id);
+    if (ref.context.mounted) {
+      ScaffoldMessenger.of(ref.context).showSnackBar(
+        SnackBar(
+          content: Text('${contact.partner.name} wurde entfernt.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // QR-Kontakte sind nur lokal gespeichert (kein DB-Match).
@@ -522,18 +563,32 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
           ],
           if (qrContacts.isNotEmpty) ...[
             const _SectionHeader(
-              icon: Icons.qr_code_2,
-              title: 'Kontakte',
-              subtitle: 'Per QR Code verbunden',
+              icon: Icons.bookmark,
+              title: 'Gespeicherte Profile',
+              subtitle:
+                  'Lokal gespeichert (max. 5) - zum Nachschreiben, wenn du '
+                  'unterwegs kein Internet hattest',
             ),
             ...qrContacts.map((m) => ListTile(
                   leading: const CircleAvatar(
                     child: Icon(Icons.person),
                   ),
                   title: Text('${m.partner.name}, ${m.partner.age}'),
-                  trailing: m.unreadCount > 0
-                      ? Badge.count(count: m.unreadCount)
-                      : Text(Formatters.relative(m.matchedAt)),
+                  subtitle: const Text('Gespeichert - später anschreiben'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (m.unreadCount > 0)
+                        Badge.count(count: m.unreadCount),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            color: Colors.red),
+                        tooltip: 'Gespeichertes Profil entfernen',
+                        onPressed: () =>
+                            _deleteSavedProfile(context, ref, m),
+                      ),
+                    ],
+                  ),
                   onTap: () {
                     ref.read(chatProvider.notifier).markRead(m.id);
                     context.go(AppRoutes.chatDetailPath(m.id));
@@ -559,13 +614,12 @@ subtitle: L10n.t(context, 'interests.matchesSub'),
               }
               return _MatchTile(
                 match: m,
-                onTap: () {
-                  if (m.quizGated) {
-                    context.go(AppRoutes.quizPath(m.matchId));
-                  } else {
-                    context.go(AppRoutes.chatDetailPath(m.matchId.toString()));
-                  }
-                },
+                // v0.9.0-Feedback: "Auf die Person klicken -> kommt direkt
+                // das Kennenlern-Quiz" - jetzt öffnet die Kachel IMMER den
+                // Chat; das Quiz ist als Button im Chat erreichbar (es
+                // schaltet nur das Foto frei).
+                onTap: () =>
+                    context.go(AppRoutes.chatDetailPath(m.matchId.toString())),
               );
             }),
           ],
@@ -583,10 +637,8 @@ subtitle: L10n.t(context, 'interests.matchesSub'),
             ),
             ...cooledMatches.map((m) => _CooledMatchTile(
                   match: m,
-                  onOpen: m.quizGated
-                      ? () => context.go(AppRoutes.quizPath(m.matchId))
-                      : () =>
-                          context.go(AppRoutes.chatDetailPath(m.matchId.toString())),
+                  onOpen: () =>
+                      context.go(AppRoutes.chatDetailPath(m.matchId.toString())),
                   onRespark: () => _respark(m),
                 )),
           ],
@@ -698,15 +750,14 @@ class _MatchTile extends StatelessWidget {
                 if (p.distanceKm > 0) p.distanceLabel,
               ].join(' · ')),
             ),
-            if (match.createdAt != null)
-              FunkeStreak(compact: true, createdAt: match.createdAt!),
+            // KEINE Streaks/Flammen-Zählung (v0.9.0-Feedback).
           ],
         ),
         subtitle: Text(
           match.quizPassed
               ? 'Foto freigeschaltet'
               : match.createdVia == 'find_match'
-                  ? 'Quiz offen: ${match.unlockLevel}/2'
+                  ? 'Foto-Freischaltung: Kennenlern-Quiz'
                   : p.bio.isNotEmpty
                       ? p.bio
                       : 'Keine Bio',
@@ -714,7 +765,7 @@ class _MatchTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         trailing: match.quizGated
-            ? const Icon(Icons.lock_outline)
+            ? const Icon(Icons.photo_outlined)
             : const Icon(Icons.chat_bubble_outline),
       ),
     );
