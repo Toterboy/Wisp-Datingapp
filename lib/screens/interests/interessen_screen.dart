@@ -53,8 +53,8 @@ class _InteressenScreenState extends ConsumerState<InteressenScreen>
           // Abgerundete Klick-Animation (kein eckiger Aufblitzer).
           splashBorderRadius: const BorderRadius.all(Radius.circular(24)),
           tabs: const [
-            Tab(text: 'Eigene Likes'),
-            Tab(text: 'Erhaltene Likes'),
+            Tab(text: 'Gesendet'),
+            Tab(text: 'Erhalten'),
             Tab(text: 'Funken'),
           ],
         ),

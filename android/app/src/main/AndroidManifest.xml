@@ -5,6 +5,14 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Legacy-BT fuer Android 11 und aelter (Scan/Advertise brauchen
+         dort BLUETOOTH_ADMIN + Standort; maxSdkVersion begrenzt sauber) -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
     <!-- Benachrichtigungen (Android 13+ Runtime-Permission wird in
          NotificationService.initialize() angefragt). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

@@ -376,18 +376,31 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Bild senden'),
         content: Text(L10n.t(context, 'chat.imageSourcePrompt')),
+        // v0.9.0-Feedback: Buttons volle Breite, untereinander,
+        // Abbrechen ganz unten (vorher quetschten sie sich in eine Reihe).
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Abbrechen'),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(ctx).pop('camera'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: const Text('Kamera'),
           ),
+          const SizedBox(height: 8),
           FilledButton.tonal(
             onPressed: () => Navigator.of(ctx).pop('gallery'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
             child: const Text('Galerie'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop('camera'),
-            child: const Text('Kamera'),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            style: TextButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+            ),
+            child: const Text('Abbrechen'),
           ),
         ],
       ),
