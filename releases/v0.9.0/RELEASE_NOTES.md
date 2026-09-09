@@ -14,7 +14,22 @@ Entdecken-Neuaufbau.
   Match-Pipeline: Chat, Quiz, Freischaltung).
   - 45-Minuten-Fenster (asynchron – auch Stunden später funken), Token-
     Rotation alle 10 Minuten, Radar-Stop jederzeit, Daten-Aufräumung
-  - **Modus-Wahl**: „Bahn/Café“ vs. „Messe/Event“ – im Messe-Modus zählen
+  - **Modus-Wahl nach Reichweite**: „Normal“ (Begegnungen im Vorbeigehen –
+    Straße, Zug, Café, auch als Fußgänger) vs. „Nur direkt daneben“ (volle
+    Messen/Events, nur starke Signale)
+- **15 Aussehen-Merkmale** (T-Shirt, Pullover, kurze/lange Hose,
+    sportliche Kleidung u. a.) mit optionaler Farbwahl (überspringbar)
+- **Tägliche Selbst-Angaben** beim Radar-Start (1–3 Merkmale zu dir
+    selbst) – andere finden dich darüber; das Matching prüft, dass
+    bemerkte Merkmale die Selbstdarstellung des anderen treffen
+- **Bluetooth-Prompt** direkt aus der App; **2FA-Einfügen-Button**
+    (Zwischenablage) beim Sicherheitscode
+- **Suchradius-Modus** (km / Bundesland / Ganz Deutschland) wird jetzt
+    serverseitig gespeichert – Fix für den „Radius-weg nach
+    Neuinstallation“-Bug (Migration 085)
+- **Diagnose**: Signal-Fehler zeigen die Ursache im Snackbar; Signale
+    senden mit Fallback-Kette unabhängig vom Server-Migrationsstand
+- **Modus-Wahl**: „Bahn/Café“ vs. „Messe/Event“ – im Messe-Modus zählen
     nur starke BLE-Signale (echter Sichtkontakt in dichten Umgebungen)
   - **Merkmal-Tags**: „Blicke getauscht“ öffnet eine Auswahl (1–3
     Merkmale, z. B. schwarzer Hoodie, Lanyard) – gematcht wird nur bei
