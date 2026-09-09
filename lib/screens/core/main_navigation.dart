@@ -55,6 +55,9 @@ class MainNavigation extends ConsumerWidget {
   static const _hideBottomNavRoutes = {
     AppRoutes.personalityTest,
     AppRoutes.emailVerification,
+    // Chat (v0.9.0-Feedback): Im Chat sollen die Reiter unten nicht mehr
+    // sichtbar sein - das Gespraech hat den vollen Bildschirm.
+    AppRoutes.chatDetail,
   };
 
   int _index(String location) {
