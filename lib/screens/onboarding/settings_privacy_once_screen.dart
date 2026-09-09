@@ -32,6 +32,7 @@ import 'package:wisp/widgets/buttons.dart';
 import 'package:wisp/widgets/gender_preference_selector.dart';
 import 'package:wisp/widgets/habitude_selector.dart';
 import 'package:wisp/widgets/intro_editor.dart';
+import 'package:wisp/widgets/interview_bubble.dart';
 import 'package:wisp/widgets/selectable_tile.dart';
 import 'package:wisp/widgets/theme_picker.dart';
 
@@ -296,9 +297,8 @@ class _SettingsPrivacyOnceScreenState
       if (!mounted) return;
       setState(() => _passkeyCreated = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Passkey eingerichtet. Du kannst dich künftig damit '
-              'anmelden.'),
+        SnackBar(
+          content: Text(L10n.t(context, 'setup.passkeyDone')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -306,9 +306,8 @@ class _SettingsPrivacyOnceScreenState
       debugPrint('[SettingsPrivacyOnce] Passkey-Setup fehlgeschlagen: $e');
       // Nur die bereinigte Meldung zeigen - keine Plugin-/WebAuthn-Interna.
       final msg = e is AppException
-          ? e.message
-          : 'Passkey-Setup fehlgeschlagen oder abgebrochen. Du kannst es '
-              'später jederzeit in den Einstellungen nachholen.';
+          ? L10n.exc(context, e)
+          : L10n.t(context, 'setup.passkeySetupFailed');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -408,25 +407,20 @@ class _SettingsPrivacyOnceScreenState
       builder: (ctx) => AlertDialog(
         icon: Icon(Icons.shield_outlined,
             color: Theme.of(ctx).colorScheme.primary, size: 40),
-        title: const Text('Dringend empfohlen'),
-        content: const Text(
-          'Sichere dein Konto jetzt mit einem Passkey oder der '
-          'Zwei-Faktor-Authentisierung. Ohne zweiten Faktor kann jeder '
-          'mit deinem Passwort dein Konto übernehmen. Bei einer '
-          'Dating-App besonders heikel.',
-        ),
+        title: Text(L10n.t(ctx, 'setup.nudgeTitle')),
+        content: Text(L10n.t(ctx, 'setup.nudgeBody')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop('skip'),
-            child: const Text('Trotzdem fortfahren'),
+            child: Text(L10n.t(ctx, 'setup.nudgeSkip')),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop('mfa'),
-            child: const Text('2FA einrichten'),
+            child: Text(L10n.t(ctx, 'setup.nudgeMfa')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop('passkey'),
-            child: const Text('Passkey einrichten'),
+            child: Text(L10n.t(ctx, 'setup.nudgePasskey')),
           ),
         ],
       ),
@@ -683,7 +677,7 @@ class _SettingsPrivacyOnceScreenState
                   children: [
                     // Page 1: Privatsphäre & Theme
                     _Page(
-                      title: L10n.t(context, 'onb.page1.title'),
+                      questionKey: 'setupq.visibility',
                       subtitle:
                           'Wer darf dein Profil sehen? Wie soll die App aussehen?',
                       child: Column(
@@ -759,10 +753,10 @@ class _SettingsPrivacyOnceScreenState
                         ],
                       ),
                     ),
-                     // Page 3: Filter & Präferenzen
-                     _Page(
-                       title: L10n.t(context, 'setup.filterTitle'),
-                       subtitle: L10n.t(context, 'setup.filterSub'),
+                      // Page 3: Filter & Präferenzen
+                      _Page(
+                        questionKey: 'setupq.filter',
+                        subtitle: L10n.t(context, 'setup.filterSub'),
                        child: Column(
                          crossAxisAlignment: CrossAxisAlignment.start,
                          children: [
@@ -1021,7 +1015,7 @@ class _SettingsPrivacyOnceScreenState
                     ),
                     // Page 3: Profil & Interessen (Bio, Bundesland, Bild)
                     _Page(
-                      title: L10n.t(context, 'onb.page2.title'),
+                      questionKey: 'setupq.profile',
                       subtitle:
                           'Ein Bild, ein paar Worte über dich und deine '
                           'Interessen helfen anderen, dich kennenzulernen. '
@@ -1132,7 +1126,7 @@ class _SettingsPrivacyOnceScreenState
                     ),
                     // Page 4: Deine Vorstellung (Text + Audio, überspringbar)
                     _Page(
-                      title: 'Deine Vorstellung',
+                      questionKey: 'setupq.intro',
                       subtitle:
                           'Erzähl von dir, als Text und gesprochen. Beides '
                           'wird anderen gezeigt, bevor sie dein Foto sehen. '
@@ -1151,7 +1145,7 @@ class _SettingsPrivacyOnceScreenState
                     ),
                     // Page 5: Gewohnheiten (Rauchen, Alkohol, Drogen)
                     _Page(
-                      title: 'Gewohnheiten',
+                      questionKey: 'setupq.habits',
                       subtitle: 'Wie stehst du zu Rauchen, Alkohol und Drogen? '
                           'Diese Angaben beeinflussen, wen du bei '
                           '"Find your Match" siehst.',
@@ -1189,7 +1183,7 @@ class _SettingsPrivacyOnceScreenState
                     ),
                     // Page 4: Passkey (überspringbar)
                     _Page(
-                      title: 'Passkey einrichten (dringend empfohlen)',
+                      questionKey: 'setupq.passkey',
                       subtitle:
                           'Melde dich künftig ohne Passwort an, per '
                           'Fingerabdruck oder Gesicht. Optional, du kannst '
@@ -1239,7 +1233,7 @@ class _SettingsPrivacyOnceScreenState
                     ),
                     // Page 5: Zwei-Faktor-Schutz (überspringbar)
                     _Page(
-                      title: 'Konto absichern',
+                      questionKey: 'setupq.mfa',
                       subtitle:
                           'Melde dich künftig zusätzlich mit einem Code aus '
                           'einer Authenticator-App an. Optional, du kannst '
@@ -1300,7 +1294,7 @@ class _SettingsPrivacyOnceScreenState
                     ),
                     // Page 8: Community Richtlinien
                     _Page(
-                      title: 'Community Richtlinien',
+                      questionKey: 'setupq.guidelines',
                       subtitle:
                           'Bitte akzeptiere die Regeln der App, um fortzufahren.',
                       child: _buildCommunityGuidelines(context),
@@ -1422,12 +1416,13 @@ class _RuleItem extends StatelessWidget {
 
 class _Page extends StatelessWidget {
   const _Page({
-    required this.title,
+    required this.questionKey,
     required this.subtitle,
     required this.child,
   });
 
-  final String title;
+  /// Interview-Frage als L10n-Key (Wisp-Bubble statt Formular-Überschrift).
+  final String questionKey;
   final String subtitle;
   final Widget child;
 
@@ -1442,10 +1437,18 @@ class _Page extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 24),
+            // Interview-Stil: Wisp stellt die Frage (Chat-Optik).
+            InterviewBubble(text: L10n.t(context, questionKey)),
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+            const SizedBox(height: 16),
             Expanded(
               child: Scrollbar(
                 child: SingleChildScrollView(
@@ -1463,7 +1466,7 @@ class _Page extends StatelessWidget {
        ),
      );
    }
-}
+ }
 
 /// Dezent gestylter Hinweis-/Fehlerkasten fuer Standort-Meldungen
 /// (statt roher roter Einzeilen-Texte).

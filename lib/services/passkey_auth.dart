@@ -147,26 +147,38 @@ class PasskeyAuth {
   ///  - NotAllowedError: Abbruch/Timeout oder kein Sperrbildschirm aktiv
   ///  - SecurityError: RP-ID/Domain-Verknüpfung (assetlinks.json) passt nicht
   ///  - InvalidStateError: Auf diesem Gerät existiert bereits ein Passkey
+  ///
+  /// Jede Meldung bekommt zusätzlich einen L10n-Key ([AppException.messageKey])
+  /// mit - Services haben keinen BuildContext, die Anzeige-Stellen lokalisieren
+  /// deshalb über [L10n.exc] (Fallschlüssel: die deutsche Message).
   static AppException _explain(Object e, {required bool login}) {
     final action = login ? 'Anmeldung' : 'Einrichtung';
+    final k = 'passkey.err.';
     // Plugin-Fehler kommen teils als PlatformException, teils als generisches
     // FlutterError - daher String-basiert auf den Fehlertyp prüfen.
     final text = e.toString();
 
     if (text.contains('cancelled') ||
         text.toLowerCase().contains('cancellationexception')) {
-      return AppException('Passkey-$action abgebrochen.');
+      return AppException(
+        'Passkey-$action abgebrochen.',
+        messageKey: login
+            ? '${k}cancelledLogin'
+            : '${k}cancelledRegister',
+      );
     }
     if (text.contains('NotAllowedError')) {
       return AppException(
         'Passkey-$action wurde abgebrochen oder ist abgelaufen. '
         'Vergewissere dich, dass dein Gerät einen Sperrbildschirm '
         '(PIN, Muster oder Biometrie) hat, und versuche es erneut.',
+        messageKey: login ? '${k}notAllowedLogin' : '${k}notAllowedRegister',
       );
     }
     if (text.contains('InvalidStateError')) {
       return AppException(
         'Auf diesem Gerät existiert bereits ein Passkey für dieses Konto.',
+        messageKey: '${k}invalidState',
       );
     }
     if (text.contains('SecurityError')) {
@@ -174,6 +186,7 @@ class PasskeyAuth {
         'Die App konnte ihre Domain-Zugehörigkeit nicht nachweisen '
         '(Passkey-Domain-Verknüpfung). Prüfe, ob die neueste App-Version '
         'installiert ist, und melde es dem Support, falls es bleibt.',
+        messageKey: '${k}securityError',
       );
     }
     if (text.contains('android-sync-account-not-available')) {
@@ -181,12 +194,14 @@ class PasskeyAuth {
         'Der Passkey konnte nicht verschlüsselt gespeichert werden. '
         'Stelle sicher, dass du auf dem Gerät mit einem Google-Konto '
         'angemeldet bist und die Google Play Services aktuell sind.',
+        messageKey: '${k}syncAccount',
       );
     }
     if (text.contains('android-timeout')) {
       return AppException(
         'Zeitüberschreitung beim Passkey-$action. Bitte versuche es '
         'gleichzeitig am Bildschirm erneut.',
+        messageKey: login ? '${k}timeoutLogin' : '${k}timeoutRegister',
       );
     }
     if (text.contains('no_credential') || text.contains('NoCredential')) {
@@ -196,6 +211,7 @@ class PasskeyAuth {
                 'unter Einstellungen ein.'
             : 'Kein Passkey-Speicher verfügbar. Prüfe Sperrbildschirm und '
                 'Google Play Services.',
+        messageKey: login ? '${k}noCredentialLogin' : '${k}noCredentialRegister',
       );
     }
 
@@ -207,6 +223,7 @@ class PasskeyAuth {
       return AppException(
         'Der Sicherheitscheck fehlte oder ist abgelaufen. '
         'Bitte versuche es erneut.',
+        messageKey: '${k}captcha',
       );
     }
     // GoTrue lehnt ab, NACHDEM die native Zeremonie lief: Die WebAuthn-
@@ -224,6 +241,7 @@ class PasskeyAuth {
         'Passkey-Konfiguration des Servers - siehe '
         'docs/PASSKEYS_SERVER_SETUP.md. Alternativ: alten Passkey unter '
         '"Passkeys verwalten" löschen und erneut anlegen.',
+        messageKey: '${k}verificationFailed',
       );
     }
     final isAuthApiError = text.contains('AuthApiException') ||
@@ -239,6 +257,8 @@ class PasskeyAuth {
         'Der Server hat die Passkey-Anfrage abgelehnt. Bitte prüfe in den '
         'Supabase-Einstellungen, ob "Passkeys" aktiviert ist und die '
         'RP-ID auf auth.wispdating.de gesetzt ist.$reason',
+        messageKey: '${k}serverRejected',
+        params: {'reason': reason},
       );
     }
 
@@ -248,6 +268,7 @@ class PasskeyAuth {
     debugPrint('[PasskeyAuth] $action fehlgeschlagen: $e');
     return AppException(
       'Passkey-$action fehlgeschlagen. Bitte versuche es später erneut.',
+      messageKey: login ? '${k}unknownLogin' : '${k}unknownRegister',
     );
   }
 

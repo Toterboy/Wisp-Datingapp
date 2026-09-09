@@ -381,11 +381,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (mounted) {
         final message = e is AppException
-            ? e.message
+            ? L10n.exc(context, e)
             : (e.toString().toLowerCase().contains('cancel')
-                ? 'Passkey-Anmeldung abgebrochen.'
-                : 'Passkey-Anmeldung fehlgeschlagen. Bitte versuche es mit '
-                    'E-Mail und Passwort.');
+                ? L10n.t(context, 'auth.passkeyCancelled')
+                : L10n.t(context, 'auth.passkeyFailed'));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
         );

@@ -7,6 +7,68 @@ und folgt der [Semantic Versioning Specification (SemVer)](https://semver.org/la
 Solange die Versionsnummer mit `0.` beginnt (Initial Development Phase nach SemVer §4),
 können sich Schnittstellen und Verhalten jederzeit ändern.
 
+## [Unreleased] – v0.9.0-Nachträge
+
+Server: Migration **086** einspielen + Edge Functions `notify-user`
+erneut deployen.
+
+### Behoben
+
+- **QR-Scan öffnete nur ein „Fenster" statt des Chats**: Der Scanner
+  navigierte zur PARTNER-ID (`/chat/<peerId>`), der Chat-Screen suchte
+  aber nach der lokal generierten MATCH-ID → „Dieser Chat existiert
+  nicht mehr". Jetzt wird mit der Match-ID navigiert
+  (`findOrCreateMatch` liefert das Match), Regressionstests ergänzt.
+- **QR-Kontakt hieß „Unbekannt"**: Nach dem Scan wird das echte
+  Profil (Name, Alter, Interessen, Vorstellung) via
+  `get_public_profile` geladen und der lokale Kontakt befüllt - auch
+  nachträglich im Chat-Screen (Fallback, falls der Scan offline war).
+- **Empfangender Like konnte die Vorstellung nicht anhören**: Der
+  Chat zeigt jetzt eine Vorstellungs-Karte (Text + Audio-Player) für
+  BEIDE Seiten; im „Erhalten"-Tab bleibt der Player (solange das
+  Profil eine Audio-Vorstellung hat).
+
+### Geändert
+
+- **KEINE Streaks**: Flamme mit Tageszähler („Funke-Streak") aus Chat-
+  AppBar und Funken-Liste entfernt, Widget gelöscht.
+- **Chat zuerst, Quiz später**: Match-Kacheln im Funken-Tab öffnen
+  IMMER den Chat (vorher direkt das Quiz); das Quiz-Gate blockiert
+  Text/Bild/Sprachnachricht/Anruf nicht mehr - es schaltet
+  ausschließlich das Profilfoto frei (weiterhin serverseitig
+  erzwungen via match-media). Banner im Chat verweist aufs Quiz.
+- **P2P-Fehler entschärft**: Wenn die andere Seite (noch) nicht im
+  Chat ist, erscheint keine rote Fehlermeldung mehr - der orange
+  E2E-Badge zeigt „Verbindung wird aufgebaut".
+- **Push bei erhaltenem Like** (QR-Scan): `notify-user` unterstützt
+  das Kind `likes` (fixer Server-Text, Like-Beziehungsprüfung,
+  Einzel-Schalter `notify_likes` respektiert).
+
+### Neu
+
+- **Personalisierte Quiz-Fragen (Migration 086)**: `start_quiz_attempt`
+  zieht bevorzugt Fragen aus dem PARTNER-Profil - „Welches dieser
+  Interessen gehört zu <Name>?" und „Wie alt ist <Name>?" -
+  deterministisch aus (Match, Versuchszahl) generiert, damit BEIDE
+  dieselbe Frage bekommen; korrekte Antwort bleibt serverseitig,
+  Optionen werden wie bisher per Match gemischt. Fällt nichts an,
+  greift der generische Pool (075).
+- **Neues Design für Sprachnachrichten im Chat**: Play/Pause-Knopf,
+  Wellenform (deterministische Balken aus der Message-ID - beide
+  Seiten sehen dieselbe Form), Fortschritt-Färbung und Dauer; nach
+  dem Anhören wird die entschlüsselte Datei gelöscht (M-17) und der
+  Zustand „angehört" verständlich angezeigt.
+- **Gespeicherte Profile (max. 5, lokal)**: QR-Kontakte sind jetzt
+  PERSISTENT (AES-256-verschlüsselt, SecureHive) - gescannte Profile
+  überleben den App-Neustart, damit man sie später anschreiben kann,
+  wenn man unterwegs kein Internet hatte. Maximum 5 (kein stilles
+  Verdrängen: beim Scan öffnet ein Auswahl-Dialog zum Löschen),
+  einzeln löschbar (Funken-Tab „Gespeicherte Profile" + Lesezeichen-
+  Aktion im Profil-Detail). Profil-Updates (Name/Vorstellung nach dem
+  Online-Fetch) werden sofort persistiert; offline gescannte Kontakte
+  bleiben „Unbekannt" und laden ihren Namen automatisch, sobald
+  wieder Internet da ist.
+
 ## [0.9.0] – Beta – 2026-09-08
 
 Server: Migrationen **080, 081, 082** einspielen (Reihenfolge).

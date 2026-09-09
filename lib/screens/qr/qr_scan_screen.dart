@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/find_your_match_service.dart';
+import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/peer_id.dart';
 
@@ -40,7 +43,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
     super.dispose();
   }
 
-  void _onUserFound(String peerId) async {
+  Future<void> _onUserFound(String peerId) async {
     final myId = ref.read(profileProvider).id;
     if (myId.isEmpty) {
       // Eigenes Profil noch nicht geladen: Supabase-ID verwenden.
@@ -60,13 +63,41 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
     }
 
     final notifier = ref.read(chatProvider.notifier);
-    final profile = notifier.findOrCreateMatch(peerId);
 
-    // v0.9.0-Feedback ('gescannt und kein Funke'): Der QR-Kontakt fuehrt
-    // zum Chat, aber es fehlte die Server-Pipeline - jetzt legen wir
-    // zusaetzlich einen Like an, damit die Verbindung im Funken-Feed
+    // Echtes Profil holen, BEVOR der Kontakt angelegt wird - offline
+    // bleibt der Platzhalter ("Unbekannt") und der Kontakt wird trotzdem
+    // LOKAL gespeichert (max. 5), um später anzuschreiben.
+    UserProfile? real;
+    if (SupabaseService.isInitialized) {
+      try {
+        final db = ref.read(supabaseDatabaseServiceProvider);
+        final row = await db.fetchPublicProfile(peerId);
+        if (row != null) {
+          real = UserProfile.fromPublicView(
+            Map<String, dynamic>.from(row as Map),
+          );
+        }
+      } catch (e) {
+        debugPrint('[QR] Profil-Fetch fehlgeschlagen (offline?): $e');
+      }
+    }
+
+    final match = notifier.findOrCreateMatch(peerId);
+    if (match == null) {
+      // Maximum erreicht: kein stilles Verdrängen - der Nutzer wählt,
+      // welchen gespeicherten Kontakt er stattdessen löscht.
+      if (mounted) {
+        await _showQrLimitDialog();
+      }
+      return;
+    }
+    if (real != null) {
+      notifier.updatePartner(match.id, real);
+    }
+
+    // Server-Pipeline: Like anlegen, damit die Verbindung im Funken-Feed
     // sichtbar ist (Blockier-/Jugendschutz greift serverseitig).
-    if (SupabaseService.isInitialized && profile != null) {
+    if (SupabaseService.isInitialized) {
       try {
         await ref
             .read(findYourMatchServiceProvider)
@@ -74,26 +105,110 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
       } catch (e) {
         debugPrint('[QR] Like fehlgeschlagen (Chat bleibt aktiv): $e');
       }
+
+      // v0.9.0-Feedback ("auf dem anderen Gerät passiert gar nichts"):
+      // Push an die gescannte Person - sie sieht den Like dann sofort in
+      // "Erhalten". Nur Metadaten, serverseitig generierter Text
+      // (notify-user prüft Like-Beziehung + Einzel-Schalter).
+      try {
+        await SupabaseService.client.functions.invoke(
+          'notify-user',
+          body: {
+            'kind': 'likes',
+            'target_user_id': peerId,
+          },
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[QR] Like-Push fehlgeschlagen: $e');
+        }
+      }
     }
 
     if (!mounted) return;
 
-    if (profile != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(L10n.tf(context, 'qr.openingChat', {'name': profile.name})),
-          behavior: SnackBarBehavior.floating,
+    final updated =
+        ref.read(chatProvider.notifier).getMatchById(match.id) ?? match;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(L10n.tf(
+            context, 'qr.openingChat', {'name': updated.partner.name})),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    // WICHTIG: Mit der MATCH-ID navigieren, nicht mit der Partner-ID -
+    // die Match-ID ist lokal generiert und die Chat-Route erwartet sie.
+    context.go(AppRoutes.chatDetailPath(match.id));
+  }
+
+  /// Maximum (5) erreicht: Der Nutzer wählt im Dialog, welchen
+  /// gespeicherten Kontakt er löscht - danach kann er neu scannen.
+  Future<void> _showQrLimitDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L10n.t(ctx, 'qr.limitTitle')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(L10n.t(ctx, 'qr.limitBody')),
+              const SizedBox(height: 8),
+              Consumer(
+                builder: (ctx, ref, _) {
+                  final qrContacts = ref
+                      .watch(chatProvider)
+                      .where((m) => m.isQrContact)
+                      .toList();
+                  return SizedBox(
+                    height: 240,
+                    child: qrContacts.isEmpty
+                        ? Center(
+                            child: Text(L10n.t(ctx, 'qr.limitEmpty')),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: qrContacts.length,
+                            itemBuilder: (context, i) {
+                              final m = qrContacts[i];
+                              return ListTile(
+                                leading: const CircleAvatar(
+                                  child: Icon(Icons.person),
+                                ),
+                                title: Text(
+                                  m.partner.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete_outline,
+                                      color: Colors.red),
+                                  tooltip:
+                                      L10n.t(ctx, 'qr.savedDeleteTooltip'),
+                                  onPressed: () {
+                                    ref
+                                        .read(chatProvider.notifier)
+                                        .deleteQrContact(m.id);
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
-      );
-      context.go(AppRoutes.chatDetailPath(profile.id));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nutzer nicht gefunden.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(L10n.t(ctx, 'common.close')),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Löst den eingegebenen Kurz-Code serverseitig in eine User-ID auf.

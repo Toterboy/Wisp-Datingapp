@@ -831,22 +831,20 @@ class _PasskeyTileState extends ConsumerState<_PasskeyTile> {
           builder: (ctx) => AlertDialog(
             icon: Icon(Icons.fingerprint,
                 color: Theme.of(ctx).colorScheme.primary, size: 36),
-            title: const Text('Passkey existiert bereits'),
-            content: Text(
-              'Auf deinem Konto sind bereits $existing Passkey(s) '
-              'registriert. Wenn das Anlegen wieder an der Server-'
-              'Bestätigung scheitert, lösche die alten Einträge unter '
-              '"Passkeys verwalten" und versuche es erneut.\n\n'
-              'Trotzdem einen weiteren Passkey erstellen?',
-            ),
+            title: Text(L10n.t(ctx, 'settings.passkeyExistsTitle')),
+            content: Text(L10n.tf(
+              ctx,
+              'settings.passkeyExistsBody',
+              {'count': '$existing'},
+            )),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Abbrechen'),
+                child: Text(L10n.t(ctx, 'settings.passkeyExistsAbort')),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('Weiter erstellen'),
+                child: Text(L10n.t(ctx, 'settings.passkeyExistsContinue')),
               ),
             ],
           ),
@@ -866,7 +864,7 @@ class _PasskeyTileState extends ConsumerState<_PasskeyTile> {
     } catch (e) {
       if (mounted) {
         final msg = e is AppException
-            ? e.message
+            ? L10n.exc(context, e)
             : L10n.t(context, 'settings.passkeyFailed');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -887,7 +885,7 @@ class _PasskeyTileState extends ConsumerState<_PasskeyTile> {
       title: Text(L10n.t(context, 'settings.passkeyCreate')),
       subtitle: Text(
         _busy
-            ? 'Warte auf Bestätigung …'
+            ? L10n.t(context, 'settings.passkeyWaitConfirm')
             : L10n.t(context, 'settings.passkeyCreateSub'),
       ),
       trailing: _busy
@@ -949,9 +947,8 @@ class _PasskeyManagerCardState extends ConsumerState<_PasskeyManagerCard> {
         _passkeys = null;
         _needsStepUp = aal2Needed;
         _error = aal2Needed
-            ? 'Zum Anzeigen der Passkeys ist eine 2FA-Bestätigung nötig.'
-            : 'Passkeys konnten nicht geladen werden. Bitte später erneut '
-                'versuchen.';
+            ? L10n.t(context, 'passkey.stepUpHint')
+            : L10n.t(context, 'passkey.loadError');
       });
     }
   }
@@ -961,23 +958,23 @@ class _PasskeyManagerCardState extends ConsumerState<_PasskeyManagerCard> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Passkey umbenennen'),
+        title: Text(L10n.t(ctx, 'passkey.renameTitle')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Anzeigename',
-            hintText: 'z. B. Pixel 8',
+          decoration: InputDecoration(
+            labelText: L10n.t(ctx, 'passkey.renameLabel'),
+            hintText: L10n.t(ctx, 'passkey.renameHint'),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Abbrechen'),
+            child: Text(L10n.t(ctx, 'common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-            child: const Text('Speichern'),
+            child: Text(L10n.t(ctx, 'common.save')),
           ),
         ],
       ),
@@ -988,7 +985,9 @@ class _PasskeyManagerCardState extends ConsumerState<_PasskeyManagerCard> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      final msg = e is AppException ? e.message : 'Umbenennen fehlgeschlagen.';
+      final msg = e is AppException
+          ? L10n.exc(context, e)
+          : L10n.t(context, 'passkey.renameFailed');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
       );
@@ -1002,15 +1001,15 @@ class _PasskeyManagerCardState extends ConsumerState<_PasskeyManagerCard> {
         icon: Icon(Icons.delete_outline,
             color: Theme.of(ctx).colorScheme.error, size: 36),
         title: Text(L10n.t(context, 'settings.passkeyDeleteTitle')),
-        content: Text(
-          '"${passkey.friendlyName ?? 'Passkey'}" wird von deinem Konto '
-          'entfernt. Die Anmeldung damit ist danach nicht mehr möglich. '
-          'Der Passkey bleibt ggf. auf dem Gerät gespeichert.',
-        ),
+        content: Text(L10n.tf(
+          context,
+          'passkey.deleteBody',
+          {'name': passkey.friendlyName ?? L10n.t(context, 'passkey.name')},
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
+            child: Text(L10n.t(ctx, 'common.cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -1036,7 +1035,9 @@ class _PasskeyManagerCardState extends ConsumerState<_PasskeyManagerCard> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      final msg = e is AppException ? e.message : L10n.t(context, 'settings.deleteFailed');
+      final msg = e is AppException
+          ? L10n.exc(context, e)
+          : L10n.t(context, 'settings.deleteFailed');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
       );
@@ -1055,9 +1056,9 @@ class _PasskeyManagerCardState extends ConsumerState<_PasskeyManagerCard> {
   @override
   Widget build(BuildContext context) {
     final subtitle = _passkeys == null
-        ? (_error ?? 'Registrierte Passkeys auf deinem Konto')
-        : '${_passkeys!.length} registriert - tippe zum Umbenennen, '
-            'Papierkorb zum Entfernen';
+        ? (_error ?? L10n.t(context, 'passkey.managerSub'))
+        : L10n.tf(context, 'passkey.managerHint',
+            {'count': '${_passkeys!.length}'});
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
