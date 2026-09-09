@@ -179,12 +179,18 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
 
 ## Geplant für 0.9.0 – Nahbereichs-Funke („Transit Spark", BLE)
 
-> Status nach dem Bau (v0.9.0-Beta): Kern-Feature + Begleitposten
-> umgesetzt (Migrationen 080-082). ABWEICHUNG: Das Matching läuft als
-> SECURITY-DEFINER-RPC `match_proximity_spark` statt als Edge Function -
-> gleiche Aufgabe, einfachere Wartung/Deployment. Soft-Ping folgt in
-> 0.9.1. Geraetetest auf zwei echten Geraeten steht aus (BLE-Reichweite,
-> Advertise-Abdeckung, Match-Flow).
+> Status nach dem Bau (v0.9.0-Beta, Endstand): Kern-Feature + Begleit-
+> posten + Soft-Ping umgesetzt (Migrationen 080-085). ABWEICHUNG: Das
+> Matching läuft als SECURITY-DEFINER-RPC `match_proximity_spark` statt
+> als Edge Function - gleiche Aufgabe, einfachere Wartung/Deployment.
+> Ergänzt im Bau: Tags v2 (15 Merkmale, generalisiert mit optionaler
+> Farbwahl), tägliche Selbst-Angaben beim Radar-Start, Matching v2
+> (bemerkte Tags treffen Selbstdarstellung des anderen), Modus-Wahl nach
+> REICHWEITE (Normal vs. Nur-direkt-daneben, Fußgänger abgedeckt),
+> Bluetooth-Prompt in der App, 2FA-Einfügen-Button, Suchradius-Modus
+> serverseitig (085, "Suchradius-weg"-Bug endgültig), RPC-Fallback-Kette
+> + Fehlerursache im Snackbar. Geraetetest auf zwei echten Geraeten
+> steht aus (BLE-Reichweite, Advertise-Abdeckung, Match-Flow).
 
 > Vision: Man lächelt sich im Zug, Café oder auf einer Messe (z. B.
 > Gamescom) an – traut sich aber nicht anzusprechen. Kurz darauf ist die
@@ -237,7 +243,7 @@ sich durch Feedback verschieben). Konkrete Entscheidungshistorie:
       öffnet den Chat mit situativen Fragen („Bist du noch in der Nähe von
       Halle 7?") + optionaler gegenseitiger Foto-Freischaltung nur für
       diese Session
-- [x] **Einseitiges Anschreiben („Soft-Ping")** – umgesetzt in 0.9.1 (Migration 083): Falls die andere Person
+- [x] **Einseitiges Anschreiben („Soft-Ping")** – umgesetzt in v0.9.0 (Migration 083, aus 0.9.1 vorgezogen): Falls die andere Person
       nicht an die App denkt oder sich selbst nicht traut, kann NUR der
       Meldende nach der Begegnung EINMAL eine diskrete Anfrage senden
       (vorgefertigte, freundliche Sätze + optional eine kurze eigene Zeile
