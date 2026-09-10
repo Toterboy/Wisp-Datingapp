@@ -78,6 +78,18 @@ class ChatNotifier extends StateNotifier<List<Match>> {
     state = _chat.getMatches();
   }
 
+  /// Legt ein lokales Match mit der SERVER-Match-ID an (für Chats aus dem
+  /// Funken-Tab, die nur serverseitig existieren). Existiert bereits eines,
+  /// wird es zurückgegeben.
+  Match? restoreServerMatch(
+      String matchId, UserProfile partner, DateTime matchedAt) {
+    final match = _chat.restoreServerMatch(matchId, partner, matchedAt);
+    if (match != null) {
+      state = _chat.getMatches();
+    }
+    return match;
+  }
+
   /// Stellt persistierte QR-Kontakte nach dem App-Start wieder her
   /// ("gespeicherte Profile" überleben den Neustart).
   Future<void> restorePersistedQrContacts() async {

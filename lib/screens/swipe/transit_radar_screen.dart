@@ -10,8 +10,13 @@ import 'package:wisp/models/transit_models.dart';
 import 'package:wisp/providers/transit_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
+import 'package:wisp/services/local_storage.dart';
 import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
+
+/// Lokale Speicher-Stelle für die gemerkte Radar-Exit-Entscheidung
+/// ('stop' | 'keep' | null = immer fragen).
+const String kTransitExitPolicyKey = 'transit_exit_policy';
 
 /// Transit-Radar (v0.9.0): "Blicke getauscht, sich nicht getraut?"
 /// Aktiviert BLE-Nähe-Erkennung (Vordergrund), zeigt live, wie viele
@@ -279,12 +284,96 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
     );
   }
 
+  /// Radar läuft: Beim Verlassen der Seite nachfragen, ob es gestoppt
+  /// oder weiterlaufen soll - mit Merk-Checkbox ("zukünftig automatisch
+  /// so beibehalten"). Gespeicherte Entscheidung wird ohne Dialog
+  /// angewendet; Abbrechen bleibt auf der Seite.
+  Future<bool> _confirmExitWhileActive() async {
+    final transit = ref.read(transitProvider);
+    if (!transit.active) return true;
+
+    final storage = ref.read(localStorageProvider);
+    try {
+      final saved = await storage.getString(kTransitExitPolicyKey);
+      if (saved == 'stop') {
+        await ref.read(transitProvider.notifier).deactivate();
+        return true;
+      }
+      if (saved == 'keep') return true;
+    } catch (_) {
+      // Kein Storage -> immer fragen.
+    }
+    if (!mounted) return false;
+
+    var remember = false;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          icon: Icon(Icons.radar,
+              color: Theme.of(ctx).colorScheme.primary, size: 40),
+          title: Text(L10n.t(ctx, 'transit.exitTitle')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(L10n.t(ctx, 'transit.exitBody')),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                value: remember,
+                onChanged: (v) => setDialogState(() => remember = v ?? false),
+                title: Text(L10n.t(ctx, 'transit.exitRemember')),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('keep'),
+              child: Text(L10n.t(ctx, 'transit.exitKeep')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop('stop'),
+              child: Text(L10n.t(ctx, 'transit.exitStop')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return false; // Bleiben.
+    if (remember && mounted) {
+      try {
+        await ref
+            .read(localStorageProvider)
+            .saveString(kTransitExitPolicyKey, choice);
+      } catch (_) {}
+    }
+    if (choice == 'stop') {
+      await ref.read(transitProvider.notifier).deactivate();
+    }
+    return true; // 'keep' oder 'stop': Seite verlassen.
+  }
+
   @override
   Widget build(BuildContext context) {
     final transit = ref.watch(transitProvider);
     final myAge = ref.watch(profileProvider).age;
 
-    return Scaffold(
+    // v0.9.0-Feedback: Beim Verlassen der Radar-Seite fragen, ob das Radar
+    // gestoppt werden soll - mit Merk-Checkbox ("zukünftig automatisch so
+    // beibehalten"). Gespeicherte Entscheidungen werden ohne Nachfrage
+    // angewendet.
+    return PopScope(
+      canPop: !transit.active,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await _confirmExitWhileActive();
+        if (leave && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(L10n.t(context, 'transit.title')),
       ),
@@ -490,6 +579,7 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
       ),
     );
   }

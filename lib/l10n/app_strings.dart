@@ -430,6 +430,14 @@ const Map<String, Map<String, String>> _strings = {
     'qr.searchUser': 'Nutzer suchen',
     'qr.ownCode': 'Das ist dein eigener Code!',
     'qr.noUserFound': 'Kein Nutzer mit diesem Code gefunden.',
+    // QR-Scan = erstmal Like (nicht direkt ein Chat)
+    'qr.likeSent':
+        'Like gesendet! Sobald die Person annimmt, entsteht euer Funke '
+        'und damit der Chat.',
+    'qr.likeFailed': 'Like konnte nicht gesendet werden: {error}',
+    'qr.savedOffline':
+        'Kein Internet - Profil lokal gespeichert. Du kannst die Person '
+        'später anschreiben ("Gespeicherte Profile").',
     'setupq.filter': 'Wonach soll Wisp jemanden für dich suchen?',
     'setupq.profile':
         'Was macht dich aus? Ein Bild, ein paar Worte, deine Interessen.',
@@ -518,6 +526,15 @@ const Map<String, Map<String, String>> _strings = {
     'transit.startFailed':
         'Radar konnte nicht gestartet werden. Bluetooth an und Berechtigung '
         'erteilen.',
+    // Radar-Verlassen (Radar läuft): Stoppen? + Merk-Checkbox
+    'transit.exitTitle': 'Radar laufen lassen?',
+    'transit.exitBody':
+        'Das Radar läuft noch. Du kannst es beim Verlassen der Seite '
+        'stoppen oder im Hintergrund weiterlaufen lassen (Fenster läuft '
+        'weiter, Funke auch Stunden später möglich).',
+    'transit.exitKeep': 'Weiterlaufen lassen',
+    'transit.exitStop': 'Radar stoppen',
+    'transit.exitRemember': 'Zukünftig automatisch so beibehalten',
     'transit.howTitle': 'Wie funktioniert das?',
     'transit.howBody':
         'Aktiviere das Radar, wenn du unterwegs bist (Zug, Café, Messe). '
@@ -1815,6 +1832,15 @@ const Map<String, Map<String, String>> _strings = {
     'transit.openSparks': 'To the sparks',
     'transit.startFailed':
         'Radar could not start. Turn on Bluetooth and grant permission.',
+    // Leaving the radar screen (radar active): stop? + remember checkbox
+    'transit.exitTitle': 'Keep the radar running?',
+    'transit.exitBody':
+        'The radar is still active. You can stop it when leaving this page '
+        'or let it keep running in the background (the window keeps '
+        'running, a spark is possible hours later).',
+    'transit.exitKeep': 'Keep running',
+    'transit.exitStop': 'Stop radar',
+    'transit.exitRemember': 'Apply automatically in the future',
     'transit.howTitle': 'How does it work?',
     'transit.howBody':
         'Activate the radar while you are on the go (train, café, '
@@ -2490,6 +2516,13 @@ const Map<String, Map<String, String>> _strings = {
     'qr.searchUser': 'Search user',
     'qr.ownCode': 'That is your own code!',
     'qr.noUserFound': 'No user found with this code.',
+    // QR scan = like first (no instant chat)
+    'qr.likeSent':
+        'Like sent! As soon as the person accepts it, your chat opens up.',
+    'qr.likeFailed': 'Like could not be sent: {error}',
+    'qr.savedOffline':
+        'No internet - profile saved locally. You can write to the person '
+        'later ("Saved profiles").',
     'onb.page1.title': 'Privacy & appearance',
     'onb.page2.title': 'Your profile',
     'onb.page3.title': 'Done',

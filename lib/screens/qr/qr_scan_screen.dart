@@ -3,12 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/find_your_match_service.dart';
-import 'package:wisp/services/supabase_database_service.dart';
 import 'package:wisp/services/supabase_service.dart';
 import 'package:wisp/utils/peer_id.dart';
 
@@ -62,52 +60,30 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
       return;
     }
 
-    final notifier = ref.read(chatProvider.notifier);
-
-    // Echtes Profil holen, BEVOR der Kontakt angelegt wird - offline
-    // bleibt der Platzhalter ("Unbekannt") und der Kontakt wird trotzdem
-    // LOKAL gespeichert (max. 5), um später anzuschreiben.
-    UserProfile? real;
-    if (SupabaseService.isInitialized) {
-      try {
-        final db = ref.read(supabaseDatabaseServiceProvider);
-        final row = await db.fetchPublicProfile(peerId);
-        if (row != null) {
-          real = UserProfile.fromPublicView(
-            Map<String, dynamic>.from(row as Map),
-          );
-        }
-      } catch (e) {
-        debugPrint('[QR] Profil-Fetch fehlgeschlagen (offline?): $e');
-      }
-    }
-
-    final match = notifier.findOrCreateMatch(peerId);
-    if (match == null) {
-      // Maximum erreicht: kein stilles Verdrängen - der Nutzer wählt,
-      // welchen gespeicherten Kontakt er stattdessen löscht.
-      if (mounted) {
-        await _showQrLimitDialog();
-      }
-      return;
-    }
-    if (real != null) {
-      notifier.updatePartner(match.id, real);
-    }
-
-    // Server-Pipeline: Like anlegen, damit die Verbindung im Funken-Feed
-    // sichtbar ist (Blockier-/Jugendschutz greift serverseitig).
+    // v0.9.0-Feedback: "Wenn man den QR-Code scannt oder den Code eingibt,
+    // soll es ERSTMAL ein Like sein" - kein sofortiger Chat-Kontakt. Der
+    // Chat entsteht, wenn die gescannte Person den Like annimmt
+    // (Funken-Tab "Erhalten" -> Funke -> Chat).
     if (SupabaseService.isInitialized) {
       try {
         await ref
             .read(findYourMatchServiceProvider)
             .likeUser(peerId);
       } catch (e) {
-        debugPrint('[QR] Like fehlgeschlagen (Chat bleibt aktiv): $e');
+        debugPrint('[QR] Like fehlgeschlagen: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  L10n.tf(context, 'qr.likeFailed', {'error': '$e'})),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
       }
 
-      // v0.9.0-Feedback ("auf dem anderen Gerät passiert gar nichts"):
-      // Push an die gescannte Person - sie sieht den Like dann sofort in
+      // Push an die gescannte Person - sie sieht den Like sofort in
       // "Erhalten". Nur Metadaten, serverseitig generierter Text
       // (notify-user prüft Like-Beziehung + Einzel-Schalter).
       try {
@@ -123,22 +99,41 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
           debugPrint('[QR] Like-Push fehlgeschlagen: $e');
         }
       }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L10n.t(context, 'qr.likeSent')),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.go(AppRoutes.interessen);
+      }
+      return;
     }
 
-    if (!mounted) return;
-
-    final updated =
-        ref.read(chatProvider.notifier).getMatchById(match.id) ?? match;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(L10n.tf(
-            context, 'qr.openingChat', {'name': updated.partner.name})),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    // WICHTIG: Mit der MATCH-ID navigieren, nicht mit der Partner-ID -
-    // die Match-ID ist lokal generiert und die Chat-Route erwartet sie.
-    context.go(AppRoutes.chatDetailPath(match.id));
+    // OFFLINE (kein Internet): Like ist unmöglich - Profil lokal
+    // speichern (max. 5), um sie später anzuschreiben. Beim späteren
+    // Öffnen des Chats holt der Chat-Screen das Like automatisch nach.
+    final notifier = ref.read(chatProvider.notifier);
+    final match = notifier.findOrCreateMatch(peerId);
+    if (match == null) {
+      // Maximum erreicht: kein stilles Verdrängen - der Nutzer wählt,
+      // welchen gespeicherten Kontakt er stattdessen löscht.
+      if (mounted) {
+        await _showQrLimitDialog();
+      }
+      return;
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.t(context, 'qr.savedOffline')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.go(AppRoutes.interessen);
+    }
   }
 
   /// Maximum (5) erreicht: Der Nutzer wählt im Dialog, welchen

@@ -9,10 +9,28 @@ können sich Schnittstellen und Verhalten jederzeit ändern.
 
 ## [Unreleased] – v0.9.0-Nachträge
 
-Server: Migration **086** einspielen + Edge Functions `notify-user`
-erneut deployen.
+Server: Migrationen **086 + 087** einspielen + Edge Functions
+`notify-user` erneut deployen.
 
 ### Behoben
+
+- **„Bad state: DataChannel nicht verbunden"** (Zufallschat, QR-Chat,
+  Ideen-Rad-Vorschläge): Sendungen vor verbundenem DataChannel landen
+  jetzt in einer Outbox und werden AUTOMATISCH verschickt, sobald der
+  Kanal offen ist (max. 50, pro Chat-Session, kein Transport in den
+  falschen Chat).
+- **„Dieser Chat existiert nicht mehr" beim Öffnen aus dem Funken-Tab**:
+  Server-Matches existierten nur serverseitig; der Chat-Screen lädt sie
+  jetzt via `list_my_matches_with_state` lokal nach (gleiche Match-ID,
+  P2P-Aufbau danach).
+- **Radar startete auf Android 11 nicht**: Beim Radar-Start fehlten die
+  Laufzeit-Berechtigungen komplett. Jetzt Pre-Flight: Android ≤ 11
+  STANDORT (Pflicht für BLE-Scan), Android 12+ BLUETOOTH_SCAN/CONNECT,
+  iOS Bluetooth - plus vorhandener Bluetooth-Prompt.
+- **QR-Scan = erstmal nur Like** (kein sofortiger Chat): Online entsteht
+  der Chat erst, wenn die gescannte Person annimmt (Funken-Tab
+  „Erhalten"). Offline wird das Profil lokal gespeichert (max. 5) und
+  das Like beim späteren Öffnen des Chats automatisch nachgeholt.
 
 - **QR-Scan öffnete nur ein „Fenster" statt des Chats**: Der Scanner
   navigierte zur PARTNER-ID (`/chat/<peerId>`), der Chat-Screen suchte

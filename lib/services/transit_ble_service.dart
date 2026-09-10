@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// BLE-Schicht für Transit Spark (Phase 1, v0.9.0).
 ///
@@ -38,6 +41,55 @@ class TransitBleService {
 
   bool get isActive => _advertising || _scanning;
 
+  /// Laufzeit-Berechtigungen fürs Radar (v0.9.0-Feedback: "Radar lässt
+  /// sich auf Android 11 nicht starten").
+  ///
+  /// Ursache: startScan() wurde ohne Laufzeit-Berechtigungen aufgerufen.
+  ///  - Android <= 11: ACCESS_FINE_LOCATION ist PFLICHT für BLE-Scan
+  ///    (Manifest hat sie, aber sie wurde NIE angefragt) - plus
+  ///    BLUETOOTH/BLUETOOTH_ADMIN als Manifest-Permissions.
+  ///  - Android >= 12: BLUETOOTH_SCAN + BLUETOOTH_CONNECT als
+  ///    Laufzeit-Berechtigungen (neverForLocation).
+  /// Auf alternden Geräten, wo permission_handler die 31er-Permissions
+  /// nicht sauber melden kann, fail-open (die native Ebene wirft ggf.
+  /// trotzdem eine verständliche Ausnahme).
+  Future<bool> _ensurePermissions() async {
+    try {
+      if (kIsWeb) return true;
+      if (Platform.isIOS) {
+        var bt = await Permission.bluetooth.status;
+        if (!bt.isGranted) bt = await Permission.bluetooth.request();
+        return bt.isGranted || bt.isLimited;
+      }
+      if (!Platform.isAndroid) return true;
+
+      // Legacy-Berechtigungen (<= Android 11): Standort ist Laufzeit-
+      // Pflicht für BLE-Scan. Auf 12+ zusätzlich SCAN/CONNECT anfragen
+      // (auf <= 11 im Manifest nie zur Laufzeit greifbar -> Ergebnis
+      // bewusst NICHT blockierend auswerten).
+      var location = await Permission.locationWhenInUse.status;
+      if (!location.isGranted) {
+        location = await Permission.locationWhenInUse.request();
+      }
+      if (!location.isGranted) return false;
+
+      final info = await DeviceInfoPlugin().androidInfo;
+      if (info.version.sdkInt >= 31) {
+        var scan = await Permission.bluetoothScan.status;
+        if (!scan.isGranted) scan = await Permission.bluetoothScan.request();
+        var connect = await Permission.bluetoothConnect.status;
+        if (!connect.isGranted) connect = await Permission.bluetoothConnect.request();
+        if (!scan.isGranted || !connect.isGranted) return false;
+      }
+      return true;
+    } catch (e) {
+      // permission_handler versagt -> nicht blockieren; die nativen
+      // Aufrufe werfen gegebenenfalls eine klare Meldung.
+      debugPrint('[TransitBle] Berechtigungsprüfung fehlgeschlagen: $e');
+      return true;
+    }
+  }
+
   /// Startet Advertising (eigenes Token) + Scanning (fremde Tokens).
   /// [onEncounter] feuert pro gesichtetem fremden Token.
   Future<bool> start({
@@ -46,6 +98,16 @@ class TransitBleService {
   }) async {
     await stop();
     _currentToken = token;
+
+    // Laufzeit-Berechtigungen (Android 11 braucht STANDORT fürs Scanning,
+    // Android 12+ braucht SCAN/CONNECT) - vorher kam der Start mit einer
+    // unbegründeten Exception nicht zustande.
+    if (!await _ensurePermissions()) {
+      debugPrint('[TransitBle] Berechtigungen verweigert - Radar startet '
+          'nicht.');
+      return false;
+    }
+
     try {
       // --- Advertising (nativ) ---
       final ok = await _channel

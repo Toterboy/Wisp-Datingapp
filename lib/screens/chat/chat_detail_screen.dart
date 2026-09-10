@@ -94,14 +94,73 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _initP2P();
+    unawaited(_bootstrap());
     unawaited(_loadQuizGate());
-    unawaited(_loadPartnerProfileIfNeeded());
     // Opt-in-Verlauf (v0.8.0): gespeicherte Nachrichten laden, sobald der
     // Nutzer den verschlüsselten lokalen Verlauf aktiviert hat.
     unawaited(ref
         .read(chatProvider.notifier)
         .hydrateHistory(widget.matchId));
+  }
+
+  /// Bootstrapping in richtiger Reihenfolge:
+  ///   1. Lokales Match sicherstellen (Server-Matches aus dem Funken-Tab
+  ///      existieren sonst NUR serverseitig -> "Dieser Chat existiert
+  ///      nicht mehr", v0.9.0-Fix).
+  ///   2. P2P-Verbindung aufbauen (braucht das lokale Match).
+  ///   3. Partner-Profil nachladen (QR-Kontakte: Name "Unbekannt").
+  ///   4. Offline gescannter Kontakt: Like nachholen (der QR-Scan erzeugt
+  ///      nur bei Online den Like - beim späteren Öffnen nachholen).
+  Future<void> _bootstrap() async {
+    await _ensureLocalMatch();
+    await _initP2P();
+    await _loadPartnerProfileIfNeeded();
+    await _ensureLikeForSavedContact();
+  }
+
+  /// Auflösung von Matches, die es lokal noch nicht gibt: Bei einer
+  /// numerischen Match-ID (Server-Match) wird list_my_matches_with_state
+  /// geladen und das Match lokal mit derselben ID wiederhergestellt.
+  Future<void> _ensureLocalMatch() async {
+    final notifier = ref.read(chatProvider.notifier);
+    if (notifier.getMatchById(widget.matchId) != null) return;
+    final id = int.tryParse(widget.matchId);
+    if (id == null || !SupabaseService.isInitialized) return;
+    try {
+      final service = ref.read(findYourMatchServiceProvider);
+      final matches = await service.listMatchesWithState();
+      final server = matches.where((x) => x.matchId == id).firstOrNull;
+      if (server == null || !mounted) return;
+      notifier.restoreServerMatch(
+        widget.matchId,
+        server.partner,
+        server.createdAt ?? DateTime.now(),
+      );
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('[ChatDetail] Server-Match laden fehlgeschlagen: $e');
+    }
+  }
+
+  /// Offline gescannter Kontakt (gespeichertes Profil): Beim späteren
+  /// Öffnen des Chats holen wir das versäumte Like nach - der Funke
+  /// entsteht, sobald die Person annimmt. Best-Effort, mehrfach-fähig
+  /// (like_user ist idempotent).
+  Future<void> _ensureLikeForSavedContact() async {
+    final match = ref.read(chatProvider.notifier).getMatchById(widget.matchId);
+    if (match == null || !match.isQrContact) return;
+    if (!SupabaseService.isInitialized) return;
+    try {
+      await ref
+          .read(findYourMatchServiceProvider)
+          .likeUser(match.partner.id);
+      await SupabaseService.client.functions.invoke(
+        'notify-user',
+        body: {'kind': 'likes', 'target_user_id': match.partner.id},
+      );
+    } catch (e) {
+      debugPrint('[ChatDetail] Nachträgliches Like fehlgeschlagen: $e');
+    }
   }
 
   /// QR-Kontakte werden beim Scan mit Platzhaltern ("Unbekannt") angelegt.

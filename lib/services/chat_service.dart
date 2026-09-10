@@ -268,6 +268,26 @@ class ChatService {
     _messages[matchId] = [];
   }
 
+  /// Legt ein lokales Match mit der SERVER-Match-ID an (v0.9.0-Fix):
+  /// Matches aus dem Funken-Tab (Find-your-Match/QR-Annahme) existieren
+  /// bisher nur serverseitig - der Chat-Screen suchte sie lokal und zeigte
+  /// "Dieser Chat existiert nicht mehr". Der Partner kommt aus
+  /// list_my_matches_with_state.
+  Match? restoreServerMatch(
+      String matchId, UserProfile partner, DateTime matchedAt) {
+    final existing = getMatchById(matchId);
+    if (existing != null) return existing;
+    final match = Match(
+      id: matchId,
+      partner: partner,
+      matchedAt: matchedAt,
+      photosUnlocked: true,
+    );
+    _matches.add(match);
+    _messages[match.id] = _messages[match.id] ?? [];
+    return match;
+  }
+
   /// Liefert alle Nachrichten eines Matches (chronologisch).
   List<Message> getMessages(String matchId) =>
       List.unmodifiable(_messages[matchId] ?? const []);
