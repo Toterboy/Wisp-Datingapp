@@ -26,8 +26,10 @@ UPDATE storage.buckets
        ]
  WHERE id = 'avatars';
 
-COMMENT ON COLUMN storage.buckets.file_size_limit IS
-'088: avatars erlaubt jetzt auch Audio (intro.m4a, AAC).';
+-- HINWEIS: KEIN "COMMENT ON storage.buckets ..." hier - die Tabelle
+-- gehört dem Storage-Admin; COMMENT verlangt Eigentümerschaft und bricht
+-- die Migration mit 42501 ab. Das UPDATE oben läuft mit der
+-- postgres-Rolle normal durch.
 
 -- ==========================================================================
 -- 2) get_find_match_candidates: "Ich suche"-Reziprozitaet ------------------
