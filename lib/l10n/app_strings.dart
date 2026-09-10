@@ -265,6 +265,171 @@ const Map<String, Map<String, String>> _strings = {
     // Erst-Einrichtung als Interview (Wisp-Fragen-Bubbles)
     'setupq.visibility':
         'Wie privat magst du bleiben – und wie soll die App aussehen?',
+    // Setup: Dialoge, Validierung, Status
+    'setup.abortTitle': 'Einrichtung abbrechen?',
+    'setup.abortBody':
+        'Möchtest du die Einrichtung wirklich abbrechen? Deine bisherigen '
+        'Angaben werden gespeichert.',
+    'setup.abortContinue': 'Weiter machen',
+    'setup.hintBio': 'Bitte schreibe eine kurze Bio (Über mich).',
+    'setup.hintInterests': 'Bitte wähle mindestens ein Interesse.',
+    'setup.hintIntro':
+        'Deine Vorstellung braucht Text UND Audio. Andere sollen dich '
+        'kennenlernen, bevor sie dein Foto sehen.',
+    'setup.stepOf': 'Schritt {n} von {of}',
+    'setup.flagsWarn':
+        'Hinweis: Der Einrichtungs-Stand konnte nicht auf dem Server '
+        'gesichert werden. Die Einrichtung erscheint beim nächsten Login '
+        'möglicherweise erneut.',
+    'setup.locationDetectFail':
+        'Standort konnte nicht ermittelt werden. Bitte gib ihn manuell ein '
+        'oder erlaube den Zugriff.',
+    'setup.locationSuspicious':
+        'Hinweis: Dieser Standort weicht deutlich von deinen bisherigen '
+        'Standorten auf diesem Gerät ab. Falls das stimmt, wähle ihn '
+        'trotzdem - andernfalls gib deinen Ort bitte manuell ein.',
+    'setup.locationError': 'Fehler bei der Standortermittlung: {error}',
+    'setup.locationTooFar':
+        'Der Ort liegt mehr als 15 km von deinem aktuellen Standort entfernt.',
+    // Setup: Seiten-Inhalte
+    'setupp.visibilitySub':
+        'Wer darf dein Profil sehen? Wie soll die App aussehen?',
+    'setupp.visibilityQuestion': 'Wer kann mein Profil sehen?',
+    'setupp.appearance': 'Darstellung',
+    'setupp.systemTheme': 'System',
+    'setupp.lightTheme': 'Hell',
+    'setupp.darkTheme': 'Dunkel',
+    'setupp.colorWorld': 'Farbwelt',
+    'setupp.lookingFor': 'Ich suche',
+    'setupp.whatLooking': 'Was suchst du?',
+    'setupp.relType': 'Beziehungsart',
+    'setupp.distance': 'Entfernung',
+    'setupp.filterLabel': 'Filter',
+    'setupp.maxDistance': 'Maximale Entfernung: {km} km',
+    'setupp.stateLabel': 'Bundesland',
+    'setupp.stateHint': 'z. B. Bayern',
+    'setupp.germanyNote': 'Es werden Profile aus ganz Deutschland angezeigt.',
+    'setupp.location': 'Standort',
+    'setupp.locationLabel': 'Dein Standort / Stadt',
+    'setupp.locationHint': 'z. B. Berlin',
+    'setupp.locationGps': 'Standort erkennen (GPS)',
+    'setupp.bioLabel': 'Über mich (Bio)',
+    'setupp.bioHint': 'z. B. Hobbys, was dir wichtig ist',
+    'setupp.stateOptional': 'Bundesland (optional)',
+    'setupp.interests': 'Interessen',
+    'setupp.profileSub':
+        'Ein Bild, ein paar Worte über dich und deine Interessen helfen '
+        'anderen, dich kennenzulernen. Alles optional und später änderbar.',
+    'setupp.photoDone': 'Profilbild hochgeladen.',
+    'setupp.photoFail':
+        'Upload fehlgeschlagen. Du kannst das Bild jederzeit später im '
+        'Profil festlegen.',
+    'setupp.introSub':
+        'Erzähl von dir, als Text und gesprochen. Beides wird anderen '
+        'gezeigt, bevor sie dein Foto sehen. Du kannst diesen Schritt auch '
+        'überspringen.',
+    'setupp.habitsSub':
+        'Wie stehst du zu Rauchen, Alkohol und Drogen? Diese Angaben '
+        'beeinflussen, wen du bei "Find your Match" siehst.',
+    'setupp.habitsHint':
+        'Es werden nur Personen gezeigt, die maximal so viel konsumieren '
+        'wie du. Du kannst das später in den Einstellungen oder im Profil '
+        'ändern.',
+    'setupp.passkeySub':
+        'Melde dich künftig ohne Passwort an, per Fingerabdruck oder '
+        'Gesicht. Optional, du kannst diesen Schritt überspringen.',
+    'setupp.passkeyBody':
+        'Ein Passkey ist die sicherste und bequemste Anmeldeart: Kein '
+        'Passwort, das du merken oder vergessen kannst, und schwerer zu '
+        'stehlen als ein Passwort.',
+    'setupp.passkeyDone': 'Passkey eingerichtet',
+    'setupp.passkeyStart': 'Passkey jetzt einrichten',
+    'setupp.mfaActive':
+        'Zwei-Faktor-Schutz ist aktiv. Bei jedem Login wirst du nach dem '
+        'Code aus deiner Authenticator-App gefragt.',
+    'setupp.mfaBody':
+        'Ein zweiter Faktor schützt dein Konto, selbst wenn dein Passwort '
+        'gestohlen wird. Du brauchst eine Authenticator-App (z. B. Google '
+        'Authenticator, Aegis oder 2FAS).',
+    'setupp.mfaDone': '2FA eingerichtet',
+    'setupp.mfaStart': 'Jetzt einrichten',
+    'setupp.laterHint':
+        'Du kannst die Einrichtung jederzeit später in den Einstellungen '
+        'nachholen.',
+    'setupp.guidelinesSub':
+        'Bitte akzeptiere die Regeln der App, um fortzufahren.',
+    'setupp.guidelinesIntroTitle': 'Wertegemeinschaft',
+    'setupp.guidelinesIntroBody':
+        'Diese App lebt von einem respektvollen, wertschätzenden Umgang '
+        'miteinander, unabhängig von Herkunft, Geschlecht, Religion oder '
+        'Lebensentwurf.',
+    'setupp.guidelinesWarn':
+        'Bei Verstoß kann der Zugang dauerhaft gesperrt werden.',
+    'setupp.finish': "Akzeptieren & los geht's",
+    'setupp.changeLater':
+        'Diese Einstellungen kannst du später jederzeit in den '
+        'Einstellungen ändern.',
+    // Interessen-Tab
+    'interests.title': 'Interessen',
+    'interests.tabSent': 'Gesendet',
+    'interests.tabReceived': 'Erhalten',
+    'interests.tabSparks': 'Funken',
+    'interests.emptySentTitle': 'Du hast noch niemanden geliked',
+    'interests.emptySentBody':
+        'Lerne Leute über ihre Vorstellung kennen ("Find your Match") oder '
+        'swipe blind durch Profile.',
+    'interests.emptyReceivedTitle': 'Noch keine erhaltenen Likes',
+    'interests.emptyReceivedBody':
+        'Sobald dich jemand über seine Vorstellung mag, erscheint er hier '
+        'und du entscheidest über Funke oder Ablehnung.',
+    'interests.emptySparksTitle': 'Noch keine Funken',
+    'interests.emptySparksBody':
+        'Bestätige erhaltene Likes, um Funken zu bekommen. Danach kannst du '
+        'direkt chatten und optional das Kennenlern-Quiz für das Foto '
+        'spielen.',
+    'interests.likedYou': 'Hat dich geliked',
+    'interests.decline': 'Ablehnen',
+    'interests.sparkAccepted':
+        'Ein Funke mit {name} ist entstanden! Ihr könnt direkt chatten.',
+    'interests.likeDeclined': 'Like von {name} abgelehnt.',
+    'interests.photoUnlocked': 'Foto freigeschaltet',
+    'interests.quizPending': 'Foto-Freischaltung: Kennenlern-Quiz',
+    'interests.noBio': 'Keine Bio',
+    'interests.manage': 'Verwalten',
+    'interests.hideSelected': 'Ausblenden ({n})',
+    'interests.hiddenCount': '{n} Chat(s) aus der Liste entfernt.',
+    'interests.hideFailed':
+        '{failed} von {total} konnten nicht entfernt werden. Bitte erneut '
+        'versuchen.',
+    'interests.resparkBtn': 'Re-Funke',
+    'interests.resparkFailed':
+        'Re-Funke fehlgeschlagen. Bitte erneut versuchen.',
+    'interests.cooledTitle': 'Erschlossene Funken',
+    'interests.cooledSub':
+        'Ruhig beendet - ohne Druck, jederzeit wieder entzündbar',
+    'interests.savedTitle': 'Gespeicherte Profile',
+    'interests.savedSub':
+        'Lokal gespeichert (max. 5) - zum Nachschreiben, wenn du unterwegs '
+        'kein Internet hattest',
+    'interests.savedTileSub': 'Gespeichert - später anschreiben',
+    'interests.deleteSavedTitle': 'Gespeichertes Profil entfernen?',
+    'interests.deleteSavedBody':
+        '{name} wird lokal gelöscht. Der zugehörige Chat-Verlauf geht damit '
+        'verloren.',
+    // QR-Flow
+    'qr.menuTitle': 'QR Code',
+    'qr.choiceTitle': 'Was möchtest du tun?',
+    'qr.showMine': 'Meinen QR Code zeigen',
+    'qr.showMineBtn': 'Meinen eigenen Code anzeigen',
+    'qr.scanTitle': 'QR Code scannen',
+    'qr.enterCode': 'Code eingeben',
+    'qr.enterCodeSub': 'Den 8 stelligen Code manuell eintippen',
+    'qr.enterCodeHint':
+        'Gib den 8 stelligen Code der Person ein,\ndie du finden möchtest.',
+    'qr.codeHint': 'z. B. A1B2C3D4',
+    'qr.searchUser': 'Nutzer suchen',
+    'qr.ownCode': 'Das ist dein eigener Code!',
+    'qr.noUserFound': 'Kein Nutzer mit diesem Code gefunden.',
     'setupq.filter': 'Wonach soll Wisp jemanden für dich suchen?',
     'setupq.profile':
         'Was macht dich aus? Ein Bild, ein paar Worte, deine Interessen.',
@@ -813,6 +978,83 @@ const Map<String, Map<String, String>> _strings = {
     'profile.edit.minAgeLabel': 'Mindestalter',
     'profile.edit.maxAgeLabel': 'Höchstalter',
     'common.years': 'Jahre',
+    'common.unknownError': 'Unbekannter Fehler',
+    'common.errorWith': 'Fehler: {error}',
+    'common.close': 'Schließen',
+    // Quiz "Wie gut kenn ich mein Match"
+    'quiz.title': 'Kennenlern-Quiz',
+    'quiz.loadError': 'Quiz-Zustand konnte nicht geladen werden.',
+    'quiz.photoHidden': 'Foto noch verborgen',
+    'quiz.startTitle': 'Wie gut kennst du dein Gegenüber?',
+    'quiz.startBody':
+        'Ihr bekommt dieselbe Frage. Antwortet ihr beide richtig, ist das '
+        'Foto dauerhaft freigeschaltet.',
+    'quiz.startPersonalHint':
+        'Fragen richten sich nach dem Profil deines Gegenübers.',
+    'quiz.startAttempt': 'Versuch starten',
+    'quiz.submit': 'Antwort abgeben',
+    'quiz.passedTitle': 'Bestanden! Das Foto ist jetzt dauerhaft freigeschaltet.',
+    'quiz.toChat': 'Zum Chat',
+    'quiz.correctTitle':
+        'Richtig! Jetzt wartest du auf die Antwort deines Matches.',
+    'quiz.correctBody':
+        'Antwortet dein Gegenüber auch richtig, ist das Quiz bestanden.',
+    'quiz.roundClosed':
+        'Die Runde ist vorbei. Dein Gegenüber hat sie nicht bestanden, also '
+        'startet ihr nach der Pause gemeinsam neu.',
+    'quiz.wrongTitle': 'Leider falsch.',
+    'quiz.wrongBody':
+        'Fehlversuch {failed}: Foto-Stufe {level}. Neuer Versuch nach der '
+        '5-Minuten-Pause.',
+    'quiz.cooldownIn': 'Nächster Versuch in {time}',
+    'quiz.cooldownBody':
+        'Nach jedem Fehlversuch gilt eine Pause von 5 Minuten. Danach könnt '
+        'ihr es erneut versuchen.',
+    'quiz.cooldownReady': 'Bereit - neuen Versuch starten',
+    'quiz.passedBadge': 'Quiz bestanden!',
+    'quiz.passedBody':
+        'Das Foto bleibt dauerhaft scharf und farbig. Das komplette Profil '
+        'deines Matches ist jetzt freigeschaltet.',
+    // Community-Regeln (Rechts-Screen + Erst-Einrichtung)
+    'cg.0.title': '§0 Respektvoller Umgang',
+    'cg.0.body':
+        'Wir erwarten von allen Nutzern einen freundlichen, respektvollen '
+        'und wertschätzenden Umgang miteinander, unabhängig von Herkunft, '
+        'Geschlecht, sexueller Orientierung, Religion oder Aussehen. Kritik '
+        'und Ablehnung sollen stets sachlich und ohne Herabwürdigung '
+        'erfolgen.',
+    'cg.1.title': '§1 Keine Belästigung',
+    'cg.1.titleShort': 'Behandle andere mit Respekt und Freundlichkeit.',
+    'cg.1.body':
+        'Beleidigungen, Diskriminierung, Drohungen oder unerwünschte '
+        'sexuelle Ansprachen sind nicht gestattet und führen zum sofortigen '
+        'Ausschluss.',
+    'cg.2.title': '§2 Echte Profile',
+    'cg.2.titleShort': 'Keine Fake Profile, keine Werbung und kein Missbrauch.',
+    'cg.2.body':
+        'Nutze nur echte Angaben und Bilder von dir selbst. Fake Profile '
+        'oder das Vorgeben einer falschen Identität sind untersagt.',
+    'cg.3.title': '§3 Kein Spam',
+    'cg.3.titleShort':
+        'Persönlichkeit vor Aussehen: Fotos werden erst nach einem Funke '
+        'gezeigt.',
+    'cg.3.body':
+        'Werbung, Kettenbriefe oder das gezielte Weiterleiten von Links zu '
+        'externen Angeboten sind nicht erlaubt.',
+    'cg.4.title': '§4 Datenschutz',
+    'cg.4.titleShort':
+        'Respektiere Grenzen: Keine unerwünschten Bilder oder Nachrichten.',
+    'cg.4.body':
+        'Teile keine fremden privaten Daten (Adressen, Telefonnummern, '
+        'Dokumente) ohne Zustimmung. Der Schutz Minderjähriger hat oberste '
+        'Priorität.',
+    'cg.5.title': '§5 Melden & Konsequenzen',
+    'cg.5.titleShort':
+        'Ehrlichkeit zahlt sich aus: Sei authentisch in deinem Profil.',
+    'cg.5.body':
+        'Verstöße können über den Melde-Button in Profil und Chat gemeldet '
+        'werden. Wiederholter oder schwerer Verstoß führt zur Sperrung des '
+        'Accounts.',
     'onb.page1.title': 'Privatsphäre & Darstellung',
     'onb.page2.title': 'Dein Profil',
     'onb.page3.title': 'Fertig',
@@ -842,6 +1084,93 @@ const Map<String, Map<String, String>> _strings = {
     'chat.voiceOnlyOnce': 'Wiedergabe nicht möglich - die Nachricht wurde '
         'bereits angehört.',
     'chat.voiceListened': 'angehört',
+    // Chat-Dialoge & Steuerung (zweisprachig)
+    'chat.sendFailed': 'Nachricht konnte nicht gesendet werden: {error}',
+    'chat.imageSend': 'Bild senden',
+    'chat.camera': 'Kamera',
+    'chat.gallery': 'Galerie',
+    'chat.imageSendFailed': 'Senden fehlgeschlagen',
+    'chat.imageSendFailedBody':
+        'Das Bild konnte nicht gesendet werden.\n\n{error}',
+    'chat.retry': 'Wiederholen',
+    'chat.voiceTooShort': 'Aufnahme zu kurz (< 1 s), verworfen.',
+    'chat.voiceRecordFailed': 'Aufnahme fehlgeschlagen: {error}',
+    'chat.voiceStartFailed': 'Aufnahme konnte nicht gestartet werden: {error}',
+    'chat.voiceCancelled': 'Aufnahme abgebrochen',
+    'chat.voiceStopSend': 'Aufnahme beenden & senden',
+    'chat.voiceTooltip': 'Sprachnachricht',
+    'chat.voiceCancel': 'Aufnahme abbrechen',
+    'chat.recordingHint': 'Aufnahme: {s} s',
+    'chat.blockTitle': 'Nutzer blockieren?',
+    'chat.blockBody':
+        '{name} wird dauerhaft blockiert: Der Funke wird beendet und diese '
+        'Person kann dich nicht mehr liken, einen Funke setzen oder dir '
+        'Nachrichten senden. Die Blockierung kann später über den '
+        'Support-Dialog nicht aufgehoben werden. Nur du selbst kannst sie '
+        'in den Einstellungen entfernen.',
+    'chat.blockAction': 'Blockieren',
+    'chat.blockedDone': '{name} wurde blockiert.',
+    'chat.blockFailed':
+        'Blockieren fehlgeschlagen. Bitte versuche es erneut.',
+    'chat.spiceTooltip': 'Eisbrecher-Fragen (Spice Questions)',
+    'chat.reportTooltip': 'Nutzer melden',
+    'chat.reportImageSub': 'Wird mit Kontext an den Support übermittelt.',
+    'chat.ideaWheelBtn': 'Dreh das Rad - Date-Idee finden',
+    'chat.icebreakerOn': 'Interessen-Vorschläge anzeigen',
+    'chat.icebreakerOff': 'Interessen-Vorschläge ausblenden',
+    'chat.icebreakerText':
+        'Wir teilen das Interesse "{interest}". Erzähl mir davon: was war '
+        'dein Highlight dazu? 😊',
+    'chat.dateIdea': 'Idee für ein Date: {idea} ✨ Was meinst du?',
+    'chat.ideaSendFailed': 'Vorschlag konnte nicht gesendet werden.',
+    'chat.endSparkTitle': 'Funke beenden – ehrlich & freundlich',
+    'chat.endSparkBody':
+        'Der Funke wandert bei euch beiden in "Erschlossene Funken" – ohne '
+        'Countdown, ohne Benachrichtigung. Ein Re-Funke ist jederzeit mit '
+        'einem Tap möglich.',
+    'chat.endSilent': 'Ruhig enden lassen',
+    'chat.endSilentSub': 'Ohne Nachricht',
+    'chat.goodbye.1':
+        'Hey, ich hatte wirklich schöne Gespräche mit dir, spüre aber '
+        'selbst, dass es nicht das wird, was wir beide verdienen. Ich '
+        'lasse den Funken jetzt ruhen – danke dir und alles Gute! 🌿',
+    'chat.goodbye.2':
+        'Ich mag dich, aber ich merke, dass ich gerade nicht dasselbe '
+        'investieren kann wie du. Ehrlicher finde ich, das klar zu sagen, '
+        'statt mich zu verziehen. Mach\'s gut! 🙏',
+    'chat.goodbye.3':
+        'Wir passen für mich gerade nicht zusammen – das sagt nichts über '
+        'dich aus. Ich wünsche dir von Herzen alles Gute! ✨',
+    'chat.goodbye.4':
+        'Meine Gefühle haben sich verändert. Statt dich im Ungewissen zu '
+        'lassen, lasse ich den Funken jetzt sanft ruhen. Danke für die '
+        'schönen Momente! 🕊️',
+    'chat.wheelTitle': 'Dreh das Rad',
+    'chat.wheelSpin': 'Drehen',
+    'chat.wheelAgain': 'Nochmal drehen',
+    'chat.wheelHint':
+        'Passt das? Schick den Vorschlag – deine Gegenstelle kann einfach '
+        'antworten.',
+    'chat.wheelSend': 'Vorschlag senden',
+    'chat.revealTitle': 'Bild anzeigen?',
+    'chat.revealBody':
+        'Dieses Bild ist verpixelt, um dich vor unangemessenen Inhalten zu '
+        'schützen. Es kann Inhalte enthalten, die du als störend '
+        'empfindest.\n\nDu kannst es danach direkt melden.',
+    'chat.revealAction': 'Anzeigen',
+    'chat.reportImage': 'Bild melden',
+    'chat.blurred': 'Verpixelt',
+    'chat.viewOnce': 'Einmalig',
+    'chat.viewedOnce': 'Bereits angesehen',
+    'chat.photosAfterSpark': 'Fotos nach Funke sichtbar',
+    'chat.safetyNotConnected':
+        'Noch keine verschlüsselte Verbindung zu {name} aufgebaut. Die '
+        'Nummer erscheint nach der ersten Nachricht.',
+    'chat.safetyCompare':
+        'Vergleiche diese Nummer mit {name}, am besten persönlich oder '
+        'telefonisch:',
+    'chat.identityVerifiedHint':
+        'Nur aktivieren, wenn die Nummern übereinstimmen.',
     'chat.more': 'Weitere Optionen',
     'dh.event.startingSoon': 'Dating Hour startet gleich',
     'dh.event.cancelledToday':
@@ -1933,6 +2262,234 @@ const Map<String, Map<String, String>> _strings = {
     'profile.edit.minAgeLabel': 'Minimum age',
     'profile.edit.maxAgeLabel': 'Maximum age',
     'common.years': 'years',
+    'common.unknownError': 'Unknown error',
+    'common.errorWith': 'Error: {error}',
+    'common.close': 'Close',
+    // Quiz "How well do I know my match"
+    'quiz.title': 'Getting-to-know quiz',
+    'quiz.loadError': 'Could not load the quiz state.',
+    'quiz.photoHidden': 'Photo still hidden',
+    'quiz.startTitle': 'How well do you know your counterpart?',
+    'quiz.startBody':
+        'You both get the same question. If you both answer correctly, the '
+        'photo is unlocked permanently.',
+    'quiz.startPersonalHint':
+        'Questions are based on your counterpart\'s profile.',
+    'quiz.startAttempt': 'Start attempt',
+    'quiz.submit': 'Submit answer',
+    'quiz.passedTitle':
+        'Passed! The photo is now unlocked permanently.',
+    'quiz.toChat': 'To the chat',
+    'quiz.correctTitle':
+        'Correct! Now you wait for your match\'s answer.',
+    'quiz.correctBody':
+        'If your counterpart also answers correctly, the quiz is passed.',
+    'quiz.roundClosed':
+        'The round is over. Your counterpart did not pass it, so you both '
+        'start again after the break.',
+    'quiz.wrongTitle': 'Unfortunately wrong.',
+    'quiz.wrongBody':
+        'Failed attempt {failed}: photo level {level}. New attempt after '
+        'the 5-minute break.',
+    'quiz.cooldownIn': 'Next attempt in {time}',
+    'quiz.cooldownBody':
+        'Each failed attempt starts a 5-minute break. Afterwards you can '
+        'try again.',
+    'quiz.cooldownReady': 'Ready - start a new attempt',
+    'quiz.passedBadge': 'Quiz passed!',
+    'quiz.passedBody':
+        'The photo stays sharp and colored permanently. Your match\'s '
+        'complete profile is now unlocked.',
+    // Community guidelines (legal screen + one-time setup)
+    'cg.0.title': '§0 Respectful interaction',
+    'cg.0.body':
+        'We expect all users to interact in a friendly, respectful and '
+        'appreciative way, regardless of origin, gender, sexual '
+        'orientation, religion or appearance. Criticism and rejection '
+        'should always remain factual and non-degrading.',
+    'cg.1.title': '§1 No harassment',
+    'cg.1.titleShort': 'Treat others with respect and kindness.',
+    'cg.1.body':
+        'Insults, discrimination, threats or unwanted sexual advances are '
+        'not permitted and lead to immediate exclusion.',
+    'cg.2.title': '§2 Real profiles',
+    'cg.2.titleShort': 'No fake profiles, no advertising, no abuse.',
+    'cg.2.body':
+        'Only use real information and pictures of yourself. Fake profiles '
+        'or pretending to be someone else are prohibited.',
+    'cg.3.title': '§3 No spam',
+    'cg.3.titleShort':
+        'Personality before looks: Photos are shown only after a spark.',
+    'cg.3.body':
+        'Advertising, chain letters or deliberately forwarding links to '
+        'external offers are not allowed.',
+    'cg.4.title': '§4 Privacy',
+    'cg.4.titleShort':
+        'Respect boundaries: no unwanted pictures or messages.',
+    'cg.4.body':
+        'Do not share other people\'s private data (addresses, phone '
+        'numbers, documents) without consent. Protecting minors has '
+        'top priority.',
+    'cg.5.title': '§5 Reporting & consequences',
+    'cg.5.titleShort': 'Honesty pays off: Be authentic in your profile.',
+    'cg.5.body':
+        'Violations can be reported via the report button in profile and '
+        'chat. Repeated or serious violations lead to account suspension.',
+    // Setup: dialogs, validation, status
+    'setup.abortTitle': 'Cancel setup?',
+    'setup.abortBody':
+        'Do you really want to cancel the setup? Your entries so far are '
+        'saved.',
+    'setup.abortContinue': 'Keep going',
+    'setup.hintBio': 'Please write a short bio (about me).',
+    'setup.hintInterests': 'Please pick at least one interest.',
+    'setup.hintIntro':
+        'Your intro needs text AND audio. Others should get to know you '
+        'before they see your photo.',
+    'setup.stepOf': 'Step {n} of {of}',
+    'setup.flagsWarn':
+        'Note: The setup state could not be saved to the server. The setup '
+        'may appear again on your next login.',
+    'setup.locationDetectFail':
+        'Location could not be detected. Please enter it manually or grant '
+        'access.',
+    'setup.locationSuspicious':
+        'Note: This location differs clearly from your previous locations '
+        'on this device. If that is correct, choose it anyway - otherwise '
+        'please enter your place manually.',
+    'setup.locationError': 'Location detection failed: {error}',
+    'setup.locationTooFar':
+        'The place is more than 15 km away from your current location.',
+    // Setup: page content
+    'setupp.visibilitySub':
+        'Who may see your profile? How should the app look?',
+    'setupp.visibilityQuestion': 'Who can see my profile?',
+    'setupp.appearance': 'Appearance',
+    'setupp.systemTheme': 'System',
+    'setupp.lightTheme': 'Light',
+    'setupp.darkTheme': 'Dark',
+    'setupp.colorWorld': 'Color scheme',
+    'setupp.lookingFor': 'I am looking for',
+    'setupp.whatLooking': 'What are you looking for?',
+    'setupp.relType': 'Relationship type',
+    'setupp.distance': 'Distance',
+    'setupp.filterLabel': 'Filter',
+    'setupp.maxDistance': 'Maximum distance: {km} km',
+    'setupp.stateLabel': 'Federal state',
+    'setupp.stateHint': 'e.g. Bavaria',
+    'setupp.germanyNote': 'Profiles from all over Germany are shown.',
+    'setupp.location': 'Location',
+    'setupp.locationLabel': 'Your location / city',
+    'setupp.locationHint': 'e.g. Berlin',
+    'setupp.locationGps': 'Detect location (GPS)',
+    'setupp.bioLabel': 'About me (bio)',
+    'setupp.bioHint': 'e.g. hobbies, what matters to you',
+    'setupp.stateOptional': 'Federal state (optional)',
+    'setupp.interests': 'Interests',
+    'setupp.profileSub':
+        'A photo, a few words about you and your interests help others get '
+        'to know you. All optional and changeable later.',
+    'setupp.photoDone': 'Profile photo uploaded.',
+    'setupp.photoFail':
+        'Upload failed. You can set the photo later in your profile.',
+    'setupp.introSub':
+        'Tell about yourself, as text and voice. Both are shown to others '
+        'before they see your photo. You can skip this step.',
+    'setupp.habitsSub':
+        'How do you feel about smoking, alcohol and drugs? These answers '
+        'influence who you see in "Find your Match".',
+    'setupp.habitsHint':
+        'Only people who consume at most as much as you are shown. You can '
+        'change this later in settings or in your profile.',
+    'setupp.passkeySub':
+        'Sign in without a password in the future, via fingerprint or face. '
+        'Optional, you can skip this step.',
+    'setupp.passkeyBody':
+        'A passkey is the most secure and convenient sign-in method: no '
+        'password to remember or forget, and harder to steal than a '
+        'password.',
+    'setupp.passkeyDone': 'Passkey set up',
+    'setupp.passkeyStart': 'Set up passkey now',
+    'setupp.mfaActive':
+        'Two-factor protection is active. Every sign-in will ask for the '
+        'code from your authenticator app.',
+    'setupp.mfaBody':
+        'A second factor protects your account even if your password is '
+        'stolen. You need an authenticator app (e.g. Google Authenticator, '
+        'Aegis or 2FAS).',
+    'setupp.mfaDone': '2FA set up',
+    'setupp.mfaStart': 'Set up now',
+    'setupp.laterHint':
+        'You can complete the setup any time later in the settings.',
+    'setupp.guidelinesSub':
+        'Please accept the app\'s rules to continue.',
+    'setupp.guidelinesIntroTitle': 'Community of values',
+    'setupp.guidelinesIntroBody':
+        'This app thrives on respectful, appreciative interaction, '
+        'regardless of origin, gender, religion or way of life.',
+    'setupp.guidelinesWarn':
+        'In case of violations access can be blocked permanently.',
+    'setupp.finish': 'Accept & let\'s go',
+    'setupp.changeLater':
+        'You can change these settings any time later in the settings.',
+    // Interests tab
+    'interests.title': 'Interests',
+    'interests.tabSent': 'Sent',
+    'interests.tabReceived': 'Received',
+    'interests.tabSparks': 'Sparks',
+    'interests.emptySentTitle': 'You have not liked anyone yet',
+    'interests.emptySentBody':
+        'Meet people through their intro ("Find your Match") or swipe '
+        'profiles blindly.',
+    'interests.emptyReceivedTitle': 'No received likes yet',
+    'interests.emptyReceivedBody':
+        'As soon as someone likes your intro, they appear here and you '
+        'decide on spark or decline.',
+    'interests.emptySparksTitle': 'No sparks yet',
+    'interests.emptySparksBody':
+        'Confirm received likes to get sparks. Afterwards you can chat '
+        'right away and optionally play the quiz for the photo.',
+    'interests.likedYou': 'Liked you',
+    'interests.decline': 'Decline',
+    'interests.sparkAccepted':
+        'A spark with {name} was created! You can chat right away.',
+    'interests.likeDeclined': 'Like from {name} declined.',
+    'interests.photoUnlocked': 'Photo unlocked',
+    'interests.quizPending': 'Photo unlock: getting-to-know quiz',
+    'interests.noBio': 'No bio',
+    'interests.manage': 'Manage',
+    'interests.hideSelected': 'Hide ({n})',
+    'interests.hiddenCount': '{n} chat(s) removed from the list.',
+    'interests.hideFailed':
+        '{failed} of {total} could not be removed. Please try again.',
+    'interests.resparkBtn': 'Re-spark',
+    'interests.resparkFailed': 'Re-spark failed. Please try again.',
+    'interests.cooledTitle': 'Cooled sparks',
+    'interests.cooledSub':
+        'Quietly ended - no pressure, can be re-sparked any time',
+    'interests.savedTitle': 'Saved profiles',
+    'interests.savedSub':
+        'Stored locally (max. 5) - to write to them later when you had no '
+        'internet on the go',
+    'interests.savedTileSub': 'Saved - write later',
+    'interests.deleteSavedTitle': 'Remove saved profile?',
+    'interests.deleteSavedBody':
+        '{name} will be deleted locally. The related chat history is lost '
+        'with it.',
+    // QR flow
+    'qr.menuTitle': 'QR code',
+    'qr.choiceTitle': 'What would you like to do?',
+    'qr.showMine': 'Show my QR code',
+    'qr.showMineBtn': 'Show my own code',
+    'qr.scanTitle': 'Scan QR code',
+    'qr.enterCode': 'Enter code',
+    'qr.enterCodeSub': 'Type the 8-digit code manually',
+    'qr.enterCodeHint':
+        'Enter the 8-digit code of the person\nyou want to find.',
+    'qr.codeHint': 'e.g. A1B2C3D4',
+    'qr.searchUser': 'Search user',
+    'qr.ownCode': 'That is your own code!',
+    'qr.noUserFound': 'No user found with this code.',
     'onb.page1.title': 'Privacy & appearance',
     'onb.page2.title': 'Your profile',
     'onb.page3.title': 'Done',
@@ -1962,6 +2519,88 @@ const Map<String, Map<String, String>> _strings = {
     'chat.voiceOnlyOnce': 'Playback not possible - the message was already '
         'listened to.',
     'chat.voiceListened': 'listened',
+    // Chat dialogs & controls
+    'chat.sendFailed': 'Message could not be sent: {error}',
+    'chat.imageSend': 'Send image',
+    'chat.camera': 'Camera',
+    'chat.gallery': 'Gallery',
+    'chat.imageSendFailed': 'Sending failed',
+    'chat.imageSendFailedBody': 'The image could not be sent.\n\n{error}',
+    'chat.retry': 'Retry',
+    'chat.voiceTooShort': 'Recording too short (< 1 s), discarded.',
+    'chat.voiceRecordFailed': 'Recording failed: {error}',
+    'chat.voiceStartFailed': 'Recording could not be started: {error}',
+    'chat.voiceCancelled': 'Recording cancelled',
+    'chat.voiceStopSend': 'Stop recording & send',
+    'chat.voiceTooltip': 'Voice message',
+    'chat.voiceCancel': 'Cancel recording',
+    'chat.recordingHint': 'Recording: {s} s',
+    'chat.blockTitle': 'Block user?',
+    'chat.blockBody':
+        '{name} will be blocked permanently: the spark is ended and this '
+        'person can no longer like you, spark you or send you messages. '
+        'Blocking cannot be undone via the support dialog later. Only you '
+        'can remove it in the settings.',
+    'chat.blockAction': 'Block',
+    'chat.blockedDone': '{name} was blocked.',
+    'chat.blockFailed': 'Blocking failed. Please try again.',
+    'chat.spiceTooltip': 'Icebreaker questions (Spice Questions)',
+    'chat.reportTooltip': 'Report user',
+    'chat.reportImageSub': 'Sent with context to the support team.',
+    'chat.ideaWheelBtn': 'Spin the wheel - find a date idea',
+    'chat.icebreakerOn': 'Show interest suggestions',
+    'chat.icebreakerOff': 'Hide interest suggestions',
+    'chat.icebreakerText':
+        'We share the interest "{interest}". Tell me about it: what was '
+        'your highlight there? 😊',
+    'chat.dateIdea': 'Date idea: {idea} ✨ What do you think?',
+    'chat.ideaSendFailed': 'Suggestion could not be sent.',
+    'chat.endSparkTitle': 'End spark - honestly & kindly',
+    'chat.endSparkBody':
+        'The spark moves to "Cooled sparks" for both of you - without '
+        'countdown, without notification. Re-sparking is one tap away at '
+        'any time.',
+    'chat.endSilent': 'Let it end quietly',
+    'chat.endSilentSub': 'Without a message',
+    'chat.goodbye.1':
+        'Hey, I really had lovely conversations with you, but I feel '
+        'myself that it is not going to become what we both deserve. I am '
+        'letting the spark rest now - thank you and all the best! 🌿',
+    'chat.goodbye.2':
+        'I like you, but I notice that I currently cannot invest as much '
+        'as you. I find it more honest to say that clearly instead of '
+        'vanishing. Take care! 🙏',
+    'chat.goodbye.3':
+        'We do not fit together for me right now - that says nothing about '
+        'you. I wish you all the best from my heart! ✨',
+    'chat.goodbye.4':
+        'My feelings have changed. Instead of leaving you in uncertainty, '
+        'I let the spark rest gently now. Thanks for the beautiful '
+        'moments! 🕊️',
+    'chat.wheelTitle': 'Spin the wheel',
+    'chat.wheelSpin': 'Spin',
+    'chat.wheelAgain': 'Spin again',
+    'chat.wheelHint':
+        'Like it? Send the suggestion - your counterpart can simply reply.',
+    'chat.wheelSend': 'Send suggestion',
+    'chat.revealTitle': 'Show image?',
+    'chat.revealBody':
+        'This image is blurred to protect you from inappropriate content. '
+        'It may contain content you find disturbing.\n\nYou can report it '
+        'directly afterwards.',
+    'chat.revealAction': 'Show',
+    'chat.reportImage': 'Report image',
+    'chat.blurred': 'Blurred',
+    'chat.viewOnce': 'Once',
+    'chat.viewedOnce': 'Already viewed',
+    'chat.photosAfterSpark': 'Photos visible after spark',
+    'chat.safetyNotConnected':
+        'No encrypted connection to {name} established yet. The number '
+        'appears after the first message.',
+    'chat.safetyCompare':
+        'Compare this number with {name}, ideally in person or by phone:',
+    'chat.identityVerifiedHint':
+        'Only enable if the numbers match.',
     'chat.more': 'More options',
     'dh.event.startingSoon': 'Dating Hour starts soon',
     'dh.event.cancelledToday':

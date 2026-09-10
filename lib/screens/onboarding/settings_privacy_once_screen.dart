@@ -110,19 +110,16 @@ class _SettingsPrivacyOnceScreenState
     final leave = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Einrichtung abbrechen?'),
-            content: const Text(
-              'Möchtest du die Einrichtung wirklich abbrechen? '
-              'Deine bisherigen Angaben werden gespeichert.',
-            ),
+            title: Text(L10n.t(ctx, 'setup.abortTitle')),
+            content: Text(L10n.t(ctx, 'setup.abortBody')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Weiter machen'),
+                child: Text(L10n.t(ctx, 'setup.abortContinue')),
               ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('Abbrechen'),
+                child: Text(L10n.t(ctx, 'common.cancel')),
               ),
             ],
           ),
@@ -149,11 +146,11 @@ class _SettingsPrivacyOnceScreenState
     // (Filter) hat sinnvolle Defaults und ist damit immer gueltig.
     if (_currentPage == _profilePage) {
       if (_bioCtrl.text.trim().isEmpty) {
-        _showStepHint('Bitte schreibe eine kurze Bio (Über mich).');
+        _showStepHint(L10n.t(context, 'setup.hintBio'));
         return;
       }
       if (_selectedInterests.isEmpty) {
-        _showStepHint('Bitte wähle mindestens ein Interesse.');
+        _showStepHint(L10n.t(context, 'setup.hintInterests'));
         return;
       }
       unawaited(_saveProfileExtras());
@@ -161,10 +158,7 @@ class _SettingsPrivacyOnceScreenState
     if (_currentPage == _introPage) {
       if (!IntroEditor.isValid(
           text: _introText, audioPath: _introAudioPath)) {
-        _showStepHint(
-          'Deine Vorstellung braucht Text UND Audio. Andere sollen dich '
-          'kennenlernen, bevor sie dein Foto sehen.',
-        );
+        _showStepHint(L10n.t(context, 'setup.hintIntro'));
         return;
       }
       _saveIntro();
@@ -270,16 +264,15 @@ class _SettingsPrivacyOnceScreenState
       await ref.read(profileProvider.notifier).update(photos: [path]);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profilbild hochgeladen.')),
+          SnackBar(content: Text(L10n.t(context, 'setupp.photoDone'))),
         );
       }
     } catch (e) {
       debugPrint('[SettingsPrivacyOnce] Avatar-Upload fehlgeschlagen: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Upload fehlgeschlagen. Du kannst das Bild '
-                  'jederzeit später im Profil festlegen.')),
+          SnackBar(
+              content: Text(L10n.t(context, 'setupp.photoFail'))),
         );
       }
     } finally {
@@ -378,13 +371,9 @@ class _SettingsPrivacyOnceScreenState
     }
     if (mounted && !flagsSaved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Hinweis: Der Einrichtungs-Stand konnte nicht auf dem Server '
-            'gesichert werden. Die Einrichtung erscheint beim nächsten '
-            'Login möglicherweise erneut.',
-          ),
-          duration: Duration(seconds: 6),
+        SnackBar(
+          content: Text(L10n.t(context, 'setup.flagsWarn')),
+          duration: const Duration(seconds: 6),
         ),
       );
     }
@@ -500,8 +489,7 @@ class _SettingsPrivacyOnceScreenState
       if (position == null) {
         setState(() {
           _isDetectingLocation = false;
-          _locationError = 'Standort konnte nicht ermittelt werden. '
-              'Bitte gib ihn manuell ein oder erlaube den Zugriff.';
+          _locationError = L10n.t(context, 'setup.locationDetectFail');
         });
         return;
       }
@@ -513,10 +501,7 @@ class _SettingsPrivacyOnceScreenState
       if (await locationService.isLocationSuspicious(position)) {
         setState(() {
           _isDetectingLocation = false;
-          _locationError = 'Hinweis: Dieser Standort weicht deutlich von '
-              'deinen bisherigen Standorten auf diesem Ger\u00e4t ab. '
-              'Falls das stimmt, w\u00e4hle ihn trotzdem - andernfalls '
-              'gib deinen Ort bitte manuell ein.';
+          _locationError = L10n.t(context, 'setup.locationSuspicious');
         });
         return;
       }
@@ -581,7 +566,8 @@ class _SettingsPrivacyOnceScreenState
       if (!mounted) return;
       setState(() {
         _isDetectingLocation = false;
-        _locationError = 'Fehler bei der Standortermittlung: $e';
+        _locationError = L10n.tf(
+            context, 'setup.locationError', {'error': e.toString()});
       });
     }
   }
@@ -647,7 +633,8 @@ class _SettingsPrivacyOnceScreenState
                     Row(
                       children: [
                         Text(
-                          'Schritt ${_currentPage + 1} von $_pageCount',
+                          L10n.tf(context, 'setup.stepOf',
+                              {'n': '${_currentPage + 1}', 'of': '$_pageCount'}),
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
                         const Spacer(),
@@ -678,14 +665,11 @@ class _SettingsPrivacyOnceScreenState
                     // Page 1: Privatsphäre & Theme
                     _Page(
                       questionKey: 'setupq.visibility',
-                      subtitle:
-                          'Wer darf dein Profil sehen? Wie soll die App aussehen?',
+                      subtitle: L10n.t(context, 'setupp.visibilitySub'),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Wer kann mein Profil sehen?',
-                            style: Theme.of(context).textTheme.titleMedium,
+                          Text(L10n.t(context, 'setupp.visibilityQuestion'), style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
                           for (final v in ProfileVisibility.values)
@@ -700,9 +684,7 @@ class _SettingsPrivacyOnceScreenState
                               },
                             ),
                           const Divider(),
-                          Text(
-                            'Darstellung',
-                            style: Theme.of(context).textTheme.titleMedium,
+                          Text(L10n.t(context, 'setupp.appearance'), style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
                           // String-Keys statt bool?-Werten: Radio mit
@@ -716,7 +698,7 @@ class _SettingsPrivacyOnceScreenState
                                 : (settings.useDarkMode!
                                     ? 'dark'
                                     : 'light'),
-                            title: 'System',
+                            title: L10n.t(context, 'setupp.systemTheme'),
                             onChanged: (_) => notifier.setDarkMode(null),
                           ),
                           SelectableTile<String>(
@@ -726,7 +708,7 @@ class _SettingsPrivacyOnceScreenState
                                 : (settings.useDarkMode!
                                     ? 'dark'
                                     : 'light'),
-                            title: 'Hell',
+                            title: L10n.t(context, 'setupp.lightTheme'),
                             onChanged: (_) => notifier.setDarkMode(false),
                           ),
                           SelectableTile<String>(
@@ -736,13 +718,11 @@ class _SettingsPrivacyOnceScreenState
                                 : (settings.useDarkMode!
                                     ? 'dark'
                                     : 'light'),
-                            title: 'Dunkel',
+                            title: L10n.t(context, 'setupp.darkTheme'),
                             onChanged: (_) => notifier.setDarkMode(true),
                           ),
                           const SizedBox(height: 16),
-                          Text(
-                            'Farbwelt',
-                            style: Theme.of(context).textTheme.titleMedium,
+                          Text(L10n.t(context, 'setupp.colorWorld'), style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
                           ThemePicker(
@@ -760,9 +740,7 @@ class _SettingsPrivacyOnceScreenState
                        child: Column(
                          crossAxisAlignment: CrossAxisAlignment.start,
                          children: [
-                            Text(
-                              'Ich suche',
-                              style: Theme.of(context).textTheme.titleMedium,
+                            Text(L10n.t(context, 'setupp.lookingFor'), style: Theme.of(context).textTheme.titleMedium,
                             ),
                             const SizedBox(height: 12),
                             // Mehrfachauswahl per Chips (inkl. "Alle"-Kurzform).
@@ -770,16 +748,14 @@ class _SettingsPrivacyOnceScreenState
                             // werden, solange es das letzte aktive ist.
                             const GenderPreferenceSelector(),
                            const SizedBox(height: 20),
-                           Text(
-                             'Was suchst du?',
-                             style: Theme.of(context).textTheme.titleMedium,
+                           Text(L10n.t(context, 'setupp.whatLooking'), style: Theme.of(context).textTheme.titleMedium,
                            ),
                            const SizedBox(height: 12),
                             DropdownButtonFormField<RelationshipType>(
                               initialValue: userPrefs.relationshipType,
                               borderRadius: BorderRadius.circular(16),
-                              decoration: const InputDecoration(
-                                labelText: 'Beziehungsart',
+                              decoration: InputDecoration(
+                                labelText: L10n.t(context, 'setupp.relType'),
 
                              ),
                               items: [
@@ -817,16 +793,14 @@ class _SettingsPrivacyOnceScreenState
                              },
                            ),
                            const SizedBox(height: 20),
-                           Text(
-                             'Entfernung',
-                             style: Theme.of(context).textTheme.titleMedium,
+                           Text(L10n.t(context, 'setupp.distance'), style: Theme.of(context).textTheme.titleMedium,
                            ),
                            const SizedBox(height: 12),
                             DropdownButtonFormField<DistanceFilterMode>(
                               initialValue: userPrefs.distanceFilterMode,
                               borderRadius: BorderRadius.circular(16),
-                              decoration: const InputDecoration(
-                                labelText: 'Filter',
+                              decoration: InputDecoration(
+                                labelText: L10n.t(context, 'setupp.filterLabel'),
 
                              ),
                              items: DistanceFilterMode.values.map((mode) {
@@ -847,7 +821,7 @@ class _SettingsPrivacyOnceScreenState
                                 // Gleiche Quelle wie "Profil bearbeiten"
                                 // (userPreferences), damit beide Screens
                                 // immer denselben Wert zeigen.
-                                'Maximale Entfernung: ${userPrefs.maxDistanceKm} km',
+                                L10n.tf(context, 'setupp.maxDistance', {'km': ''}),
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),
@@ -868,8 +842,8 @@ class _SettingsPrivacyOnceScreenState
                                 controller: _locationCtrl,
                                 keyboardType: TextInputType.text,
                                 decoration: InputDecoration(
-                                  labelText: 'Bundesland',
-                                  hintText: 'z. B. Bayern',
+                                  labelText: L10n.t(context, 'setupp.stateLabel'),
+                                  hintText: L10n.t(context, 'setupp.stateHint'),
                                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                                   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                                 ),
@@ -891,14 +865,12 @@ class _SettingsPrivacyOnceScreenState
                            if (userPrefs.distanceFilterMode == DistanceFilterMode.germany) ...[
                              const SizedBox(height: 20),
                              Text(
-                               'Es werden Profile aus ganz Deutschland angezeigt.',
+                               L10n.t(context, 'setupp.germanyNote'),
                                style: Theme.of(context).textTheme.bodyMedium,
                              ),
                              const SizedBox(height: 20),
                            ],
-                           Text(
-                             'Standort',
-                             style: Theme.of(context).textTheme.titleMedium,
+                           Text(L10n.t(context, 'setupp.location'), style: Theme.of(context).textTheme.titleMedium,
                            ),
                            const SizedBox(height: 12),
                             // GPS-Button als suffixIcon: immer perfekt
@@ -907,8 +879,8 @@ class _SettingsPrivacyOnceScreenState
                               controller: _locationCtrl,
                               keyboardType: TextInputType.text,
                               decoration: InputDecoration(
-                                labelText: 'Dein Standort / Stadt',
-                                hintText: 'z. B. Berlin',
+                                labelText: L10n.t(context, 'setupp.locationLabel'),
+                                hintText: L10n.t(context, 'setupp.locationHint'),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   borderSide: BorderSide(
@@ -933,8 +905,7 @@ class _SettingsPrivacyOnceScreenState
                                         ),
                                       )
                                     : IconButton(
-                                        tooltip:
-                                            'Standort erkennen (GPS)',
+                                        tooltip: L10n.t(context, 'setupp.locationGps'),
                                         onPressed: _detectLocation,
                                         icon:
                                             const Icon(Icons.my_location),
@@ -958,7 +929,9 @@ class _SettingsPrivacyOnceScreenState
                                     _locationCtrl.clear();
                                     userPrefsNotifier.setLocation(null);
                                     setState(() {
-                                      _locationValidationError = 'Der Ort liegt mehr als 15 km von deinem aktuellen Standort entfernt.';
+                                      _locationValidationError =
+                                          L10n.t(context,
+                                              'setup.locationTooFar');
                                     });
                                     return;
                                   }
@@ -1016,10 +989,7 @@ class _SettingsPrivacyOnceScreenState
                     // Page 3: Profil & Interessen (Bio, Bundesland, Bild)
                     _Page(
                       questionKey: 'setupq.profile',
-                      subtitle:
-                          'Ein Bild, ein paar Worte über dich und deine '
-                          'Interessen helfen anderen, dich kennenzulernen. '
-                          'Alles optional und später änderbar.',
+                      subtitle: L10n.t(context, 'setupp.profileSub'),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1073,9 +1043,9 @@ class _SettingsPrivacyOnceScreenState
                             controller: _bioCtrl,
                             maxLines: 3,
                             maxLength: 300,
-                            decoration: const InputDecoration(
-                              labelText: 'Über mich (Bio)',
-                              hintText: 'z. B. Hobbys, was dir wichtig ist',
+                            decoration: InputDecoration(
+                              labelText: L10n.t(context, 'setupp.bioLabel'),
+                              hintText: L10n.t(context, 'setupp.bioHint'),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -1086,8 +1056,8 @@ class _SettingsPrivacyOnceScreenState
                                     ? null
                                     : _selectedState,
                             borderRadius: BorderRadius.circular(16),
-                            decoration: const InputDecoration(
-                              labelText: 'Bundesland (optional)',
+                            decoration: InputDecoration(
+                              labelText: L10n.t(context, 'setupp.stateOptional'),
                             ),
                             hint: Text(L10n.t(context, 'setup.pleasePick')),
                             items: kGermanStates
@@ -1101,8 +1071,7 @@ class _SettingsPrivacyOnceScreenState
                           ),
                           const SizedBox(height: 20),
                           // ---- Interessen ----
-                          Text('Interessen',
-                              style: Theme.of(context).textTheme.titleMedium),
+                          Text(L10n.t(context, 'setupp.interests'), style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
@@ -1127,10 +1096,7 @@ class _SettingsPrivacyOnceScreenState
                     // Page 4: Deine Vorstellung (Text + Audio, überspringbar)
                     _Page(
                       questionKey: 'setupq.intro',
-                      subtitle:
-                          'Erzähl von dir, als Text und gesprochen. Beides '
-                          'wird anderen gezeigt, bevor sie dein Foto sehen. '
-                          'Du kannst diesen Schritt auch überspringen.',
+                      subtitle: L10n.t(context, 'setupp.introSub'),
                       child: IntroEditor(
                         initialText: _introText,
                         initialAudioPath: _introAudioPath,
@@ -1146,17 +1112,14 @@ class _SettingsPrivacyOnceScreenState
                     // Page 5: Gewohnheiten (Rauchen, Alkohol, Drogen)
                     _Page(
                       questionKey: 'setupq.habits',
-                      subtitle: 'Wie stehst du zu Rauchen, Alkohol und Drogen? '
-                          'Diese Angaben beeinflussen, wen du bei '
-                          '"Find your Match" siehst.',
+                      subtitle: L10n.t(context, 'setupp.habitsSub'),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Es werden nur Personen gezeigt, die maximal so '
-                            'viel konsumieren wie du. Du kannst das später in '
-                            'den Einstellungen oder im Profil ändern.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          Text(
+                            L10n.t(context, 'setupp.habitsHint'),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                           ),
                           const SizedBox(height: 16),
                           HabitudeSelector(
@@ -1184,20 +1147,14 @@ class _SettingsPrivacyOnceScreenState
                     // Page 4: Passkey (überspringbar)
                     _Page(
                       questionKey: 'setupq.passkey',
-                      subtitle:
-                          'Melde dich künftig ohne Passwort an, per '
-                          'Fingerabdruck oder Gesicht. Optional, du kannst '
-                          'diesen Schritt überspringen.',
+                      subtitle: L10n.t(context, 'setupp.passkeySub'),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const Icon(Icons.key, size: 48),
                           const SizedBox(height: 16),
-                          const Text(
-                            'Ein Passkey ist die sicherste und bequemste '
-                            'Anmeldeart: Kein Passwort, das du merken oder '
-                            'vergessen kannst, und schwerer zu stehlen als '
-                            'ein Passwort.',
+                          Text(
+                            L10n.t(context, 'setupp.passkeyBody'),
                           ),
                           const SizedBox(height: 24),
                           FilledButton.icon(
@@ -1217,14 +1174,13 @@ class _SettingsPrivacyOnceScreenState
                                     : Icons.fingerprint),
                             label: Text(
                               _passkeyCreated
-                                  ? 'Passkey eingerichtet'
-                                  : 'Passkey jetzt einrichten',
+                                  ? L10n.t(context, 'setupp.passkeyDone')
+                                  : L10n.t(context, 'setupp.passkeyStart'),
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Du kannst die Einrichtung jederzeit später in '
-                            'den Einstellungen nachholen.',
+                            L10n.t(context, 'setupp.laterHint'),
                             style: Theme.of(context).textTheme.bodySmall,
                             textAlign: TextAlign.center,
                           ),
@@ -1258,15 +1214,8 @@ class _SettingsPrivacyOnceScreenState
                               const SizedBox(height: 16),
                               Text(
                                 mfaActive
-                                    ? 'Zwei-Faktor-Schutz ist aktiv. Bei '
-                                        'jedem Login wirst du nach dem '
-                                        'Code aus deiner Authenticator-App '
-                                        'gefragt.'
-                                    : 'Ein zweiter Faktor schützt dein '
-                                        'Konto, selbst wenn dein Passwort '
-                                        'gestohlen wird. Du brauchst eine '
-                                        'Authenticator-App (z. B. Google '
-                                        'Authenticator, Aegis oder 2FAS).',
+                                    ? L10n.t(context, 'setupp.mfaActive')
+                                    : L10n.t(context, 'setupp.mfaBody'),
                               ),
                               const SizedBox(height: 24),
                               FilledButton.icon(
@@ -1277,13 +1226,12 @@ class _SettingsPrivacyOnceScreenState
                                     ? Icons.check_circle
                                     : Icons.qr_code),
                                 label: Text(mfaActive
-                                    ? '2FA eingerichtet'
-                                    : 'Jetzt einrichten'),
+                                    ? L10n.t(context, 'setupp.mfaDone')
+                                    : L10n.t(context, 'setupp.mfaStart')),
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Du kannst die Einrichtung jederzeit später '
-                                'in den Einstellungen nachholen.',
+                                L10n.t(context, 'setupp.laterHint'),
                                 style: Theme.of(context).textTheme.bodySmall,
                                 textAlign: TextAlign.center,
                               ),
@@ -1296,7 +1244,7 @@ class _SettingsPrivacyOnceScreenState
                     _Page(
                       questionKey: 'setupq.guidelines',
                       subtitle:
-                          'Bitte akzeptiere die Regeln der App, um fortzufahren.',
+                          L10n.t(context, 'setupp.guidelinesSub'),
                       child: _buildCommunityGuidelines(context),
                     ),
                   ],
@@ -1308,20 +1256,19 @@ class _SettingsPrivacyOnceScreenState
                   children: [
                     if (_currentPage < _pageCount - 1)
                       PrimaryButton(
-                        label: 'Weiter',
+                        label: L10n.t(context, 'onb.next'),
                         icon: const Icon(Icons.arrow_forward),
                         onPressed: _nextPage,
                       )
                     else
                       PrimaryButton(
-                        label: 'Akzeptieren & los geht\'s',
+                        label: L10n.t(context, 'setupp.finish'),
                         icon: const Icon(Icons.check),
                         onPressed: _acceptAndFinish,
                       ),
                     const SizedBox(height: 12),
                     Text(
-                      'Diese Einstellungen kannst du später jederzeit in '
-                      'den Einstellungen ändern.',
+                      L10n.t(context, 'setupp.changeLater'),
                       style: Theme.of(context).textTheme.bodySmall,
                       textAlign: TextAlign.center,
                     ),
@@ -1340,43 +1287,23 @@ class _SettingsPrivacyOnceScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Wertegemeinschaft',
+          L10n.t(context, 'setupp.guidelinesIntroTitle'),
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Diese App lebt von einem respektvollen, wertschätzenden Umgang '
-          'miteinander, unabhängig von Herkunft, Geschlecht, Religion oder '
-          'Lebensentwurf.',
+        Text(
+          L10n.t(context, 'setupp.guidelinesIntroBody'),
         ),
         const SizedBox(height: 16),
-        const _RuleItem(
-          '1',
-          'Behandle andere mit Respekt und Freundlichkeit.',
-        ),
-        const _RuleItem(
-          '2',
-          'Keine Fake Profile, keine Werbung und kein Missbrauch.',
-        ),
-        const _RuleItem(
-          '3',
-          'Persönlichkeit vor Aussehen: Fotos werden erst nach einem Funke gezeigt.',
-        ),
-        const _RuleItem(
-          '4',
-          'Respektiere Grenzen: Keine unerwünschten Bilder oder Nachrichten.',
-        ),
-        const _RuleItem(
-          '5',
-          'Ehrlichkeit zahlt sich aus: Sei authentisch in deinem Profil.',
-        ),
-        const _RuleItem(
-          '6',
-          'Bei Verstoß gegen diese Regeln kann der Zugang gesperrt werden.',
-        ),
+        _RuleItem('1', L10n.t(context, 'cg.1.titleShort')),
+        _RuleItem('2', L10n.t(context, 'cg.2.titleShort')),
+        _RuleItem('3', L10n.t(context, 'cg.3.titleShort')),
+        _RuleItem('4', L10n.t(context, 'cg.4.titleShort')),
+        _RuleItem('5', L10n.t(context, 'cg.5.titleShort')),
+        _RuleItem('6', L10n.t(context, 'setupp.guidelinesBan')),
         const SizedBox(height: 12),
         Text(
-          'Bei Verstoß kann der Zugang dauerhaft gesperrt werden.',
+          L10n.t(context, 'setupp.guidelinesWarn'),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.error,
               ),

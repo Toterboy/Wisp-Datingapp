@@ -46,15 +46,15 @@ class _InteressenScreenState extends ConsumerState<InteressenScreen>
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Interessen'),
+        title: Text(L10n.t(context, 'interests.title')),
         bottom: TabBar(
           controller: _tabController,
           // Abgerundete Klick-Animation (kein eckiger Aufblitzer).
           splashBorderRadius: const BorderRadius.all(Radius.circular(24)),
-          tabs: const [
-            Tab(text: 'Gesendet'),
-            Tab(text: 'Erhalten'),
-            Tab(text: 'Funken'),
+          tabs: [
+            Tab(text: L10n.t(context, 'interests.tabSent')),
+            Tab(text: L10n.t(context, 'interests.tabReceived')),
+            Tab(text: L10n.t(context, 'interests.tabSparks')),
           ],
         ),
       ),
@@ -129,12 +129,10 @@ class _OwnLikesTabState extends ConsumerState<_OwnLikesTab> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_likes.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.favorite_border,
-        title: 'Du hast noch niemanden geliked',
-        message:
-            'Lerne Leute über ihre Vorstellung kennen ("Find your Match") '
-            'oder swipe blind durch Profile.',
+        title: L10n.t(context, 'interests.emptySentTitle'),
+        message: L10n.t(context, 'interests.emptySentBody'),
       );
     }
     return RefreshIndicator(
@@ -237,9 +235,10 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
         SnackBar(
           content: Text(
             accept
-                ? 'Ein Funke mit ${like.profile.name} ist entstanden! '
-                    'Ihr könnt direkt chatten.'
-                : 'Like von ${like.profile.name} abgelehnt.',
+                ? L10n.tf(context, 'interests.sparkAccepted',
+                    {'name': like.profile.name})
+                : L10n.tf(context, 'interests.likeDeclined',
+                    {'name': like.profile.name}),
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -248,7 +247,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
       debugPrint('[Interessen] Antwort fehlgeschlagen: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler: $e')),
+          SnackBar(content: Text(L10n.tf(context, 'common.errorWith', {'error': '$e'}))),
         );
       }
     } finally {
@@ -262,12 +261,10 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_likes.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.favorite_border,
-        title: 'Noch keine erhaltenen Likes',
-        message:
-            'Sobald dich jemand über seine Vorstellung mag, erscheint er hier '
-            'und du entscheidest über Funke oder Ablehnung.',
+        title: L10n.t(context, 'interests.emptyReceivedTitle'),
+        message: L10n.t(context, 'interests.emptyReceivedBody'),
       );
     }
     return RefreshIndicator(
@@ -303,7 +300,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
                     subtitle: Text(
                       profile.introText.isNotEmpty
                           ? profile.introText
-                          : 'Hat dich geliked',
+                          : L10n.t(context, 'interests.likedYou'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -322,7 +319,7 @@ class _ReceivedLikesTabState extends ConsumerState<_ReceivedLikesTab> {
                           onPressed:
                               busy ? null : () => _respond(like, accept: false),
                           icon: const Icon(Icons.close, color: Colors.red),
-                          label: const Text('Ablehnen'),
+                          label: Text(L10n.t(context, 'interests.decline')),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -414,9 +411,12 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(failed == 0
-              ? '${_selected.length} Chat(s) aus der Liste entfernt.'
-              : '$failed von ${_selected.length} konnten nicht entfernt '
-                  'werden. Bitte erneut versuchen.'),
+              ? L10n.tf(context, 'interests.hiddenCount',
+                  {'n': '${_selected.length}'})
+              : L10n.tf(context, 'interests.hideFailed', {
+                  'failed': '$failed',
+                  'total': '${_selected.length}',
+                })),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -445,8 +445,8 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Re-Funke fehlgeschlagen. Bitte erneut versuchen.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'interests.resparkFailed')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -464,22 +464,23 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Gespeichertes Profil entfernen?'),
-        content: Text(
-          '${contact.partner.name} wird lokal gelöscht. Der zugehörige '
-          'Chat-Verlauf geht damit verloren.',
-        ),
+        title: Text(L10n.t(ctx, 'interests.deleteSavedTitle')),
+        content: Text(L10n.tf(
+          ctx,
+          'interests.deleteSavedBody',
+          {'name': contact.partner.name},
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Behalten'),
+            child: Text(L10n.t(ctx, 'intro.discardKeep')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Entfernen'),
+            child: Text(L10n.t(ctx, 'intro.delete')),
           ),
         ],
       ),
@@ -489,7 +490,9 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
     if (ref.context.mounted) {
       ScaffoldMessenger.of(ref.context).showSnackBar(
         SnackBar(
-          content: Text('${contact.partner.name} wurde entfernt.'),
+          content: Text(L10n.tf(
+              ref.context, 'profile.detail.savedRemoved',
+              {'name': contact.partner.name})),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -513,12 +516,10 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_serverMatches.isEmpty && qrContacts.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.chat_bubble_outline,
-        title: 'Noch keine Funken',
-        message:
-            'Bestätige erhaltene Likes, um Funken zu bekommen. Danach wartet '
-            'das Kennenlern-Quiz auf euch.',
+        title: L10n.t(context, 'interests.emptySparksTitle'),
+        message: L10n.t(context, 'interests.emptySparksBody'),
       );
     }
 
@@ -541,20 +542,21 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
                         });
                       },
                       icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Abbrechen'),
+                      label: Text(L10n.t(context, 'common.cancel')),
                     ),
                     const Spacer(),
                     FilledButton.icon(
                       onPressed: _selected.isEmpty ? null : _hideSelected,
                       icon: const Icon(Icons.visibility_off, size: 18),
-                      label: Text('Ausblenden (${_selected.length})'),
+                      label: Text(L10n.tf(context, 'interests.hideSelected',
+                          {'n': '${_selected.length}'})),
                     ),
                   ] else ...[
                     const Spacer(),
                     TextButton.icon(
                       onPressed: () => setState(() => _selectMode = true),
                       icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text('Verwalten'),
+                      label: Text(L10n.t(context, 'interests.manage')),
                     ),
                   ],
                 ],
@@ -562,19 +564,17 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
             ),
           ],
           if (qrContacts.isNotEmpty) ...[
-            const _SectionHeader(
+            _SectionHeader(
               icon: Icons.bookmark,
-              title: 'Gespeicherte Profile',
-              subtitle:
-                  'Lokal gespeichert (max. 5) - zum Nachschreiben, wenn du '
-                  'unterwegs kein Internet hattest',
+              title: L10n.t(context, 'interests.savedTitle'),
+              subtitle: L10n.t(context, 'interests.savedSub'),
             ),
             ...qrContacts.map((m) => ListTile(
                   leading: const CircleAvatar(
                     child: Icon(Icons.person),
                   ),
                   title: Text('${m.partner.name}, ${m.partner.age}'),
-                  subtitle: const Text('Gespeichert - später anschreiben'),
+                  subtitle: Text(L10n.t(context, 'interests.savedTileSub')),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -583,7 +583,7 @@ class _MatchesTabState extends ConsumerState<_MatchesTab> {
                       IconButton(
                         icon: const Icon(Icons.delete_outline,
                             color: Colors.red),
-                        tooltip: 'Gespeichertes Profil entfernen',
+                        tooltip: L10n.t(context, 'qr.savedDeleteTooltip'),
                         onPressed: () =>
                             _deleteSavedProfile(context, ref, m),
                       ),
@@ -629,11 +629,10 @@ subtitle: L10n.t(context, 'interests.matchesSub'),
           if (cooledMatches.isNotEmpty) ...[
             const SizedBox(height: 8),
             const Divider(indent: 16, endIndent: 16),
-            const _SectionHeader(
+            _SectionHeader(
               icon: Icons.archive_outlined,
-              title: 'Erschlossene Funken',
-              subtitle:
-                  'Ruhig beendet - ohne Druck, jederzeit wieder entzündbar',
+              title: L10n.t(context, 'interests.cooledTitle'),
+              subtitle: L10n.t(context, 'interests.cooledSub'),
             ),
             ...cooledMatches.map((m) => _CooledMatchTile(
                   match: m,
@@ -673,14 +672,14 @@ class _CooledMatchTile extends StatelessWidget {
         leading: const CircleAvatar(child: Icon(Icons.person_outline)),
         title: Text('${p.name}, ${p.age ?? '?'}'),
         subtitle: Text(
-          p.bio.isNotEmpty ? p.bio : 'Keine Bio',
+          p.bio.isNotEmpty ? p.bio : L10n.t(context, 'interests.noBio'),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         trailing: FilledButton.tonalIcon(
           onPressed: onRespark,
           icon: const Icon(Icons.local_fire_department, size: 18),
-          label: const Text('Re-Funke'),
+          label: Text(L10n.t(context, 'interests.resparkBtn')),
         ),
       ),
     );
@@ -755,12 +754,12 @@ class _MatchTile extends StatelessWidget {
         ),
         subtitle: Text(
           match.quizPassed
-              ? 'Foto freigeschaltet'
+              ? L10n.t(context, 'interests.photoUnlocked')
               : match.createdVia == 'find_match'
-                  ? 'Foto-Freischaltung: Kennenlern-Quiz'
+                  ? L10n.t(context, 'interests.quizPending')
                   : p.bio.isNotEmpty
                       ? p.bio
-                      : 'Keine Bio',
+                      : L10n.t(context, 'interests.noBio'),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

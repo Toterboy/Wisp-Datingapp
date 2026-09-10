@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -349,7 +349,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Nachricht konnte nicht gesendet werden: $e')),
+          SnackBar(
+            content: Text(
+                L10n.tf(context, 'chat.sendFailed', {'error': '$e'})),
+          ),
         );
       }
     }
@@ -384,7 +387,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Bild senden'),
+        title: Text(L10n.t(context, 'chat.imageSend')),
         content: Text(L10n.t(context, 'chat.imageSourcePrompt')),
         // v0.9.0-Feedback: Buttons volle Breite, untereinander,
         // Abbrechen ganz unten (vorher quetschten sie sich in eine Reihe).
@@ -394,7 +397,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
             ),
-            child: const Text('Kamera'),
+            child: Text(L10n.t(ctx, 'chat.camera')),
           ),
           const SizedBox(height: 8),
           FilledButton.tonal(
@@ -402,7 +405,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
             ),
-            child: const Text('Galerie'),
+            child: Text(L10n.t(ctx, 'chat.gallery')),
           ),
           const SizedBox(height: 8),
           TextButton(
@@ -502,14 +505,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         await showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.error_outline, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Senden fehlgeschlagen'),
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 8),
+                Text(L10n.t(ctx, 'chat.imageSendFailed')),
               ],
             ),
-            content: Text('Das Bild konnte nicht gesendet werden.\n\n$e'),
+            content: Text(L10n.tf(ctx, 'chat.imageSendFailedBody', {'error': '$e'})),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -520,7 +523,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   Navigator.of(ctx).pop();
                   _pickImage();
                 },
-                child: const Text('Wiederholen'),
+                child: Text(L10n.t(ctx, 'chat.retry')),
               ),
             ],
           ),
@@ -569,8 +572,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           await file.delete();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Aufnahme zu kurz (< 1 s), verworfen.'),
+              SnackBar(
+                content: Text(L10n.t(context, 'chat.voiceTooShort')),
               ),
             );
           }
@@ -628,7 +631,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Aufnahme fehlgeschlagen: $e')),
+            SnackBar(content: Text(L10n.tf(context, 'chat.voiceRecordFailed', {'error': '$e'}))),
           );
         }
       }
@@ -639,7 +642,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         if (!hasPermission) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Mikrofon Zugriff verweigert.')),
+              SnackBar(content: Text(L10n.t(context, 'intro.micDenied'))),
             );
           }
           return;
@@ -670,7 +673,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Aufnahme konnte nicht gestartet werden: $e')),
+            SnackBar(content: Text(L10n.tf(context, 'chat.voiceStartFailed', {'error': '$e'}))),
           );
         }
       }
@@ -696,7 +699,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     } catch (_) {}
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aufnahme abgebrochen')),
+        SnackBar(content: Text(L10n.t(context, 'chat.voiceCancelled'))),
       );
     }
   }
@@ -749,11 +752,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             children: [
               Text(
                 safetyNumber == null
-                    ? 'Noch keine verschlüsselte Verbindung zu $peerName '
-                        'aufgebaut. Die Nummer erscheint nach der ersten '
-                        'Nachricht.'
-                    : 'Vergleiche diese Nummer mit $peerName, am besten '
-                        'persönlich oder telefonisch:',
+                    ? L10n.tf(context, 'chat.safetyNotConnected',
+                        {'name': peerName})
+                    : L10n.tf(context, 'chat.safetyCompare',
+                        {'name': peerName}),
               ),
               if (safetyNumber != null) ...[
                 const SizedBox(height: 12),
@@ -779,8 +781,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(L10n.t(context, 'chat.identityVerifiedTitle')),
-                  subtitle: const Text(
-                    'Nur aktivieren, wenn die Nummern übereinstimmen.',
+                  subtitle: Text(
+                    L10n.t(context, 'chat.identityVerifiedHint'),
                   ),
                   value: verified,
                   onChanged: (value) async {
@@ -848,29 +850,27 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.block, color: Colors.red),
-            SizedBox(width: 8),
-            Expanded(child: Text('Nutzer blockieren?')),
+            const Icon(Icons.block, color: Colors.red),
+            const SizedBox(width: 8),
+            Expanded(child: Text(L10n.t(ctx, 'chat.blockTitle'))),
           ],
         ),
-        content: Text(
-          '$peerName wird dauerhaft blockiert: Der Funke wird beendet und '
-          'diese Person kann dich nicht mehr liken, einen Funke setzen oder dir '
-          'Nachrichten senden. Die Blockierung kann später über den '
-          'Support-Dialog nicht aufgehoben werden. Nur du selbst kannst '
-          'sie in den Einstellungen entfernen.',
-        ),
+        content: Text(L10n.tf(
+          context,
+          'chat.blockBody',
+          {'name': peerName},
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
+            child: Text(L10n.t(ctx, 'common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Blockieren'),
+            child: Text(L10n.t(ctx, 'chat.blockAction')),
           ),
         ],
       ),
@@ -883,7 +883,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$peerName wurde blockiert.'),
+            content: Text(L10n.tf(context, 'chat.blockedDone', {'name': peerName})),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -896,8 +896,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Blockieren fehlgeschlagen. Bitte versuche es erneut.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'chat.blockFailed')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -918,8 +918,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Future<void> _sendContextIcebreaker(String interest) async {
     final match = _match;
     if (match == null || _myUserId == null) return;
-    final text = 'Wir teilen das Interesse "$interest". Erzähl mir davon: '
-        'was war dein Highlight dazu? 😊';
+    final text = L10n.tf(
+        context, 'chat.icebreakerText', {'interest': interest});
     final localMsg = Message(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',
       senderId: _myUserId!,
@@ -963,7 +963,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     if (picked == null || !mounted) return;
 
     // Vorschlag als E2E-Nachricht senden (gleicher Weg wie _send()).
-    final text = 'Idee für ein Date: $picked ✨ Was meinst du?';
+    final text = L10n.tf(context, 'chat.dateIdea', {'idea': picked});
     final localMsg = Message(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',
       senderId: _myUserId ?? AppConstants.currentUserId,
@@ -978,8 +978,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vorschlag konnte nicht gesendet werden.'),
+          SnackBar(
+            content: Text(L10n.t(context, 'chat.ideaSendFailed')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -987,21 +987,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     }
   }
 
-  /// Vorbereitete, freundliche Absage-Texte ("Ehrliches Beenden", v0.8.0):  /// Ghosting aktiv erschweren, ohne den Nutzer mit Formulierungen allein
-  /// zu lassen.
-  static const _goodbyeTexts = <String>[
-    'Hey, ich hatte wirklich schöne Gespräche mit dir, spüre aber '
-        'selbst, dass es nicht das wird, was wir beide verdienen. Ich '
-        'lasse den Funken jetzt ruhen – danke dir und alles Gute! 🌿',
-    'Ich mag dich, aber ich merke, dass ich gerade nicht dasselbe '
-        'investieren kann wie du. Ehrlicher finde ich, das klar zu sagen, '
-        'statt mich zu verziehen. Mach\'s gut! 🙏',
-    'Wir passen für mich gerade nicht zusammen – das sagt nichts über '
-        'dich aus. Ich wünsche dir von Herzen alles Gute! ✨',
-    'Meine Gefühle haben sich verändert. Statt dich im Ungewissen zu '
-        'lassen, lasse ich den Funken jetzt sanft ruhen. Danke für die '
-        'schönen Momente! 🕊️',
-  ];
+  /// Vorbereitete, freundliche Absage-Texte ("Ehrliches Beenden", v0.8.0):
+  /// Ghosting aktiv erschweren, ohne den Nutzer mit Formulierungen allein
+  /// zu lassen. Zweisprachig über L10n-Keys (chat.goodbye.1..4).
+  static const _goodbyeCount = 4;
 
   /// "Ehrliches Beenden" (v0.8.0) statt hartem Auflösen: Entweder den
   /// Funken RUHIG enden lassen (status -> cooled, landet bei beiden unter
@@ -1020,11 +1009,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Der Funke wandert bei euch beiden in "Erschlossene '
-                  'Funken" – ohne Countdown, ohne Benachrichtigung. Ein '
-                  'Re-Funke ist jederzeit mit einem Tap möglich.',
-                  style: TextStyle(fontSize: 13),
+                Text(
+                  L10n.t(ctx, 'chat.endSparkBody'),
+                  style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 RadioGroup<String>(
@@ -1033,17 +1020,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       setDialogState(() => choice = v ?? 'silent'),
                   child: Column(
                     children: [
-                      const RadioListTile<String>(
+                      RadioListTile<String>(
                         value: 'silent',
-                        title: Text('Ruhig enden lassen'),
-                        subtitle: Text('Ohne Nachricht'),
+                        title: Text(L10n.t(ctx, 'chat.endSilent')),
+                        subtitle: Text(L10n.t(ctx, 'chat.endSilentSub')),
                         contentPadding: EdgeInsets.zero,
                       ),
-                      for (var i = 0; i < _goodbyeTexts.length; i++)
+                      for (var i = 1; i <= _goodbyeCount; i++)
                         RadioListTile<String>(
-                          value: 'msg_$i',
+                          value: 'msg_${i - 1}',
                           title: Text(
-                            _goodbyeTexts[i],
+                            L10n.t(ctx, 'chat.goodbye.$i'),
                             style: const TextStyle(fontSize: 12),
                           ),
                           contentPadding: EdgeInsets.zero,
@@ -1075,20 +1062,21 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     // normale Nachrichten).
     if (choice.startsWith('msg_')) {
       final index = int.tryParse(choice.substring(4)) ?? 0;
-      if (index >= 0 && index < _goodbyeTexts.length) {
+      if (index >= 0 && index < _goodbyeCount) {
         final match = _match;
         if (match != null && _myUserId != null) {
           final localMsg = Message(
             id: 'local_${DateTime.now().millisecondsSinceEpoch}',
             senderId: _myUserId!,
             receiverId: match.partner.id,
-            text: _goodbyeTexts[index],
+            text: L10n.t(context, 'chat.goodbye.${index + 1}'),
             timestamp: DateTime.now(),
           );
           ref.read(chatProvider.notifier).addMessage(match.id, localMsg,
               ref: ref);
           try {
-            await _p2p?.sendText(_goodbyeTexts[index]);
+            await _p2p?.sendText(
+                L10n.t(context, 'chat.goodbye.${index + 1}'));
             unawaited(_notifyPeerAboutMessage(match));
           } catch (_) {
             // Best-Effort: Die Verbindung kühlt trotzdem.
@@ -1304,14 +1292,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.local_fire_department_outlined),
-            tooltip: 'Eisbrecher-Fragen (Spice Questions)',
+            tooltip: L10n.t(context, 'chat.spiceTooltip'),
             onPressed: () => context.go(
               AppRoutes.spiceQuestionsPath(int.parse(widget.matchId)),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.flag_outlined),
-            tooltip: 'Nutzer melden',
+            tooltip: L10n.t(context, 'chat.reportTooltip'),
             onPressed: () {
               // Letzte 3 Nachrichten (inkl. Medien) werden automatisch mit
               // der Meldung an den Support übermittelt – nur so kann der
@@ -1360,8 +1348,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       : Icons.visibility_outlined),
                   title: Text(ref.watch(settingsProvider)
                           .contextIcebreakerEnabled
-                      ? 'Interessen-Vorschläge ausblenden'
-                      : 'Interessen-Vorschläge anzeigen'),
+                      ? L10n.t(context, 'chat.icebreakerOff')
+                      : L10n.t(context, 'chat.icebreakerOn')),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -1370,9 +1358,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.block),
                   title: Text(L10n.t(context, 'chat.block')),
-                  subtitle: const Text(
-                    'Keine Nachrichten, Likes oder Funken mehr von dieser Person.',
-                  ),
+                  subtitle: Text(L10n.t(context, 'chat.blockSub')),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -1391,7 +1377,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       body: Column(
         children: [
           if (!isPhotosVisible)
-            const BlindPhotoPlaceholder(label: 'Fotos nach Funke sichtbar'),
+            BlindPhotoPlaceholder(label: L10n.t(context, 'chat.photosAfterSpark')),
           MeetIntentCard(
             matchId: widget.matchId,
             partnerName: partner.name,
@@ -1437,7 +1423,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               child: OutlinedButton.icon(
                 onPressed: _showMeetIdeaWheel,
                 icon: const Icon(Icons.casino_outlined, size: 18),
-                label: const Text('Dreh das Rad - Date-Idee finden'),
+                label: Text(L10n.t(context, 'chat.ideaWheelBtn')),
               ),
             ),
           ),
@@ -1530,15 +1516,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.image),
-                    tooltip: 'Bild senden',
+                    tooltip: L10n.t(context, 'chat.imageSend'),
                     // E: Während eines Uploads deaktivieren.
                     onPressed: _uploadingImage ? null : _pickImage,
                   ),
                   IconButton(
                     icon: Icon(_recording ? Icons.stop : Icons.mic),
                     tooltip: _recording
-                        ? 'Aufnahme beenden & senden'
-                        : 'Sprachnachricht',
+                        ? L10n.t(context, 'chat.voiceStopSend')
+                        : L10n.t(context, 'chat.voiceTooltip'),
                     color: _recording ? Colors.red : null,
                     onPressed: _toggleRecord,
                   ),
@@ -1546,7 +1532,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   if (_recording)
                     IconButton(
                       icon: const Icon(Icons.close),
-                      tooltip: 'Aufnahme abbrechen',
+                      tooltip: L10n.t(context, 'chat.voiceCancel'),
                       color: Colors.red,
                       onPressed: _cancelRecording,
                     ),
@@ -1565,8 +1551,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       minLines: 1,
                       decoration: InputDecoration(
                         hintText: _recording
-                            ? 'Aufnahme: $_recordSeconds s'
-                            : 'Nachricht …',
+                            ? L10n.tf(context, 'chat.recordingHint',
+                                {'s': '$_recordSeconds'})
+                            : L10n.t(context, 'chat.hint'),
                         border: const OutlineInputBorder(
                           borderRadius: BorderRadius.all(Radius.circular(24)),
                         ),
@@ -1733,14 +1720,14 @@ class _MessageBubbleState extends State<_MessageBubble> {
                                 borderRadius:
                                     BorderRadius.all(Radius.circular(6)),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.visibility_off,
+                                  const Icon(Icons.visibility_off,
                                       size: 12, color: Colors.white),
-                                  SizedBox(width: 4),
-                                  Text('Verpixelt',
-                                      style: TextStyle(
+                                  const SizedBox(width: 4),
+                                  Text(L10n.t(context, 'chat.blurred'),
+                                      style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 10)),
                                 ],
@@ -1758,13 +1745,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
                                 color: Colors.black54,
                                 borderRadius: BorderRadius.all(Radius.circular(6)),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.lock, size: 12, color: Colors.white),
-                                  SizedBox(width: 2),
-                                  Text('Einmalig',
-                                      style: TextStyle(
+                                  const Icon(Icons.lock, size: 12, color: Colors.white),
+                                  const SizedBox(width: 2),
+                                  Text(L10n.t(context, 'chat.viewOnce'),
+                                      style: const TextStyle(
                                           color: Colors.white, fontSize: 10)),
                                 ],
                               ),
@@ -1802,23 +1789,19 @@ class _MessageBubbleState extends State<_MessageBubble> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Bild anzeigen?'),
-        content: const Text(
-          'Dieses Bild ist verpixelt, um dich vor unangemessenen Inhalten '
-          'zu schützen. Es kann Inhalte enthalten, die du als störend '
-          'empfindest.\n\nDu kannst es danach direkt melden.',
-        ),
+        title: Text(L10n.t(context, 'chat.revealTitle')),
+        content: Text(L10n.t(context, 'chat.revealBody')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Abbrechen'),
+            child: Text(L10n.t(context, 'common.cancel')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               setState(() => _revealed = true);
             },
-            child: const Text('Anzeigen'),
+            child: Text(L10n.t(context, 'chat.revealAction')),
           ),
         ],
       ),
@@ -1836,10 +1819,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
           children: [
             ListTile(
               leading: const Icon(Icons.flag_outlined, color: Colors.red),
-              title: const Text('Bild melden'),
-              subtitle: const Text(
-                'Wird mit Kontext an den Support übermittelt.',
-              ),
+              title: Text(L10n.t(context, 'chat.reportImage')),
+              subtitle: Text(L10n.t(context, 'chat.reportImageSub')),
               onTap: () {
                 Navigator.of(sheetCtx).pop();
                 widget.onReportImage(widget.msg);
@@ -1848,7 +1829,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
             if (blurred)
               ListTile(
                 leading: const Icon(Icons.visibility_outlined),
-                title: const Text('Bild anzeigen'),
+                title: Text(L10n.t(context, 'chat.revealAction')),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
                   _confirmRevealImage();
@@ -1869,14 +1850,15 @@ class _MessageBubbleState extends State<_MessageBubble> {
         borderRadius: BorderRadius.circular(12),
         color: Colors.grey.shade300,
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.photo_camera, size: 28, color: Colors.grey),
-            SizedBox(height: 4),
-            Text('Bereits angesehen',
-                style: TextStyle(color: Colors.grey, fontSize: 11)),
+            const Icon(Icons.photo_camera, size: 28, color: Colors.grey),
+            const SizedBox(height: 4),
+            Text(L10n.t(context, 'chat.viewedOnce'),
+                style: const TextStyle(
+                    color: Colors.grey, fontSize: 11)),
           ],
         ),
       ),
@@ -1923,13 +1905,14 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     color: Colors.red.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.timer, size: 14, color: Colors.white),
-                      SizedBox(width: 4),
-                      Text('Einmalig',
-                          style: TextStyle(color: Colors.white, fontSize: 11)),
+                      const Icon(Icons.timer, size: 14, color: Colors.white),
+                      const SizedBox(width: 4),
+                      Text(L10n.t(context, 'chat.viewOnce'),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2263,7 +2246,7 @@ class _MeetIdeaWheelDialogState extends State<_MeetIdeaWheelDialog> {
     return AlertDialog(
       icon: Icon(Icons.casino_outlined,
           color: Theme.of(context).colorScheme.primary, size: 36),
-      title: const Text('Dreh das Rad'),
+      title: Text(L10n.t(context, 'chat.wheelTitle')),
       content: SizedBox(
         width: double.maxFinite,
         child: Column(
@@ -2291,13 +2274,12 @@ class _MeetIdeaWheelDialogState extends State<_MeetIdeaWheelDialog> {
               FilledButton.icon(
                 onPressed: _spin,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Drehen'),
+                label: Text(L10n.t(context, 'chat.wheelSpin')),
               )
             else ...[
-              const Text(
-                'Passt das? Schick den Vorschlag – deine Gegenstelle '
-                'kann einfach antworten.',
-                style: TextStyle(fontSize: 12),
+              Text(
+                L10n.t(context, 'chat.wheelHint'),
+                style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -2308,7 +2290,7 @@ class _MeetIdeaWheelDialogState extends State<_MeetIdeaWheelDialog> {
         if (_result != null)
           TextButton(
             onPressed: _spin,
-            child: const Text('Nochmal drehen'),
+            child: Text(L10n.t(context, 'chat.wheelAgain')),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -2317,7 +2299,7 @@ class _MeetIdeaWheelDialogState extends State<_MeetIdeaWheelDialog> {
         if (_result != null)
           FilledButton(
             onPressed: () => Navigator.of(context).pop(_result),
-            child: const Text('Vorschlag senden'),
+            child: Text(L10n.t(context, 'chat.wheelSend')),
           ),
       ],
     );

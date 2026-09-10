@@ -53,8 +53,8 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
     if (peerId == ownId) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Das ist dein eigener Code!'),
+          SnackBar(
+            content: Text(L10n.t(context, 'qr.ownCode')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -235,8 +235,8 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
       if (rows.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Kein Nutzer mit diesem Code gefunden.'),
+            SnackBar(
+              content: Text(L10n.t(context, 'qr.noUserFound')),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -274,14 +274,14 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
 
   Widget _buildChoice() {
     return Scaffold(
-      appBar: AppBar(title: const Text('QR Code')),
+      appBar: AppBar(title: Text(L10n.t(context, 'qr.menuTitle'))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Was möchtest du tun?',
+              L10n.t(context, 'qr.choiceTitle'),
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
@@ -289,7 +289,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.qr_code_2),
-                title: const Text('Meinen QR Code zeigen'),
+                title: Text(L10n.t(context, 'qr.showMine')),
                 subtitle: Text(L10n.t(context, 'qr.shareSub')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push(AppRoutes.qrProfile),
@@ -299,7 +299,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.qr_code_scanner),
-                title: const Text('QR Code scannen'),
+                title: Text(L10n.t(context, 'qr.scanTitle')),
                 subtitle: Text(L10n.t(context, 'qr.scanSub')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => setState(() => _mode = _QrMode.camera),
@@ -309,8 +309,8 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.keyboard),
-                title: const Text('Code eingeben'),
-                subtitle: const Text('Den 8 stelligen Code manuell eintippen'),
+                title: Text(L10n.t(context, 'qr.enterCode')),
+                subtitle: Text(L10n.t(context, 'qr.enterCodeSub')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => setState(() => _mode = _QrMode.manual),
               ),
@@ -326,7 +326,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('QR Code scannen'),
+        title: Text(L10n.t(context, 'qr.scanTitle')),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -372,7 +372,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
   Widget _buildCodeInput() {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Code eingeben'),
+        title: Text(L10n.t(context, 'qr.enterCode')),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => setState(() => _mode = _QrMode.choice),
@@ -389,7 +389,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
                     color: Theme.of(context).colorScheme.primary),
                 const SizedBox(height: 24),
                 Text(
-                  'Gib den 8 stelligen Code der Person ein,\ndie du finden möchtest.',
+                  L10n.t(context, 'qr.enterCodeHint'),
                   style: Theme.of(context).textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -403,7 +403,7 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                   decoration: InputDecoration(
-                    hintText: 'z. B. A1B2C3D4',
+                    hintText: L10n.t(context, 'qr.codeHint'),
                     counterText: '',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -421,13 +421,13 @@ class _QrScanScreenState extends ConsumerState<QrScanScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.search),
-                  label: const Text('Nutzer suchen'),
+                  label: Text(L10n.t(context, 'qr.searchUser')),
                 ),
                 const SizedBox(height: 32),
                 OutlinedButton.icon(
                   onPressed: () => context.push(AppRoutes.qrProfile),
                   icon: const Icon(Icons.qr_code_2),
-                  label: const Text('Meinen eigenen Code anzeigen'),
+                  label: Text(L10n.t(context, 'qr.showMineBtn')),
                 ),
               ],
             ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:wisp/models/find_match_models.dart';
+import 'package:wisp/l10n/app_strings.dart';
 import 'package:wisp/routing/app_router.dart';
 import 'package:wisp/services/find_your_match_service.dart';
 import 'package:wisp/services/quiz_service.dart';
@@ -61,7 +62,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     if (state == null) {
       setState(() {
         _loading = false;
-        _error = 'Quiz-Zustand konnte nicht geladen werden.';
+        _error = L10n.t(context, 'quiz.loadError');
       });
       return;
     }
@@ -199,13 +200,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final state = _state;
     if (state == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Kennenlern-Quiz')),
-        body: Center(child: Text(_error ?? 'Unbekannter Fehler')),
+        appBar: AppBar(title: Text(L10n.t(context, 'quiz.title'))),
+        body: Center(child: Text(_error ?? L10n.t(context, 'common.unknownError'))),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Kennenlern-Quiz')),
+      appBar: AppBar(title: Text(L10n.t(context, 'quiz.title'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -253,7 +254,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             children: [
               Icon(Icons.visibility_off, size: 48, color: Colors.grey),
               SizedBox(height: 8),
-              Text('Foto noch verborgen'),
+              _QuizPhotoHiddenLabel(),
             ],
           ),
         ),
@@ -304,22 +305,29 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Wie gut kennst du dein Gegenüber?',
+          L10n.t(context, 'quiz.startTitle'),
           style: Theme.of(context).textTheme.headlineSmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          'Ihr bekommt dieselbe Frage. Antwortet ihr beide richtig, ist das '
-          'Foto dauerhaft freigeschaltet.',
+          L10n.t(context, 'quiz.startBody'),
           style: Theme.of(context).textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          L10n.t(context, 'quiz.startPersonalHint'),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
         FilledButton.icon(
           onPressed: _loadQuestion,
           icon: const Icon(Icons.play_arrow),
-          label: const Text('Versuch starten'),
+          label: Text(L10n.t(context, 'quiz.startAttempt')),
         ),
       ],
     );
@@ -364,7 +372,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Antwort abgeben'),
+              : Text(L10n.t(context, 'quiz.submit')),
         ),
       ],
     );
@@ -378,7 +386,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           const Icon(Icons.celebration, size: 64, color: Colors.green),
           const SizedBox(height: 8),
           Text(
-            'Bestanden! Das Foto ist jetzt dauerhaft freigeschaltet.',
+            L10n.t(context, 'quiz.passedTitle'),
             style: Theme.of(context).textTheme.titleLarge,
             textAlign: TextAlign.center,
           ),
@@ -393,7 +401,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 // Partner-Profil ist jetzt voll zugänglich.
               }
             },
-            child: const Text('Zum Chat'),
+            child: Text(L10n.t(context, 'quiz.toChat')),
           ),
         ],
       );
@@ -405,13 +413,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           const Icon(Icons.hourglass_top, size: 64, color: Colors.orange),
           const SizedBox(height: 8),
           Text(
-            'Richtig! Jetzt wartest du auf die Antwort deines Matches.',
+            L10n.t(context, 'quiz.correctTitle'),
             style: Theme.of(context).textTheme.titleLarge,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Antwortet dein Gegenüber auch richtig, ist das Quiz bestanden.',
+            L10n.t(context, 'quiz.correctBody'),
             style: Theme.of(context).textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),
@@ -425,8 +433,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           const Icon(Icons.info_outline, size: 48, color: Colors.orange),
           const SizedBox(height: 8),
           Text(
-            'Die Runde ist vorbei. Dein Gegenüber hat sie nicht bestanden, '
-            'also startet ihr nach der Pause gemeinsam neu.',
+            L10n.t(context, 'quiz.roundClosed'),
             style: Theme.of(context).textTheme.bodyLarge,
             textAlign: TextAlign.center,
           ),
@@ -439,14 +446,16 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         const Icon(Icons.close, size: 48, color: Colors.red),
         const SizedBox(height: 8),
         Text(
-          'Leider falsch.',
+          L10n.t(context, 'quiz.wrongTitle'),
           style: Theme.of(context).textTheme.titleLarge,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          'Fehlversuch ${result.failedAttempts}: Foto-Stufe ${result.unlockLevel}. '
-          'Neuer Versuch nach der 5-Minuten-Pause.',
+          L10n.tf(context, 'quiz.wrongBody', {
+            'failed': '${result.failedAttempts}',
+            'level': '${result.unlockLevel}',
+          }),
           style: Theme.of(context).textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
@@ -463,14 +472,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         const Icon(Icons.timer_outlined, size: 64, color: Colors.orange),
         const SizedBox(height: 8),
         Text(
-          'Nächster Versuch in $minutes:$seconds',
+          L10n.tf(context, 'quiz.cooldownIn', {'time': '$minutes:$seconds'}),
           style: Theme.of(context).textTheme.headlineSmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          'Nach jedem Fehlversuch gilt eine Pause von 5 Minuten. '
-          'Danach könnt ihr es erneut versuchen.',
+          L10n.t(context, 'quiz.cooldownBody'),
           style: Theme.of(context).textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
@@ -484,7 +492,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               }
             },
             icon: const Icon(Icons.refresh),
-            label: const Text('Bereit - neuen Versuch starten'),
+            label: Text(L10n.t(context, 'quiz.cooldownReady')),
           ),
       ],
     );
@@ -499,14 +507,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         const Icon(Icons.check_circle, size: 48, color: Colors.green),
         const SizedBox(height: 8),
         Text(
-          'Quiz bestanden!',
+          L10n.t(context, 'quiz.passedBadge'),
           style: Theme.of(context).textTheme.headlineSmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          'Das Foto bleibt dauerhaft scharf und farbig. Das komplette Profil '
-          'deines Matches ist jetzt freigeschaltet.',
+          L10n.t(context, 'quiz.passedBody'),
           style: Theme.of(context).textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
@@ -518,9 +525,19 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           onPressed: () =>
               context.go(AppRoutes.chatDetailPath(widget.matchId.toString())),
           icon: const Icon(Icons.chat_bubble_outline),
-          label: const Text('Zum Chat'),
+          label: Text(L10n.t(context, 'quiz.toChat')),
         ),
       ],
     );
+  }
+}
+
+/// "Foto noch verborgen" als eigenes Widget (const-fähig mit L10n).
+class _QuizPhotoHiddenLabel extends StatelessWidget {
+  const _QuizPhotoHiddenLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(L10n.t(context, 'quiz.photoHidden'));
   }
 }
