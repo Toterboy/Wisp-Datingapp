@@ -112,11 +112,13 @@ Entdecken-Neuaufbau.
 
 ### Neu
 
-- **Personalisierte Quiz-Fragen (Migration 086)**: Fragen aus dem
-  Partner-Profil – „Welches dieser Interessen gehört zu <Name>?" /
-  „Wie alt ist <Name>?" – deterministisch pro Match generiert, beide
-  Partner bekommen dieselbe zugeschnittene Frage; Fallback auf den
-  generischen Pool.
+- **Personalisierte Quiz-Fragen (Migrationen 086 + 087, ohne LLM)**:
+  Fragen aus dem Partner-Profil – Lückentext aus der Vorstellung
+  („Vorstellung von Anna: ›Ich verbringe mein Wochenende gern ___.‹
+  Welches Wort gehört in die Lücke?"), Interessen-Frage und Alters-
+  Frage; deterministisch pro Match generiert, beide Partner bekommen
+  dieselbe zugeschnittene Frage; Fallback auf den generischen Pool.
+  Kein Cloud-LLM – die Vorstellung verlässt den Server nicht.
 - **Gespeicherte Profile (max. 5, lokal)**: QR-Kontakte überleben den
   App-Neustart (AES-256-verschlüsselt) – gescannte Personen lassen
   sich später anschreiben, auch wenn beim Scannen kein Internet war.
@@ -160,11 +162,11 @@ Entdecken-Neuaufbau.
 ## Vor dem Rollout
 
 1. Migrationen **080** (Profil-RPCs), **081** (Transit Spark), **082**
-   (Merkmal-Tags + Modus), **083** (Soft-Ping) und **084/085**
-   (Tag-Whitelist v2 + Suchradius-Modus) einspielen.
-2. Migration **086** (personalisierte Quiz-Fragen) einspielen -
-   `start_quiz_attempt` zieht dann Fragen aus dem Partner-Profil.
-3. Edge Functions deployen: `notify-user` (NEU: Kind `likes` für
+   (Merkmal-Tags + Modus), **083** (Soft-Ping), **084/085**
+   (Tag-Whitelist v2 + Suchradius-Modus), **086/087**
+   (personalisierte Quiz-Fragen: Interessen/Alter + Lückentext)
+   einspielen.
+2. Edge Functions deployen: `notify-user` (NEU: Kind `likes` für
    Like-Push beim QR-Scan) + `match-media` unverändert.
-4. Betatest: Transit Spark auf ZWEI Geräten in Nähe testen (beide Radar
+3. Betatest: Transit Spark auf ZWEI Geräten in Nähe testen (beide Radar
    aktiv → ein Signal → Gegensignal → Match + Push).

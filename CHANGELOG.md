@@ -46,13 +46,23 @@ erneut deployen.
 
 ### Neu
 
-- **Personalisierte Quiz-Fragen (Migration 086)**: `start_quiz_attempt`
-  zieht bevorzugt Fragen aus dem PARTNER-Profil - „Welches dieser
-  Interessen gehört zu <Name>?" und „Wie alt ist <Name>?" -
-  deterministisch aus (Match, Versuchszahl) generiert, damit BEIDE
-  dieselbe Frage bekommen; korrekte Antwort bleibt serverseitig,
-  Optionen werden wie bisher per Match gemischt. Fällt nichts an,
-  greift der generische Pool (075).
+- **Personalisierte Quiz-Fragen (Migrationen 086 + 087, ohne LLM)**:
+  `start_quiz_attempt` zieht bevorzugt Fragen aus dem PARTNER-Profil:
+  - **Lückentext aus der Vorstellung (087)**: „Vorstellung von Anna:
+    ›Ich verbringe mein Wochenende gern ___.‹ Welches Wort gehört in
+    die Lücke?" – korrekt = echtes Wort ihrer Vorstellung, Ablenker =
+    weitere Worte aus derselben Vorstellung (mit Präfix-Guard gegen
+    film/filme-Fallen); Stoppwörter werden gefiltert, Intro-Änderung
+    verwirft veraltete Fragen, Best-Effort mit Fallback-Kette.
+  - „Welches dieser Interessen gehört zu <Name>?" und „Wie alt ist
+    <Name>?" (086).
+  - Deterministisch aus (Match, Versuchszahl) generiert, damit BEIDE
+    dieselbe Frage bekommen; korrekte Antwort bleibt serverseitig,
+    Optionen werden wie bisher pro Match gemischt. Fällt nichts an,
+    greift der generische Pool (075). Bewusst KEIN Cloud-LLM
+    (Datenschutz: die Vorstellung verlässt den Server nicht) – ein
+    lokales Modell am Gerät könnte die Antwort ohnehin nicht
+    cheatsicher erzeugen.
 - **Neues Design für Sprachnachrichten im Chat**: Play/Pause-Knopf,
   Wellenform (deterministische Balken aus der Message-ID - beide
   Seiten sehen dieselbe Form), Fortschritt-Färbung und Dauer; nach
