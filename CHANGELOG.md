@@ -1,4 +1,4 @@
-﻿# Changelog – WispDating
+# Changelog – WispDating
 
 Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
@@ -9,10 +9,18 @@ können sich Schnittstellen und Verhalten jederzeit ändern.
 
 ## [Unreleased] – v0.9.0-Nachträge
 
-Server: Migrationen **086 + 087** einspielen + Edge Functions
+Server: Migrationen **086, 087 + 088** einspielen + Edge Functions
 `notify-user` erneut deployen.
 
 ### Behoben
+
+- **Vorstellung mit Audio ging bei Aktualisierung/Neuinstallation
+  verloren**: Der Intro-Upload setzte keinen Content-Type - der
+  MIME-Whitelist-Bucket (nur Bilder) verweigerte ihn still. Migration
+  088 erlaubt audio/mp4 (+mpeg); der Upload setzt jetzt explizit
+  `audio/mp4`. Zusätzlich schreibt "Profil bearbeiten" die
+  Intro-Felder nur noch, wenn sie geändert wurden (kein
+  Stale-Null-Overwrite aus veralteten Screen-Zuständen).
 
 - **„Bad state: DataChannel nicht verbunden"** (Zufallschat, QR-Chat,
   Ideen-Rad-Vorschläge): Sendungen vor verbundenem DataChannel landen
@@ -27,17 +35,13 @@ Server: Migrationen **086 + 087** einspielen + Edge Functions
   Laufzeit-Berechtigungen komplett. Jetzt Pre-Flight: Android ≤ 11
   STANDORT (Pflicht für BLE-Scan), Android 12+ BLUETOOTH_SCAN/CONNECT,
   iOS Bluetooth - plus vorhandener Bluetooth-Prompt.
-- **QR-Scan = erstmal nur Like** (kein sofortiger Chat): Online entsteht
-  der Chat erst, wenn die gescannte Person annimmt (Funken-Tab
-  „Erhalten"). Offline wird das Profil lokal gespeichert (max. 5) und
-  das Like beim späteren Öffnen des Chats automatisch nachgeholt.
 
 - **QR-Scan öffnete nur ein „Fenster" statt des Chats**: Der Scanner
   navigierte zur PARTNER-ID (`/chat/<peerId>`), der Chat-Screen suchte
   aber nach der lokal generierten MATCH-ID → „Dieser Chat existiert
   nicht mehr". Jetzt wird mit der Match-ID navigiert
   (`findOrCreateMatch` liefert das Match), Regressionstests ergänzt.
-- **QR-Kontakt hieß „Unbekannt"**: Nach dem Scan wird das echte
+- **QR-Kontakt hieß "Unbekannt"**: Nach dem Scan wird das echte
   Profil (Name, Alter, Interessen, Vorstellung) via
   `get_public_profile` geladen und der lokale Kontakt befüllt - auch
   nachträglich im Chat-Screen (Fallback, falls der Scan offline war).
@@ -46,9 +50,16 @@ Server: Migrationen **086 + 087** einspielen + Edge Functions
   BEIDE Seiten; im „Erhalten"-Tab bleibt der Player (solange das
   Profil eine Audio-Vorstellung hat).
 
+- **QR-Scan = erstmal nur Like** (kein sofortiger Chat): Online entsteht
+  der Chat erst, wenn die gescannte Person annimmt (Funken-Tab
+  „Erhalten"). Offline wird das Profil lokal gespeichert (max. 5) und
+  das Like beim späteren Öffnen des Chats automatisch nachgeholt.
+- **Radar-Verlassen**: Dialog „Radar laufen lassen?" (Stoppen/Weiter-
+  laufen) mit Merk-Checkbox „zukünftig automatisch so beibehalten".
+
 ### Geändert
 
-- **KEINE Streaks**: Flamme mit Tageszähler („Funke-Streak") aus Chat-
+- **KEINE Streaks**: Flamme mit Tageszähler ("Funke-Streak") aus Chat-
   AppBar und Funken-Liste entfernt, Widget gelöscht.
 - **Chat zuerst, Quiz später**: Match-Kacheln im Funken-Tab öffnen
   IMMER den Chat (vorher direkt das Quiz); das Quiz-Gate blockiert
@@ -57,12 +68,27 @@ Server: Migrationen **086 + 087** einspielen + Edge Functions
   erzwungen via match-media). Banner im Chat verweist aufs Quiz.
 - **P2P-Fehler entschärft**: Wenn die andere Seite (noch) nicht im
   Chat ist, erscheint keine rote Fehlermeldung mehr - der orange
-  E2E-Badge zeigt „Verbindung wird aufgebaut".
+  E2E-Badge zeigt "Verbindung wird aufgebaut".
 - **Push bei erhaltenem Like** (QR-Scan): `notify-user` unterstützt
   das Kind `likes` (fixer Server-Text, Like-Beziehungsprüfung,
   Einzel-Schalter `notify_likes` respektiert).
 
 ### Neu
+
+- **Mehrere Profilbilder (max. 3, abgerundet-rechteckig)**: Im Profil
+  bis zu drei Bilder (primäres + 2 zusätzliche), Anzeige abgerundet
+  rechteckig statt rund; Entfernen per Knopf, Upload bleibt lokal
+  NSFW-geprüft und verschlüsselt (Slot 0 bleibt match-media-kompatibel
+  unter avatar.jpg).
+- **"Ich suche"-Reziprozität (Migration 088)**: Wer NACH FREUNDEN
+  sucht, findet nur Personen, die ebenfalls Freunde suchen - und
+  umgekehrt; Freunde-Sucher bekommen im Chat KEINE Date-Vorschläge
+  (Meet-Intent + Ideen-Rad ausgeblendet).
+- **Transit Spark: 2-Stunden-Ruhezeit**: Gesehene Geräte bleiben nach
+  dem Radar-Ende 2 Stunden sichtbar (zum Nachschauen/Anschreiben in
+  Ruhe); Button "Gesehene Geräte ansehen (2 Stunden)" unten auf der
+  Radar-Seite. Die eigenen Presence-Tokens bleiben weiterhin sofort
+  entfernt (Privacy).
 
 - **Personalisierte Quiz-Fragen (Migrationen 086 + 087, ohne LLM)**:
   `start_quiz_attempt` zieht bevorzugt Fragen aus dem PARTNER-Profil:

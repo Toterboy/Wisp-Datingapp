@@ -35,7 +35,18 @@ class TransitEncounter {
   /// 45-Minuten-Vorhaltezeit (Phase 2 asynchron - auch später funken).
   static const Duration retention = Duration(minutes: 45);
 
+  /// Erweiterte Vorhaltezeit (v0.9.0-Nutzerwunsch): Nach Ablauf der 45
+  /// Minuten bleiben gesehene Personen noch 2 Stunden SICHTBAR in der
+  /// Liste ("in Ruhe finden"), funkenfähig sind sie ab dem Server-TTL-
+  /// Ablauf allerdings nicht mehr (isFresh = funkenfähig).
+  static const Duration softRetention = Duration(hours: 2);
+
+  /// 45-Minuten-Fenster: funkenfähig (Server-TTL der Tokens).
   bool get isFresh => DateTime.now().difference(seenAt) < retention;
+
+  /// 2-Stunden-Fenster: noch sichtbar in der Liste.
+  bool get isSoftFresh =>
+      DateTime.now().difference(seenAt) < softRetention;
 }
 
 /// Merkmal-Tags (v0.9.0): Der Nutzer wählt 1-3 Merkmale, die er an der

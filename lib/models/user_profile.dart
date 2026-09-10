@@ -160,6 +160,11 @@ class UserProfile {
       id: json['user_id'] as String,
       name: json['name'] as String,
       bio: json['bio'] as String? ?? '',
+      // Profilbilder (v0.9.0, max. 3): verschlüsselte Refs - Lesen via
+      // loadAvatarBytes (Client entschlüsselt lokal).
+      photos: (json['photos'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<String>()
+          .toList(),
       interests: (json['interests'] as List<dynamic>? ?? <dynamic>[])
           .map((e) => e as String)
           .toList(),

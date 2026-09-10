@@ -460,35 +460,90 @@ class _PublicProfileAvatarState extends ConsumerState<_PublicProfileAvatar> {
 
   @override
   Widget build(BuildContext context) {
+    // v0.9.0: abgerundet-RECHTECKIG statt komplett rund + Thumbnails der
+    // weiteren Bilder (max. 3, gleiche Verschlüsselung wie Avatare).
+    final scheme = Theme.of(context).colorScheme;
+    final others = widget.profile.photos
+        .skip(1)
+        .take(SupabaseStorageService.maxPhotos - 1)
+        .toList();
+
+    Widget mainImage;
     if (!widget.isPhotosVisible) {
-      return const CircleAvatar(
-        radius: 52,
-        child: Icon(Icons.visibility_off, size: 48),
+      mainImage = const Center(
+          child: Icon(Icons.visibility_off, size: 48));
+    } else if (_avatarFuture == null) {
+      mainImage =
+          Icon(Icons.person, size: 56, color: scheme.onSurfaceVariant);
+    } else {
+      mainImage = FutureBuilder<Uint8List?>(
+        future: _avatarFuture,
+        builder: (context, snapshot) {
+          final bytes = snapshot.data;
+          if (bytes != null) {
+            return Image.memory(bytes, fit: BoxFit.cover,
+                width: double.infinity, height: double.infinity);
+          }
+          // Cache-Treffer kommen synchron an; während des ersten Downloads
+          // dezent der Platzhalter statt einesextra Spinners.
+          return Center(
+              child:
+                  Icon(Icons.person, size: 56, color: scheme.onSurfaceVariant));
+        },
       );
     }
-    if (_avatarFuture == null) {
-      return const CircleAvatar(
-        radius: 52,
-        child: Icon(Icons.person, size: 56),
-      );
-    }
-    return FutureBuilder<Uint8List?>(
-      future: _avatarFuture,
-      builder: (context, snapshot) {
-        final bytes = snapshot.data;
-        if (bytes != null) {
-          return CircleAvatar(
-            radius: 52,
-            backgroundImage: MemoryImage(bytes),
-          );
-        }
-        // Cache-Treffer kommen synchron an; während des ersten Downloads
-        // dezent der Platzhalter statt einesextra Spinners.
-        return const CircleAvatar(
-          radius: 52,
-          child: Icon(Icons.person, size: 56),
-        );
-      },
+
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: 148,
+            height: 188,
+            color: scheme.primaryContainer,
+            child: mainImage,
+          ),
+        ),
+        if (widget.isPhotosVisible && others.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (final ref1 in others)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 72,
+                      height: 92,
+                      color: scheme.surfaceContainerHighest,
+                      child: FutureBuilder<Uint8List?>(
+                        future: ref
+                            .read(supabaseStorageServiceProvider)
+                            .loadAvatarBytes(ref1),
+                        builder: (context, snap) {
+                          final b = snap.data;
+                          if (b == null) {
+                            return const Center(
+                              child: SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2),
+                              ),
+                            );
+                          }
+                          return Image.memory(b, fit: BoxFit.cover);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

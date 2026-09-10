@@ -517,6 +517,18 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
               const SizedBox(height: 8),
               const _EncounterGreetList(),
             ],
+            // v0.9.0-Nutzerwunsch: Nach dem Radar-Ende bleiben gesehene
+            // Personen 2 Stunden - Bottom-Button öffnet die Liste ("in
+            // Ruhe finden").
+            if (!transit.active &&
+                ref.read(transitProvider.notifier).hasSoftEncounters) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => _showRetainedEncounters(),
+                icon: const Icon(Icons.history, size: 18),
+                label: Text(L10n.t(context, 'transit.retainedBtn')),
+              ),
+            ],
             const SizedBox(height: 20),
             const _SoftPingInbox(),
             const SizedBox(height: 24),
@@ -580,6 +592,49 @@ class _TransitRadarScreenState extends ConsumerState<TransitRadarScreen> {
           ],
         ),
       ),
+      ),
+    );
+  }
+
+  /// v0.9.0: Nachgeschaute Personen der 2-Stunden-Ruhezeit - Bottom
+  /// Sheet mit der gewohnten Gruessen-Liste (Pingen nach 45-min-TTL
+  /// kann serverseitig ins Leere laufen; das Sheet erklärt das).
+  Future<void> _showRetainedEncounters() async {
+    final until = ref.read(transitProvider.notifier).softUntil();
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: SizedBox(
+          height: 420,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                L10n.t(ctx, 'transit.retainedTitle'),
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                until == null
+                    ? L10n.t(ctx, 'transit.retainedHint')
+                    : L10n.tf(ctx, 'transit.retainedUntil', {
+                        'time':
+                            '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}',
+                      }),
+                style: Theme.of(ctx).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Expanded(child: _EncounterGreetList()),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -699,7 +754,10 @@ class _EncounterGreetListState extends ConsumerState<_EncounterGreetList> {
 
   @override
   Widget build(BuildContext context) {
-    final encounters = ref.read(transitProvider.notifier).freshEncounters();
+    // 2-Stunden-Ruhezeit (v0.9.0): Auch nach Radar-Ende bleiben gesehene
+    // Personen sichtbar - die Liste zeigt softEncounters (2 h) statt
+    // nur frische (45 min).
+    final encounters = ref.read(transitProvider.notifier).softEncounters();
     if (encounters.isEmpty) {
       return Text(
         L10n.t(context, 'transit.noEncounters'),

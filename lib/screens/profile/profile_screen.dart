@@ -653,10 +653,19 @@ class _OwnAvatar extends ConsumerWidget {
     final placeholder = Icon(Icons.person,
         size: 56, color: Theme.of(context).colorScheme.onSurfaceVariant);
 
-    return CircleAvatar(
-      radius: 52,
-      backgroundImage: bytes != null ? MemoryImage(bytes) : null,
-      child: bytes == null ? placeholder : null,
+    // v0.9.0: abgerundet-RECHTECKIG statt komplett rund.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 118,
+        height: 152,
+        color: Theme.of(context).colorScheme.primaryContainer,
+        alignment: Alignment.center,
+        child: bytes != null
+            ? Image.memory(bytes, fit: BoxFit.cover,
+                width: 118, height: 152)
+            : placeholder,
+      ),
     );
   }
 }

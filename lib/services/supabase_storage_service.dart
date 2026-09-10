@@ -162,6 +162,34 @@ class SupabaseStorageService {
     return AvatarCrypto.encodeRef(path, enc.keyB64, enc.ivB64);
   }
 
+  /// Lädt ein ZUSÄTZLICHES Profilbild hoch (v0.9.0, max. 3 - siehe
+  /// [maxPhotos]).
+  ///
+  /// Gleiche Verschlüsselung wie [uploadAvatar], aber mit indiziertem
+  /// Pfad `{userId}/photos/{index}.jpg`, damit bis zu drei Bilder
+  /// parallel existieren. Der verschlüsselte Ref (`path|key|iv`) landet
+  /// in `profiles.photos` (Liste).
+  Future<String> uploadPhoto(List<int> data, {required int index}) async {
+    assert(index >= 0 && index < maxPhotos, 'index 0..2 (max. 3 Bilder)');
+    final userId = _currentUser?.id;
+    if (userId == null) {
+      throw AppException('Nicht eingeloggt.');
+    }
+
+    final enc = AvatarCrypto.encrypt(Uint8List.fromList(data));
+    final path = '$userId/photos/${index + 1}.jpg';
+    await _client.storage.from(_bucket).uploadBinary(
+          path,
+          enc.cipher,
+          fileOptions: const FileOptions(upsert: true),
+        );
+
+    return AvatarCrypto.encodeRef(path, enc.keyB64, enc.ivB64);
+  }
+
+  /// Maximale Anzahl an Profilbildern (v0.9.0-Nutzerwunsch).
+  static const int maxPhotos = 3;
+
   /// Lädt ein Avatar herunter und entschlüsselt es lokal (v0.8.1).
   ///
   /// Akzeptiert sowohl verschlüsselte Einträge (`path|key|iv`) als auch
@@ -253,7 +281,16 @@ class SupabaseStorageService {
           // upsert: Erneutes Hochladen (z. B. zweite Aufnahme in der
           // Einrichtung) ueberschreibt das alte Audio - ohne upsert
           // scheitert es mit StorageException 409 "Duplicate".
-          fileOptions: const FileOptions(upsert: true),
+          //
+          // contentType (088): WICHTIG - ohne expliziten Typ landet
+          // 'text/plain' in einem MIME-Whitelist-Bucket (Migration 003)
+          // und der Upload wurde still verweigert ("Vorstellung mit
+          // Audio verschwunden"). AAC/m4a = audio/mp4; der Bucket
+          // erlaubt es seit Migration 088.
+          fileOptions: const FileOptions(
+            upsert: true,
+            contentType: 'audio/mp4',
+          ),
         );
 
     return path;

@@ -125,12 +125,29 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   /// Gerät bei Nichtbestehen nicht).
   Uint8List? _pendingAvatarBytes;
 
+  /// Mehrere Profilbilder (v0.9.0-Nutzerwunsch, max. 3): Zustand der
+  /// Slots 1 und 2 (das PRIMÄRE Bild ist Slot 0 über
+  /// [_pendingAvatarBytes]). Key = Slot-Index, Value = neue Bytes.
+  final Map<int, Uint8List> _pendingExtraBytes = {};
+
+  /// Slots (0..2), die zum Entfernen markiert sind (nachträglich löschbar
+  /// bis zum Speichern; vorhandene Refs wandern dann aus profiles.photos).
+  final Set<int> _removedPhotoSlots = {};
+
+  /// Ladefutures für BESTEHENDE Extra-Bilder (Slot 1/2).
+  final Map<int, Future<Uint8List?>?> _extraBytesFutures = {};
+
   /// Verzoegerter NSFW-Modell-Warm-up (abbrechbar, siehe initState).
   Timer? _nsfwWarmupTimer;
 
   // Vorstellung (Find your Match): Zustand wird vom IntroEditor gemeldet.
   String _introTextValue = '';
   String? _introAudioPath;
+
+  /// Intro-Snapshot beim Öffnen (siehe initState-Kommentar): Nur bei
+  /// Abweichung davon werden die Intro-Felder serverseitig geschrieben.
+  String _initialIntroText = '';
+  String? _initialIntroAudioPath;
 
   // Konsum-Präferenzen (Rauchen, Alkohol, Drogen) – beeinflussen den
   // Find-your-Match-Filter.
@@ -174,6 +191,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _stateCtrl.text = p.state ?? '';
     _introTextValue = p.introText;
     _introAudioPath = p.introAudioPath;
+    // Intro-Snapshot (v0.9.0-Fix): Die Intro-Felder werden beim
+    // Server-Sync NUR mitgeschickt, wenn sie hier geändert wurden.
+    // Sonst würde ein veralteter Screen-Stand (z. B. vor dem Intro-
+    // Record geöffnet) die serverseitige Vorstellung mit Leerwerten
+    // überschreiben ("Vorstellung verschwindet bei Aktualisierung").
+    _initialIntroText = p.introText;
+    _initialIntroAudioPath = p.introAudioPath;
     _smoking = p.smoking;
     _alcohol = p.alcohol;
     _drugs = p.drugs;
@@ -233,6 +257,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           .read(supabaseStorageServiceProvider)
           .loadAvatarBytes(p.photos.first);
     }
+    // v0.9.0: bestehende ZUSATZ-Bilder (Slots 1/2) ebenfalls laden.
+    _loadExtraFutures(p.photos);
 
     // Falls das Profil später nachgeladen wird, die Felder nachziehen.
     _profileSub = ref.listenManual<UserProfile>(profileProvider, (prev, next) {
@@ -267,9 +293,34 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           } else {
             _avatarBytesFuture = null;
           }
+          _loadExtraFutures(next.photos, skipPending: true);
         });
       }
     });
+  }
+
+  /// Lädt die Vorschaubilder für BESTEHENDE Zusatz-Slots (1/2, v0.9.0).
+  ///
+  /// Slots mit ausstehender Auswahl ([_pendingExtraBytes]) werden NICHT
+  /// angefasst; entfernte Slots ([_removedPhotoSlots]) ebenfalls nicht.
+  /// Ohne Supabase (Tests/Demo) landen Platzhalter-Futures - der Screen
+  /// darf NIEMALS am Storage-Provider scheitern.
+  void _loadExtraFutures(List<String> photos, {bool skipPending = false}) {
+    SupabaseStorageService? storage;
+    try {
+      storage = ref.read(supabaseStorageServiceProvider);
+    } catch (_) {
+      storage = null;
+    }
+    final s = storage;
+    for (final slot in const [1, 2]) {
+      if (skipPending && _pendingExtraBytes.containsKey(slot)) continue;
+      if (_removedPhotoSlots.contains(slot)) continue;
+      _extraBytesFutures[slot] =
+          (s != null && photos.length > slot)
+              ? s.loadAvatarBytes(photos[slot])
+              : Future.value(null);
+    }
   }
 
   @override
@@ -521,41 +572,46 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     }
   }
 
+  /// Bild-Auswahl mit lokalem NSFW-Check (v0.8.0/0.8.1): Das Bild wird
+  /// VOR dem Upload rein lokal geprüft - es verlässt bei Nichtbestehen
+  /// das Gerät nicht. Rückgabe: freigegebene Bytes oder null (verworfen).
+  Future<Uint8List?> _pickCheckedImage() async {
+    var bytes = await pickAndCropAvatar(context);
+    while (bytes != null) {
+      // NSFW on-device (v0.8.0, Modell image-safety-classifier-xs):
+      // Das Bild verlässt bei Nichtbestehen das Gerät nicht. Bei Befund
+      // drei Wege (v0.8.1): verwerfen, anderes Bild oder Einspruch.
+      final verdict =
+          await ImageSafetyService.instance.classifyImage(bytes);
+      if (verdict == null) break; // Lokal nicht verfügbar -> normal hochladen.
+
+      if (!verdict.isFlagged) {
+        // Bestanden -> kleines ✓-Popup, dann normal weiter.
+        if (!mounted) return null;
+        await _showPhotoOkDialog(context);
+        break;
+      }
+
+      if (!mounted) return null;
+      final action = await _showNsfwAppealDialog(context, verdict);
+      if (!mounted) return null;
+      if (action == 'appeal') {
+        await _submitAppeal(bytes: bytes, verdict: verdict);
+        return null; // Bild wird verworfen - kein Avatar-Upload.
+      }
+      if (action == 'other') {
+        bytes = await pickAndCropAvatar(context);
+        continue;
+      }
+      // null = Verstanden: verwerfen.
+      return null;
+    }
+    return bytes;
+  }
+
   Future<void> _pickProfileImage() async {
     try {
-      var bytes = await pickAndCropAvatar(context);
-      while (bytes != null) {
-        // NSFW on-device (v0.8.0, Modell image-safety-classifier-xs):
-        // Das Profilbild wird VOR dem Upload rein lokal geprüft - es
-        // verlässt bei Nichtbestehen das Gerät nicht. Bei Befund gibt es
-        // drei Wege (v0.8.1): verwerfen, anderes Bild oder Einspruch in
-        // die Admin-Prüfung (das Bild selbst wird dann NIE als Avatar
-        // hochgeladen).
-        final verdict =
-            await ImageSafetyService.instance.classifyImage(bytes);
-        if (verdict == null) break; // Lokal nicht verfügbar -> normal hochladen.
-
-        if (!verdict.isFlagged) {
-          // Bestanden -> kleines ✓-Popup, dann normal weiter.
-          if (!mounted) return;
-          await _showPhotoOkDialog(context);
-          break;
-        }
-
-        if (!mounted) return;
-        final action = await _showNsfwAppealDialog(context, verdict);
-        if (!mounted) return;
-        if (action == 'appeal') {
-          await _submitAppeal(bytes: bytes, verdict: verdict);
-          return; // Bild wird verworfen - kein Avatar-Upload.
-        }
-        if (action == 'other') {
-          bytes = await pickAndCropAvatar(context);
-          continue;
-        }
-        // null = Verstanden: verwerfen.
-        return;
-      }
+      final bytes = await _pickCheckedImage();
       if (bytes == null) return;
 
       // v0.8.1-Fix: NICHT sofort hochladen. Das Bild wird vorgehalten
@@ -564,19 +620,65 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       // passiert erst mit dem Speichern. Dadurch kann ein versehentlich
       // gewähltes Bild per "Abbrechen" verworfen werden, ohne dass es
       // je den Server erreicht hat (NSFW-Check lief oben bereits).
-      setState(() => _pendingAvatarBytes = bytes);
+      setState(() {
+        _pendingAvatarBytes = bytes;
+        // Slot 0 wird ersetzt -> Entfernen-Markierung hinfällig.
+        _removedPhotoSlots.remove(0);
+      });
       _syncDirtyFlag();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-          content: Text(L10n.tf(context,
-              'profile.edit.photoUploadError',
-              {'error': e.toString()})),
-        ),
+            content: Text(L10n.tf(context,
+                'profile.edit.photoUploadError',
+                {'error': e.toString()})),
+          ),
         );
       }
     }
+  }
+
+  /// Wählt ein ZUSÄTZLICHES Bild (Slot 1/2, v0.9.0 max. 3) - gleicher
+  /// NSFW-Check wie beim primären Bild, gehalten bis zum Speichern.
+  Future<void> _pickExtraImage(int slot) async {
+    try {
+      final bytes = await _pickCheckedImage();
+      if (bytes == null || !mounted) return;
+      setState(() {
+        _pendingExtraBytes[slot] = bytes;
+        _removedPhotoSlots.remove(slot);
+        _extraBytesFutures[slot] = Future.value(bytes);
+      });
+      _syncDirtyFlag();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L10n.tf(context,
+                'profile.edit.photoUploadError',
+                {'error': e.toString()})),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Markiert einen Slot zum Entfernen (vorhandenes Bild ODER pending
+  /// Auswahl wird verworfen). Noch nicht am Server - passiert beim
+  /// Speichern.
+  void _removePhoto(int slot) {
+    setState(() {
+      _removedPhotoSlots.add(slot);
+      _pendingExtraBytes.remove(slot);
+      if (slot == 0) {
+        _pendingAvatarBytes = null;
+        _avatarBytesFuture = null;
+      } else {
+        _extraBytesFutures.remove(slot);
+      }
+    });
+    _syncDirtyFlag();
   }
 
   Future<void> _detectLocation() async {
@@ -724,6 +826,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final settings = ref.read(settingsProvider);
     final city = _cityCtrl.text.trim();
     return _pendingAvatarBytes != null ||
+        _pendingExtraBytes.isNotEmpty ||
+        _removedPhotoSlots.isNotEmpty ||
         _nameCtrl.text.trim() != p.name ||
         _bioCtrl.text.trim() != p.bio ||
         city != (_prefillCity ?? '').trim() ||
@@ -840,41 +944,81 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         return false;
       }
 
-    // Profilbild-Upload (v0.8.1): Das bei der Auswahl vorgehaltene Bild
-    // wird JETZT hochgeladen - zusammen mit allen anderen Änderungen.
-    // Fehler verhindern das Speichern nicht (Bild bleibt vorgehalten,
+    // Profilbilder-Upload (v0.8.1/v0.9.0): Die vorgehaltenen Bilder
+    // (Slot 0 = primär, Slot 1/2 = zusätzliche) werden JETZT hochgeladen.
+    // Fehler verhindern das Speichern nicht (Bilder bleiben vorgehalten,
     // nächster Speicherklick versucht es erneut).
-    if (_pendingAvatarBytes != null) {
-      try {
-        final storageService = ref.read(supabaseStorageServiceProvider);
-        final ref1 =
-            await storageService.uploadAvatar(_pendingAvatarBytes!);
-        await ref.read(profileProvider.notifier).update(photos: [ref1]);
-        // Server-Write (v0.8.1-Fix): Der photos-Pfad MUSSTE vorher immer
-        // nur lokal landen - der Server kannte das Bild nie. Jetzt sofort
-        // + bestätigt schreiben (verifiziert per Read-Back).
-        if (SupabaseService.isInitialized) {
-          await SupabaseDatabaseService(SupabaseService.client)
-              .updateSetupFlagsAndVerify({'photos': [ref1]});
-        }
-        if (!mounted) return false;
-        setState(() {
-          _pendingAvatarBytes = null;
-          _avatarBytesFuture = storageService.loadAvatarBytes(ref1);
-        });
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(L10n.tf(context,
-                  'profile.edit.photoUploadError',
-                  {'error': e.toString()})),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        // Nicht abbrechen: die Textänderungen trotzdem speichern.
+    //
+    // Slot-Modell (max. 3): Slot 0 -> {userId}/avatar.jpg (match-media-
+    // kompatibel), Slot 1/2 -> {userId}/photos/2.jpg|3.jpg. Entfernte
+    // Slots fallen aus profiles.photos; vorhandene Objekte werden im
+    // Storage aufgeräumt (Owner-Policy).
+    try {
+      final storageService = ref.read(supabaseStorageServiceProvider);
+      final current =
+          List<String>.from(ref.read(profileProvider).photos);
+      final slots = List<String?>.filled(SupabaseStorageService.maxPhotos, null);
+      for (var i = 0; i < slots.length && i < current.length; i++) {
+        slots[i] = current[i];
       }
+      if (_removedPhotoSlots.contains(0)) slots[0] = null;
+      if (_removedPhotoSlots.contains(1)) slots[1] = null;
+      if (_removedPhotoSlots.contains(2)) slots[2] = null;
+
+      if (_pendingAvatarBytes != null) {
+        slots[0] = await storageService
+            .uploadAvatar(_pendingAvatarBytes!);
+      }
+      for (final slot in const [1, 2]) {
+        final pending = _pendingExtraBytes[slot];
+        if (pending != null) {
+          slots[slot] =
+              await storageService.uploadPhoto(pending, index: slot);
+        }
+      }
+
+      final finalPhotos =
+          slots.whereType<String>().toList(growable: false);
+
+      // Storage-Aufräumen für entfernte Slots (best effort).
+      for (final i in _removedPhotoSlots) {
+        final oldRef = i < current.length ? current[i] : null;
+        if (oldRef != null && oldRef.isNotEmpty) {
+          await storageService.deleteOwnObject(oldRef.split('|').first);
+        }
+      }
+
+      if (!mounted) return false;
+      await ref.read(profileProvider.notifier).update(photos: finalPhotos);
+      // Server-Write (v0.8.1-Fix): Der photos-Pfad MUSSTE vorher immer
+      // nur lokal landen - der Server kannte das Bild nie. Jetzt sofort
+      // + bestätigt schreiben (verifiziert per Read-Back).
+      if (SupabaseService.isInitialized) {
+        await SupabaseDatabaseService(SupabaseService.client)
+            .updateSetupFlagsAndVerify({'photos': finalPhotos});
+      }
+      if (!mounted) return false;
+      setState(() {
+        _pendingAvatarBytes = null;
+        _pendingExtraBytes.clear();
+        _removedPhotoSlots.clear();
+        _extraBytesFutures.clear();
+        _avatarBytesFuture = finalPhotos.isNotEmpty
+            ? storageService.loadAvatarBytes(finalPhotos.first)
+            : null;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L10n.tf(context,
+                'profile.edit.photoUploadError',
+                {'error': e.toString()})),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      // Nicht abbrechen: die Textänderungen trotzdem speichern.
     }
 
     final location = _cityCtrl.text.trim().isEmpty
@@ -888,6 +1032,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       await _validateLocationAgainstGps(location);
     }
 
+    // Intro-Guard (v0.9.0-Fix): Intro-Felder nur übernehmen/schreiben,
+    // wenn sie in DIESEM Screen geändert wurden. Ein veralteter Zustand
+    // (null/leer) darf die Vorstellung weder lokal noch serverseitig
+    // überschreiben ("Vorstellung verschwindet bei Aktualisierung").
+    final introTextChanged =
+        _introTextValue.trim() != _initialIntroText.trim();
+    final introAudioChanged = _introAudioPath != _initialIntroAudioPath;
+
     await ref.read(profileProvider.notifier).update(
           name: _nameCtrl.text.trim(),
           birthDate: _birthDate,
@@ -896,9 +1048,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           stateStr: _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
           country: _countryValue,
           gender: _gender.value,
-          introText: _introTextValue.trim(),
-          introAudioPath: _introAudioPath,
-          clearIntroAudio: _introAudioPath == null,
+          introText: introTextChanged ? _introTextValue.trim() : null,
+          introAudioPath: introAudioChanged ? _introAudioPath : null,
+          clearIntroAudio: introAudioChanged && _introAudioPath == null,
           smoking: _smoking,
           alcohol: _alcohol,
           drugs: _drugs,
@@ -925,8 +1077,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               : _stateCtrl.text.trim(),
           'interests':
               ref.read(profileProvider).interests,
-          'intro_text': _introTextValue.trim(),
-          'intro_audio_path': _introAudioPath,
+          if (introTextChanged) 'intro_text': _introTextValue.trim(),
+          if (introAudioChanged) 'intro_audio_path': _introAudioPath,
           'country': _countryValue,
           'smoking': _smoking?.toServer(),
           'alcohol': _alcohol?.toServer(),
@@ -1126,61 +1278,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Stack(
-                  children: [
-                    // NEU gewähltes Bild gewinnt IMMER (Vorschau vor dem
-                    // Speichern) - auch wenn serverseitig noch gar kein
-                    // photos-Eintrag existiert (früher wurde hier der
-                    // Platzhalter dauerhaft angezeigt).
-                    if (_pendingAvatarBytes != null)
-                      CircleAvatar(
-                        radius: 48,
-                        backgroundImage: MemoryImage(_pendingAvatarBytes!),
-                      )
-                    else if (profile.photos.isEmpty)
-                      const CircleAvatar(
-                        radius: 48,
-                        child: Icon(Icons.person, size: 48),
-                      )
-                    else
-                      FutureBuilder<Uint8List?>(
-                        future: _avatarBytesFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const CircleAvatar(
-                              radius: 48,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
-                            );
-                          }
-
-                          final bytes = snapshot.data;
-                          if (bytes == null || snapshot.hasError) {
-                            return const CircleAvatar(
-                              radius: 48,
-                              child: Icon(Icons.person, size: 48),
-                            );
-                          }
-
-                          return CircleAvatar(
-                            radius: 48,
-                            backgroundImage: MemoryImage(bytes),
-                          );
-                        },
-                      ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: IconButton.filled(
-                        onPressed: _pickProfileImage,
-                        icon: const Icon(Icons.camera_alt),
-                      ),
-                    ),
-                  ],
-                ),
+              // Profilbilder (v0.9.0: bis zu 3, abgerundet-rechteckig -
+              // nicht mehr nur rund). Slot 0 = primäres Bild.
+              _PhotoSlotsRow(
+                pendingPrimary: _pendingAvatarBytes,
+                primaryFuture: _avatarBytesFuture,
+                pendingExtra: Map.of(_pendingExtraBytes),
+                existingExtraFutures: Map.of(_extraBytesFutures),
+                removedSlots: Set.of(_removedPhotoSlots),
+                existingPhotos: profile.photos,
+                onPickPrimary: _pickProfileImage,
+                onPickExtra: _pickExtraImage,
+                onRemove: _removePhoto,
               ),
               const SizedBox(height: 16),
               _field(
@@ -1770,6 +1879,198 @@ class _LocationNotice extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Bild-Slots für "Profil bearbeiten" (v0.9.0): bis zu 3 Bilder,
+/// ABGERUNDET-RECHTECKIG statt rund. Slot 0 = primäres Bild (größer),
+/// Slots 1/2 = zusätzliche Bilder. Leere Slots sind Klick-Ziele zum
+/// Hinzufügen; jeder belegte Slot hat einen Entfernen-Knopf (die
+/// Änderung wird erst beim Speichern am Server wirksam).
+class _PhotoSlotsRow extends StatelessWidget {
+  const _PhotoSlotsRow({
+    required this.pendingPrimary,
+    required this.primaryFuture,
+    required this.pendingExtra,
+    required this.existingExtraFutures,
+    required this.removedSlots,
+    required this.existingPhotos,
+    required this.onPickPrimary,
+    required this.onPickExtra,
+    required this.onRemove,
+  });
+
+  final Uint8List? pendingPrimary;
+  final Future<Uint8List?>? primaryFuture;
+  final Map<int, Uint8List> pendingExtra;
+  final Map<int, Future<Uint8List?>?> existingExtraFutures;
+  final Set<int> removedSlots;
+  final List<String> existingPhotos;
+  final VoidCallback onPickPrimary;
+  final ValueChanged<int> onPickExtra;
+  final ValueChanged<int> onRemove;
+
+  bool _slotHasContent(int slot) {
+    if (slot == 0) {
+      return pendingPrimary != null ||
+          (!removedSlots.contains(0) && existingPhotos.isNotEmpty);
+    }
+    return pendingExtra.containsKey(slot) ||
+        (!removedSlots.contains(slot) && existingPhotos.length > slot);
+  }
+
+  Widget _imageOrPlaceholder({
+    required BuildContext context,
+    Uint8List? pendingBytes,
+    Future<Uint8List?>? future,
+    required IconData placeholderIcon,
+  }) {
+    if (pendingBytes != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.memory(pendingBytes, fit: BoxFit.cover),
+      );
+    }
+    if (future == null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Center(
+          child: Icon(placeholderIcon,
+              size: 40,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+      );
+    }
+    return FutureBuilder<Uint8List?>(
+      future: future,
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        if (bytes == null || snapshot.hasError) {
+          return Center(
+            child: Icon(placeholderIcon,
+                size: 40,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
+          );
+        }
+        return Image.memory(bytes, fit: BoxFit.cover);
+      },
+    );
+  }
+
+  Widget _slot(BuildContext context, int slot, {required bool isPrimary}) {
+    final scheme = Theme.of(context).colorScheme;
+    final removed = removedSlots.contains(slot);
+    final hasContent = _slotHasContent(slot);
+    final IconData placeholderIcon =
+        slot == 0 ? Icons.person : Icons.add_a_photo;
+
+    Widget content;
+    if (slot == 0) {
+      content = _imageOrPlaceholder(
+        context: context,
+        pendingBytes: pendingPrimary,
+        future: (!removed && existingPhotos.isNotEmpty)
+            ? primaryFuture
+            : null,
+        placeholderIcon: placeholderIcon,
+      );
+    } else {
+      content = _imageOrPlaceholder(
+        context: context,
+        pendingBytes: pendingExtra[slot],
+        future: pendingExtra.containsKey(slot)
+            ? null
+            : (!removed && existingPhotos.length > slot
+                ? (existingExtraFutures[slot] ??
+                    Future.value(null))
+                : null),
+        placeholderIcon: placeholderIcon,
+      );
+    }
+
+    return SizedBox(
+      width: isPrimary ? 132 : 96,
+      height: isPrimary ? 176 : 128,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: content,
+            ),
+          ),
+          // Leere/entfernte Slots: Tap zum Hinzufügen.
+          if (!hasContent)
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: slot == 0 ? onPickPrimary : () => onPickExtra(slot),
+                  child: Center(
+                    child: Icon(
+                      slot == 0 ? Icons.camera_alt : Icons.add,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Primärer Slot: Kamera-Ersetzen-Knopf.
+          if (slot == 0 && hasContent)
+            Positioned(
+              right: 4,
+              bottom: 4,
+              child: IconButton.filled(
+                onPressed: onPickPrimary,
+                icon: const Icon(Icons.camera_alt, size: 18),
+              ),
+            ),
+          // Belegter Slot: Entfernen-Knopf.
+          if (hasContent)
+            Positioned(
+              left: 4,
+              top: 4,
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: IconButton.filledTonal(
+                  padding: EdgeInsets.zero,
+                  iconSize: 16,
+                  onPressed: () => onRemove(slot),
+                  icon: const Icon(Icons.close, size: 16),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _slot(context, 0, isPrimary: true),
+        const SizedBox(width: 10),
+        _slot(context, 1, isPrimary: false),
+        const SizedBox(width: 10),
+        _slot(context, 2, isPrimary: false),
+      ],
     );
   }
 }

@@ -164,8 +164,8 @@ Entdecken-Neuaufbau.
 1. Migrationen **080** (Profil-RPCs), **081** (Transit Spark), **082**
    (Merkmal-Tags + Modus), **083** (Soft-Ping), **084/085**
    (Tag-Whitelist v2 + Suchradius-Modus), **086/087**
-   (personalisierte Quiz-Fragen: Interessen/Alter + Lückentext)
-   einspielen.
+   (personalisierte Quiz-Fragen: Interessen/Alter + Lückentext),
+   **088** (Intro-Audio-MIME + „Ich suche"-Reziprozität) einspielen.
 2. Edge Functions deployen: `notify-user` (NEU: Kind `likes` für
    Like-Push beim QR-Scan) + `match-media` unverändert.
 3. Betatest: Transit Spark auf ZWEI Geräten in Nähe testen (beide Radar

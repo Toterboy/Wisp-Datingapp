@@ -172,7 +172,13 @@ class TransitNotifier extends StateNotifier<TransitState> {
     return true;
   }
 
-  /// Deaktiviert Radar + räumt lokale Tokens auf (Privacy).
+  /// Deaktiviert Radar + räumt serverseitig die Präsenz ab (Privacy).
+  ///
+  /// v0.9.0-Nutzerwunsch: Die lokal gesehene Personen-Liste bleibt
+  /// NOCH 2 STUNDEN bestehen ( zum Nachschauen/Anschreiben in Ruhe) -
+  /// die Tokens sind ephemere Zufallswerte ohne Positionsdaten und
+  /// verfallen lokael; die eigenen PRESENCE-Tokens werden weiterhin
+  /// sofort entfernt (Radar aus = nicht mehr adressierbar).
   Future<void> deactivate() async {
     _rotateTimer?.cancel();
     _countdownTimer?.cancel();
@@ -188,13 +194,28 @@ class TransitNotifier extends StateNotifier<TransitState> {
         debugPrint('[Transit] Presence-Leave fehlgeschlagen: ');
       }
     }
-    await _encounters.clear();
+    await _encounters.persist();
     state = const TransitState();
   }
 
-  /// Liste der frischen Encounters (Token + Sichtzeit) fuer die
-  /// Gruessen-Sektion im Radar.
-  List<TransitEncounter> freshEncounters() => _encounters.freshList();
+  /// Liste der NOCH SICHTBAREN Encounters (2-Stunden-Fenster, v0.9.0)
+  /// fuer die Gruessen-Sektion im Radar.
+  List<TransitEncounter> softEncounters() => _encounters.softList();
+
+  /// True, wenn gesehene Personen noch in der 2-Stunden-Ruhezeit sind.
+  bool get hasSoftEncounters => _encounters.softList().isNotEmpty;
+
+  /// Countdown der Rest-Sichtbarkeit (2 h Fenster) für die Liste; null,
+  /// wenn nichts mehr sichtbar ist.
+  DateTime? softUntil() {
+    final list = _encounters.softList();
+    if (list.isEmpty) return null;
+    var latest = list.first.seenAt;
+    for (final e in list) {
+      if (e.seenAt.isAfter(latest)) latest = e.seenAt;
+    }
+    return latest.add(TransitEncounter.softRetention);
+  }
 
   /// Soft-Ping an ein Encounter-Token senden (1x pro Token, 48 h).
   Future<bool> sendSoftPing({

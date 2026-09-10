@@ -15,10 +15,12 @@ import 'package:record/record.dart';
 
 import 'package:wisp/models/match.dart';
 import 'package:wisp/l10n/app_strings.dart';
+import 'package:wisp/models/gender.dart' show RelationshipType;
 import 'package:wisp/models/message.dart';
 import 'package:wisp/models/user_profile.dart';
 import 'package:wisp/providers/chat_provider.dart';
 import 'package:wisp/providers/profile_provider.dart';
+import 'package:wisp/providers/user_preferences_provider.dart';
 import 'package:wisp/services/find_your_match_service.dart'
     show findYourMatchServiceProvider;
 import 'package:wisp/providers/settings_provider.dart';
@@ -1214,6 +1216,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     // Kontext-Icebreaker ein-/ausschaltbar (v0.8.0).
     final icebreakerEnabled =
         ref.watch(settingsProvider).contextIcebreakerEnabled;
+    // v0.9.0-Nutzerwunsch: Wer NACH FREUNDEN sucht, bekommt keine
+    // Date-Vorschläge (Meet-Intent + Ideen-Rad ausgeblendet). Der
+    // Friends-Filter (Migration 088) stellt sicher, dass der Partner
+    // ebenfalls "Freunde" sucht - die eigene Einstellung genügt als
+    // Umschalter.
+    final noDates =
+        ref.watch(userPreferencesProvider).relationshipType ==
+            RelationshipType.friends;
     _match = ref.watch(chatProvider.notifier).getMatchById(widget.matchId);
     final settings = ref.watch(settingsProvider);
 
@@ -1437,10 +1447,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         children: [
           if (!isPhotosVisible)
             BlindPhotoPlaceholder(label: L10n.t(context, 'chat.photosAfterSpark')),
-          MeetIntentCard(
-            matchId: widget.matchId,
-            partnerName: partner.name,
-          ),
+          // Kein Meet-Intent für Freunde-Sucher (v0.9.0: "keine Dates").
+          if (!noDates)
+            MeetIntentCard(
+              matchId: widget.matchId,
+              partnerName: partner.name,
+            ),
           // Vorstellung des Partners (Text + Audio): Beide Seiten können
           // die Vorstellung im Chat anhören (v0.9.0-Feedback - die Person,
           // die den Funke erhalten hat, hörte sie bisher nur im
@@ -1474,18 +1486,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             ),
           // Ideen-Rad (v0.8.0, Test): wählt aus den bestehenden Date-
           // Kategorien einen Vorschlag, der als Nachricht gesendet wird -
-          // beide bestätigen im Chat.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _showMeetIdeaWheel,
-                icon: const Icon(Icons.casino_outlined, size: 18),
-                label: Text(L10n.t(context, 'chat.ideaWheelBtn')),
+          // beide bestätigen im Chat. Für Freunde-Sucher ausgeblendet
+          // (v0.9.0: "keine Dates vorschlagen").
+          if (!noDates)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _showMeetIdeaWheel,
+                  icon: const Icon(Icons.casino_outlined, size: 18),
+                  label: Text(L10n.t(context, 'chat.ideaWheelBtn')),
+                ),
               ),
             ),
-          ),
           // Kontext-Icebreaker (v0.8.0): gemeinsame Interessen als
           // Gesprächseinstieg. Im Menü deaktivierbar.
           if (icebreakerEnabled &&

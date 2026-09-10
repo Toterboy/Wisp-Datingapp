@@ -44,7 +44,17 @@ class TransitEncounterService {
   /// Gruessen-Sektion im Radar (Soft-Ping, v0.9.1).
   List<TransitEncounter> freshList() {
     _purgeExpired();
-    final list = _cache.values.toList()
+    final list = _cache.values.where((e) => e.isFresh).toList()
+      ..sort((a, b) => b.seenAt.compareTo(a.seenAt));
+    return list;
+  }
+
+  /// Alle NOCH SICHTBAREN Encounters (2-Stunden-Fenster, v0.9.0):
+  /// nach dem Radar-Ende bleibt die Liste zum Nachschauen bestehen;
+  /// funkenfähig sind nur die frischen ([freshTokens]).
+  List<TransitEncounter> softList() {
+    _purgeExpired();
+    final list = _cache.values.where((e) => e.isSoftFresh).toList()
       ..sort((a, b) => b.seenAt.compareTo(a.seenAt));
     return list;
   }
@@ -96,6 +106,7 @@ class TransitEncounterService {
   }
 
   void _purgeExpired() {
-    _cache.removeWhere((_, e) => !e.isFresh);
+    // v0.9.0: 2-Stunden-Sichtbarkeit - erst nach softRetention verwerfen.
+    _cache.removeWhere((_, e) => !e.isSoftFresh);
   }
 }

@@ -535,6 +535,11 @@ const Map<String, Map<String, String>> _strings = {
     'transit.exitKeep': 'Weiterlaufen lassen',
     'transit.exitStop': 'Radar stoppen',
     'transit.exitRemember': 'Zukünftig automatisch so beibehalten',
+    // 2-Stunden-Ruhezeit gesehener Personen (088-Runde)
+    'transit.retainedBtn': 'Gesehene Geräte ansehen (2 Stunden)',
+    'transit.retainedTitle': 'Gesehene Geräte',
+    'transit.retainedHint': 'Die Liste bleibt noch 2 Stunden erhalten.',
+    'transit.retainedUntil': 'Die Liste bleibt bis {time} Uhr erhalten.',
     'transit.howTitle': 'Wie funktioniert das?',
     'transit.howBody':
         'Aktiviere das Radar, wenn du unterwegs bist (Zug, Café, Messe). '
@@ -1841,6 +1846,11 @@ const Map<String, Map<String, String>> _strings = {
     'transit.exitKeep': 'Keep running',
     'transit.exitStop': 'Stop radar',
     'transit.exitRemember': 'Apply automatically in the future',
+    // 2-hour retention of seen people
+    'transit.retainedBtn': 'View seen devices (2 hours)',
+    'transit.retainedTitle': 'Seen devices',
+    'transit.retainedHint': 'The list stays for 2 more hours.',
+    'transit.retainedUntil': 'The list stays until {time}.',
     'transit.howTitle': 'How does it work?',
     'transit.howBody':
         'Activate the radar while you are on the go (train, café, '
